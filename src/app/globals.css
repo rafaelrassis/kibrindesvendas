@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f1e4;
+  --paper-2: #efe7d3;
+  --ink: #1d2b22;
+  --pine: #16241d;
+  --pine-2: #2e4a3d;
+  --mustard: #d9a63e;
+  --berry: #b23a48;
+  --line: #d8cba9;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-pine: var(--pine);
+  --color-pine-2: var(--pine-2);
+  --color-mustard: var(--mustard);
+  --color-berry: var(--berry);
+  --color-line: var(--line);
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.tag-hole {
+  position: relative;
+}
+
+.tag-hole::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  z-index: 2;
+}
+
+.tag-shape {
+  clip-path: polygon(
+    50% 0%,
+    100% 12%,
+    100% 100%,
+    0% 100%,
+    0% 12%
+  );
+}
+
