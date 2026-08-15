@@ -1,0 +1,42 @@
+# Dependências
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Build / saída
+dist/
+build/
+out/
+.next/
+target/
+*.log
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Cache e ferramentas
+.cache/
+.parcel-cache/
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.eslintcache
+
+# Editores e IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
