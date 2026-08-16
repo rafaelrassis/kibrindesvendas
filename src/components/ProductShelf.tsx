@@ -1,5 +1,6 @@
 import type { Produto } from "@/lib/mock-data";
 import Link from "next/link";
+import { compararPreco } from "@/lib/compare-price";
 
 export default function ProductShelf({
   titulo,
@@ -19,9 +20,7 @@ export default function ProductShelf({
 
       <div className="pl-5 flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide">
         {produtos.map((p) => {
-          const desconto = Math.round(
-            ((p.precoShopee - p.preco) / p.precoShopee) * 100
-          );
+          const comparacao = compararPreco(p.precoShopee, p.preco);
           return (
             <Link
               key={p.id}
@@ -38,7 +37,11 @@ export default function ProductShelf({
               <p className="font-mono text-sm font-medium">
                 R$ {p.preco.toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-[11px] text-berry">-{desconto}% vs Shopee</p>
+              {comparacao.mostrar && (
+                <p className="text-[11px] text-berry">
+                  -{comparacao.percentual}% vs Shopee
+                </p>
+              )}
             </Link>
           );
         })}

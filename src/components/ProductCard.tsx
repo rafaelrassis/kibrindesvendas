@@ -1,10 +1,9 @@
 import Link from "next/link";
 import type { Produto } from "@/lib/mock-data";
+import { compararPreco } from "@/lib/compare-price";
 
 export default function ProductCard({ produto }: { produto: Produto }) {
-  const desconto = Math.round(
-    ((produto.precoShopee - produto.preco) / produto.precoShopee) * 100
-  );
+  const comparacao = compararPreco(produto.precoShopee, produto.preco);
 
   return (
     <Link
@@ -35,10 +34,14 @@ export default function ProductCard({ produto }: { produto: Produto }) {
         <span className="text-base font-medium">
           R$ {produto.preco.toFixed(2).replace(".", ",")}
         </span>
-        <span className="text-xs text-ink/40 line-through">
-          R$ {produto.precoShopee.toFixed(2).replace(".", ",")}
-        </span>
-        <span className="text-xs text-berry">-{desconto}%</span>
+        {comparacao.mostrar && (
+          <>
+            <span className="text-xs text-ink/40 line-through">
+              R$ {produto.precoShopee.toFixed(2).replace(".", ",")}
+            </span>
+            <span className="text-xs text-berry">-{comparacao.percentual}%</span>
+          </>
+        )}
       </div>
     </Link>
   );

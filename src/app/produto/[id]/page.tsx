@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { getProduto } from "@/lib/mock-data";
 import { useCart } from "@/lib/cart-context";
+import { compararPreco } from "@/lib/compare-price";
 
 export default function ProdutoPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,9 +23,7 @@ export default function ProdutoPage() {
     );
   }
 
-  const desconto = Math.round(
-    ((produto.precoShopee - produto.preco) / produto.precoShopee) * 100
-  );
+  const comparacao = compararPreco(produto.precoShopee, produto.preco);
   const faltaEscolher = produto.variacoes.some((v) => !selecoes[v.tipo]);
 
   function continuar() {
@@ -52,27 +51,31 @@ export default function ProdutoPage() {
       <div className="mx-auto max-w-5xl px-5 pt-4 pb-8 grid md:grid-cols-2 gap-10">
         <div>
           {/* Comparação de preço, estilo "Achamos uma oferta melhor" */}
-          <div className="bg-paper-2 border border-line rounded-lg p-4 mb-4">
-            <p className="text-sm font-medium mb-3">Compare com a Shopee</p>
-            <div className="bg-white border border-line rounded-lg p-4 flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded flex items-center justify-center text-3xl shrink-0"
-                style={{ backgroundColor: `${produto.cor}22` }}
-              >
-                {produto.emoji}
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-ink/50 line-through">
-                  R$ {produto.precoShopee.toFixed(2).replace(".", ",")} na Shopee
-                </p>
-                <p className="font-mono text-lg font-semibold">
-                  R$ {produto.preco.toFixed(2).replace(".", ",")}{" "}
-                  <span className="text-berry text-sm font-normal">-{desconto}%</span>
-                </p>
-                <p className="text-xs text-ink/50">sem taxa de plataforma</p>
+          {comparacao.mostrar && (
+            <div className="bg-paper-2 border border-line rounded-lg p-4 mb-4">
+              <p className="text-sm font-medium mb-3">Compare com a Shopee</p>
+              <div className="bg-white border border-line rounded-lg p-4 flex items-center gap-4">
+                <div
+                  className="w-16 h-16 rounded flex items-center justify-center text-3xl shrink-0"
+                  style={{ backgroundColor: `${produto.cor}22` }}
+                >
+                  {produto.emoji}
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-ink/50 line-through">
+                    R$ {produto.precoShopee.toFixed(2).replace(".", ",")} na Shopee
+                  </p>
+                  <p className="font-mono text-lg font-semibold">
+                    R$ {produto.preco.toFixed(2).replace(".", ",")}{" "}
+                    <span className="text-berry text-sm font-normal">
+                      -{comparacao.percentual}%
+                    </span>
+                  </p>
+                  <p className="text-xs text-ink/50">sem taxa de plataforma</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Imagem com favorito e compartilhar */}
           <div className="relative">

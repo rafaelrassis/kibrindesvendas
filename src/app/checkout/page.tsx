@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getProduto } from "@/lib/mock-data";
 import { useCart } from "@/lib/cart-context";
+import { compararPreco } from "@/lib/compare-price";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
   }
 
   const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
+  const comparacao = compararPreco(produto.precoShopee, produto.preco);
 
   function pagar() {
     setProcessando(true);
@@ -77,21 +79,30 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <div className="bg-white border border-line rounded-lg p-5 mb-5">
-        <p className="text-sm font-medium mb-3">Comparativo de preço</p>
-        <div className="flex justify-between text-sm mb-1.5">
-          <span className="text-ink/60">Na Shopee</span>
-          <span className="line-through text-ink/40 font-mono">
-            R$ {produto.precoShopee.toFixed(2).replace(".", ",")}
-          </span>
+      {comparacao.mostrar && (
+        <div className="bg-white border border-line rounded-lg p-5 mb-5">
+          <p className="text-sm font-medium mb-3">Comparativo de preço</p>
+          <div className="flex justify-between text-sm mb-1.5">
+            <span className="text-ink/60">Na Shopee</span>
+            <span className="line-through text-ink/40 font-mono">
+              R$ {produto.precoShopee.toFixed(2).replace(".", ",")}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm font-medium mb-1.5">
+            <span>Aqui no site</span>
+            <span className="font-mono text-pine-2">
+              R$ {produto.preco.toFixed(2).replace(".", ",")}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm text-berry">
+            <span>Você economiza</span>
+            <span className="font-mono">
+              R$ {(comparacao.economia ?? 0).toFixed(2).replace(".", ",")} (
+              {comparacao.percentual}%)
+            </span>
+          </div>
         </div>
-        <div className="flex justify-between text-sm font-medium">
-          <span>Aqui no site</span>
-          <span className="font-mono text-pine-2">
-            R$ {produto.preco.toFixed(2).replace(".", ",")}
-          </span>
-        </div>
-      </div>
+      )}
 
       <div className="bg-white border border-line rounded-lg p-5 mb-8">
         <p className="text-sm font-medium mb-3">Pagamento</p>
