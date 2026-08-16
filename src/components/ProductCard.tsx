@@ -1,8 +1,14 @@
 import Link from "next/link";
 import type { Produto } from "@/lib/mock-data";
-import { compararPreco } from "@/lib/compare-price";
+import { compararPreco, formatarPreco } from "@/lib/compare-price";
 
-export default function ProductCard({ produto }: { produto: Produto }) {
+export default function ProductCard({
+  produto,
+  comparativo = false,
+}: {
+  produto: Produto;
+  comparativo?: boolean;
+}) {
   const comparacao = compararPreco(produto.precoShopee, produto.preco);
 
   return (
@@ -11,10 +17,16 @@ export default function ProductCard({ produto }: { produto: Produto }) {
       className="group block tag-shape tag-hole bg-white border border-line pt-7 pb-5 px-4 hover:-translate-y-0.5 hover:shadow-md transition-all"
     >
       <div
-        className="w-full aspect-square rounded-sm flex items-center justify-center text-5xl mb-4"
+        className="relative w-full aspect-square rounded-sm flex items-center justify-center text-5xl mb-4"
         style={{ backgroundColor: `${produto.cor}22` }}
       >
         <span>{produto.emoji}</span>
+        {/* top-6: abaixo do corte diagonal do .tag-shape, senão a etiqueta fica cortada */}
+        {comparativo && comparacao.mostrar && (
+          <span className="absolute top-6 left-3 bg-berry text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
+            Mais barato aqui
+          </span>
+        )}
       </div>
 
       <p className="text-xs uppercase tracking-wide text-ink/50 mb-1">
@@ -30,19 +42,27 @@ export default function ProductCard({ produto }: { produto: Produto }) {
         </span>
       )}
 
-      <div className="flex items-baseline gap-2 font-mono">
-        <span className="text-base font-medium">
-          R$ {produto.preco.toFixed(2).replace(".", ",")}
+      <div className="flex flex-wrap items-baseline gap-x-2 font-mono">
+        <span className="text-base font-medium whitespace-nowrap">
+          {formatarPreco(produto.preco)}
         </span>
         {comparacao.mostrar && (
           <>
-            <span className="text-xs text-ink/40 line-through">
-              R$ {produto.precoShopee.toFixed(2).replace(".", ",")}
+            <span className="text-xs text-ink/40 line-through whitespace-nowrap">
+              {formatarPreco(produto.precoShopee)}
             </span>
-            <span className="text-xs text-berry">-{comparacao.percentual}%</span>
+            {!comparativo && (
+              <span className="text-xs text-berry">-{comparacao.percentual}%</span>
+            )}
           </>
         )}
       </div>
+
+      {comparativo && comparacao.mostrar && (
+        <p className="text-[13px] font-semibold text-pine-2 mt-0.5">
+          Economize {formatarPreco(comparacao.economia)}
+        </p>
+      )}
     </Link>
   );
 }

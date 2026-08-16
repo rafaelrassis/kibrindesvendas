@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { FolderOpen, PenLine, Zap, HelpCircle, MessageCircle } from "lucide-react";
+import { FolderOpen, PenLine, Zap, TrendingDown, HelpCircle, MessageCircle } from "lucide-react";
 
 const atalhos = [
   { href: "/categorias", label: "Categorias", icon: FolderOpen, bg: "#F6EEF6", color: "#9C1C95" },
   { href: "/personalizar/ima-pet-01", label: "Personalizar", icon: PenLine, bg: "#FBF0DA", color: "#D9A63E" },
   { href: "/categoria/imas", label: "Ofertas", icon: Zap, bg: "#F3E4F2", color: "#7A1674" },
+  { href: "/comparativo", label: "Comparar", icon: TrendingDown, bg: "#F9E7E9", color: "#B23A48" },
   { href: "/suporte", label: "Como funciona", icon: HelpCircle, bg: "#F6EEF6", color: "#9C1C95" },
   { href: "/suporte", label: "Suporte", icon: MessageCircle, bg: "#FBF0DA", color: "#D9A63E" },
 ];
