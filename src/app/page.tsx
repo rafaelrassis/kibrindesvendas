@@ -1,5 +1,4 @@
 import Link from "next/link";
-import HomeTopBar from "@/components/HomeTopBar";
 import PromoBanner from "@/components/PromoBanner";
 import QuickLinks from "@/components/QuickLinks";
 import ProductShelf from "@/components/ProductShelf";
@@ -11,7 +10,6 @@ export default function Home() {
 
   return (
     <div>
-      <HomeTopBar />
 
       <div className="-mt-4">
         <PromoBanner />
