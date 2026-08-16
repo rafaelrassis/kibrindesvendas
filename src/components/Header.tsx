@@ -59,6 +59,9 @@ export default function Header() {
               </div>
             </div>
           </div>
+          <Link href="/comparativo" className="py-2 hover:text-mustard transition-colors">
+            Comparar preços
+          </Link>
           <Link href="/favoritos" className="py-2 hover:text-mustard transition-colors">
             Favoritos
           </Link>
