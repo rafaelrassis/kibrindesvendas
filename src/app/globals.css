@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f6f1e4;
-  --paper-2: #efe7d3;
-  --ink: #1d2b22;
-  --pine: #16241d;
-  --pine-2: #2e4a3d;
+  --paper: #ffffff;
+  --paper-2: #f6eef6;
+  --ink: #241226;
+  --pine: #9c1c95;
+  --pine-2: #7a1674;
   --mustard: #d9a63e;
   --berry: #b23a48;
-  --line: #d8cba9;
+  --line: #e7d6e6;
 }
 
 @theme inline {

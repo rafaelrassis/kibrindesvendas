@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="bg-pine text-paper/70 mt-16">
       <div className="mx-auto max-w-6xl px-5 py-10 flex flex-col md:flex-row justify-between gap-6 text-sm">
         <div>
-          <p className="font-display text-lg text-paper">Ki Brindes</p>
+          <p className="font-display text-lg text-paper">LeoKibrindes</p>
           <p className="mt-1 max-w-xs">
             Presentes personalizados feitos pra durar. Protótipo interno — não é loja real.
           </p>

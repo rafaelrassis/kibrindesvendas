@@ -1,12 +1,14 @@
 import { produtos } from "@/lib/mock-data";
+import AdminNav from "@/components/AdminNav";
 
 export default function AdminProdutosPage() {
   return (
     <div className="mx-auto max-w-4xl px-5 py-12">
       <h1 className="font-display text-3xl mb-1">Produtos</h1>
-      <p className="text-ink/60 mb-8 text-sm">
+      <p className="text-ink/60 mb-2 text-sm">
         Área interna (mock) — cadastro real de produtos entra na Fase 1.
       </p>
+      <AdminNav />
 
       <div className="bg-white border border-line rounded-lg overflow-hidden">
         <table className="w-full text-sm">
