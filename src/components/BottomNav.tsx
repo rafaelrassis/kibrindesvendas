@@ -12,7 +12,7 @@ export default function BottomNav() {
 
   const itens = [
     { href: "/", label: "Início", icon: "🏠" },
-    { href: "/categorias", label: "Categorias", icon: "📂" },
+    { href: "/categorias", label: "Departamentos", icon: "📂" },
     { href: "/favoritos", label: "Favoritos", icon: "🤍" },
     { href: "/checkout", label: "Sacola", icon: "👜", badge: !!item },
     { href: logado ? "/admin/produtos" : "/", label: "Conta", icon: "👤" },

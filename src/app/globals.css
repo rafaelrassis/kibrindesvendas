@@ -12,6 +12,7 @@
 }
 
 @theme inline {
+  --breakpoint-xs: 26rem;
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
   --color-ink: var(--ink);

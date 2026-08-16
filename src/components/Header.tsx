@@ -9,7 +9,6 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function Header() {
   const [menuAberto, setMenuAberto] = useState(false);
-  const [buscaAberta, setBuscaAberta] = useState(false);
   const [termo, setTermo] = useState("");
   const router = useRouter();
   const { item } = useCart();
@@ -18,18 +17,27 @@ export default function Header() {
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
     router.push(`/busca?q=${encodeURIComponent(termo)}`);
-    setBuscaAberta(false);
   };
 
   return (
     <header className="sticky top-0 z-30 bg-pine text-white border-b border-black/10">
-      <div className="mx-auto max-w-6xl px-5 py-4 flex items-center justify-between gap-4">
+      <div className="mx-auto max-w-6xl px-5 pt-4 pb-3 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 shrink-0">
           <span className="text-2xl leading-none">🎁</span>
-          <span className="font-display text-xl tracking-tight">LeoKibrindes</span>
+          <span className="font-display text-xl tracking-tight hidden xs:inline">LeoKibrindes</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-7 text-sm tracking-wide uppercase">
+        {/* Busca — sempre visível, inline no desktop */}
+        <form onSubmit={buscar} className="hidden md:flex flex-1 max-w-md">
+          <input
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            placeholder="Busca na LeoKibrindes"
+            className="w-full bg-white text-ink rounded-full px-5 py-2.5 text-sm outline-none"
+          />
+        </form>
+
+        <nav className="hidden md:flex items-center gap-6 text-sm tracking-wide uppercase">
           <div className="relative group">
             <button className="py-2 hover:text-mustard transition-colors cursor-pointer">
               Categorias
@@ -57,38 +65,7 @@ export default function Header() {
           </Link>
         </nav>
 
-        <div className="flex items-center gap-4">
-          {/* Busca */}
-          <div className="relative">
-            {buscaAberta ? (
-              <form onSubmit={buscar} className="flex items-center">
-                <input
-                  autoFocus
-                  value={termo}
-                  onChange={(e) => setTermo(e.target.value)}
-                  onBlur={() => !termo && setBuscaAberta(false)}
-                  placeholder="Buscar produtos..."
-                  className="bg-white text-ink text-sm rounded-full pl-4 pr-9 py-1.5 w-40 sm:w-56 outline-none"
-                />
-                <button
-                  type="submit"
-                  aria-label="Buscar"
-                  className="absolute right-2 text-ink/50 hover:text-ink"
-                >
-                  🔍
-                </button>
-              </form>
-            ) : (
-              <button
-                aria-label="Abrir busca"
-                onClick={() => setBuscaAberta(true)}
-                className="text-xl hover:text-mustard transition-colors"
-              >
-                🔍
-              </button>
-            )}
-          </div>
-
+        <div className="flex items-center gap-4 shrink-0">
           {/* Sacola */}
           <Link href="/checkout" aria-label="Sacola" className="relative text-xl hover:text-mustard transition-colors">
             👜
@@ -128,6 +105,16 @@ export default function Header() {
           </button>
         </div>
       </div>
+
+      {/* Busca — sempre visível, linha própria no mobile */}
+      <form onSubmit={buscar} className="md:hidden px-5 pb-4">
+        <input
+          value={termo}
+          onChange={(e) => setTermo(e.target.value)}
+          placeholder="Busca na LeoKibrindes"
+          className="w-full bg-white text-ink rounded-full px-5 py-3 text-sm outline-none shadow-sm"
+        />
+      </form>
 
       {menuAberto && (
         <div className="md:hidden border-t border-black/10 bg-pine-2 px-5 py-4 space-y-3 text-sm uppercase tracking-wide">
