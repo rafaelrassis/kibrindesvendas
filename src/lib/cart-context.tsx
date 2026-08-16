@@ -4,12 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { getProduto } from "./mock-data";
+import { criarStoreLocal } from "./store-local";
 
 export type ViaPersonalizacao = "IA" | "UPLOAD" | "MANUAL";
 
@@ -35,27 +35,24 @@ const CartContext = createContext<CartContextType | null>(null);
 
 const STORAGE_KEY = "kibrindes-mock-item";
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [item, setItem] = useState<ItemCarrinho | null>(null);
+const store = criarStoreLocal<ItemCarrinho | null>(STORAGE_KEY, (bruto) => {
+  if (!bruto) return null;
+  try {
+    return JSON.parse(bruto) as ItemCarrinho;
+  } catch {
+    return null; // ignora item mock inválido
+  }
+});
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        setItem(JSON.parse(raw));
-      } catch {
-        // ignora item mock inválido
-      }
-    }
-  }, []);
+export function CartProvider({ children }: { children: ReactNode }) {
+  const item = useSyncExternalStore(
+    store.inscrever,
+    store.ler,
+    store.lerNoServidor
+  );
 
   const persist = useCallback((next: ItemCarrinho | null) => {
-    setItem(next);
-    if (next) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
+    store.escrever(next ? JSON.stringify(next) : null);
   }, []);
 
   const iniciarItem = useCallback(
@@ -67,14 +64,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const definirPersonalizacao = useCallback(
     (p: ItemCarrinho["personalizacao"]) => {
-      setItem((prev) => {
-        if (!prev) return prev;
-        const next = { ...prev, personalizacao: p };
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        return next;
-      });
+      const atual = store.ler();
+      if (!atual) return;
+      persist({ ...atual, personalizacao: p });
     },
-    []
+    [persist]
   );
 
   const limpar = useCallback(() => persist(null), [persist]);

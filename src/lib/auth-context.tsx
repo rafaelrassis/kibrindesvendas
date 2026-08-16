@@ -4,11 +4,11 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { criarStoreLocal } from "./store-local";
 
 type AuthContextType = {
   logado: boolean;
@@ -21,22 +21,18 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const STORAGE_KEY = "kibrindes-mock-auth";
 
+const store = criarStoreLocal(STORAGE_KEY, (bruto) => bruto === "1");
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [logado, setLogado] = useState(false);
+  const logado = useSyncExternalStore(
+    store.inscrever,
+    store.ler,
+    store.lerNoServidor
+  );
 
-  useEffect(() => {
-    setLogado(window.localStorage.getItem(STORAGE_KEY) === "1");
-  }, []);
+  const entrar = useCallback(() => store.escrever("1"), []);
 
-  const entrar = useCallback(() => {
-    window.localStorage.setItem(STORAGE_KEY, "1");
-    setLogado(true);
-  }, []);
-
-  const sair = useCallback(() => {
-    window.localStorage.removeItem(STORAGE_KEY);
-    setLogado(false);
-  }, []);
+  const sair = useCallback(() => store.escrever(null), []);
 
   const value = useMemo(
     () => ({ logado, nome: "Cliente", entrar, sair }),
