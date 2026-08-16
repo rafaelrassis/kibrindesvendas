@@ -109,13 +109,33 @@ export default function Header() {
       </div>
 
       {/* Busca — sempre visível, linha própria em todos os tamanhos */}
-      <form onSubmit={buscar} className="mx-auto max-w-6xl px-5 pt-4 pb-4">
+      <form onSubmit={buscar} className="mx-auto max-w-6xl px-5 pt-4 pb-4 flex items-center gap-3">
+        {!home && (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Voltar"
+            className="md:hidden shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
+          >
+            ←
+          </button>
+        )}
         <input
           value={termo}
           onChange={(e) => setTermo(e.target.value)}
           placeholder="Busca na LeoKibrindes"
-          className="w-full bg-white text-ink rounded-full px-5 py-3 text-sm outline-none shadow-sm"
+          className="flex-1 bg-white text-ink rounded-full px-5 py-3 text-sm outline-none shadow-sm"
         />
+        <Link
+          href="/notificacoes"
+          aria-label="Notificações"
+          className="md:hidden relative shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
+        >
+          🔔
+          <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            3
+          </span>
+        </Link>
       </form>
     </header>
   );
