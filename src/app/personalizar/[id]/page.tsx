@@ -39,6 +39,9 @@ export default function PersonalizarPage() {
   const [descricaoIA, setDescricaoIA] = useState("");
   const [previewGerado, setPreviewGerado] = useState(false);
   const [arquivoNome, setArquivoNome] = useState<string | null>(null);
+  const [arteUrl, setArteUrl] = useState<string | null>(null);
+  const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [erroUpload, setErroUpload] = useState("");
   const [briefing, setBriefing] = useState("");
   const [aceite, setAceite] = useState(false);
 
@@ -66,10 +69,35 @@ export default function PersonalizarPage() {
     );
   }
 
+  // Só vale como arte pronta depois que o arquivo chegou no servidor: o nome
+  // aparece na hora, mas o upload pode falhar.
   const artePronta =
     (via === "IA" && previewGerado) ||
-    (via === "UPLOAD" && !!arquivoNome) ||
+    (via === "UPLOAD" && !!arteUrl) ||
     (via === "MANUAL" && briefing.trim().length > 5);
+
+  async function selecionarArquivo(arquivo: File | undefined) {
+    if (!arquivo) return;
+    setArquivoNome(arquivo.name);
+    setArteUrl(null);
+    setErroUpload("");
+    setEnviandoArquivo(true);
+
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+
+    try {
+      const r = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Falha no upload.");
+      setArteUrl(data.url);
+    } catch (e) {
+      setErroUpload(e instanceof Error ? e.message : "Falha no upload.");
+      setArquivoNome(null);
+    } finally {
+      setEnviandoArquivo(false);
+    }
+  }
 
   function confirmar() {
     if (!aceite) return;
@@ -85,6 +113,7 @@ export default function PersonalizarPage() {
       resumo,
       aceite: true,
       aceiteEm: new Date().toISOString(),
+      ...(arteUrl && { arteUrl }),
     });
     router.push("/checkout");
   }
@@ -186,15 +215,20 @@ export default function PersonalizarPage() {
             <label className="block border-2 border-dashed border-line rounded-md p-8 text-center cursor-pointer hover:border-mustard transition-colors">
               <input
                 type="file"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
                 className="hidden"
-                onChange={(e) => setArquivoNome(e.target.files?.[0]?.name ?? null)}
+                onChange={(e) => selecionarArquivo(e.target.files?.[0])}
               />
               <div className="text-3xl mb-2">📤</div>
               <p className="text-sm font-medium">
-                {arquivoNome ?? "Clique pra selecionar o arquivo final"}
+                {enviandoArquivo
+                  ? "Enviando..."
+                  : arquivoNome ?? "Clique pra selecionar o arquivo final"}
               </p>
-              <p className="text-xs text-ink/50 mt-1">PNG, JPG ou PDF em alta resolução</p>
+              <p className="text-xs text-ink/50 mt-1">PNG, JPG, WEBP ou PDF · até 15MB</p>
             </label>
+            {arteUrl && <p className="text-xs text-pine-2">✓ Arquivo enviado com sucesso.</p>}
+            {erroUpload && <p className="text-xs text-berry">{erroUpload}</p>}
           </div>
         )}
 
@@ -234,7 +268,7 @@ export default function PersonalizarPage() {
 
       <button
         onClick={confirmar}
-        disabled={!artePronta || !aceite}
+        disabled={!artePronta || !aceite || enviandoArquivo}
         className="w-full md:w-auto bg-berry text-paper font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-95 transition"
       >
         Confirmar arte e ir pro pagamento

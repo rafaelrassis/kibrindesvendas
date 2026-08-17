@@ -1,5 +1,6 @@
 import AdminNav from "@/components/AdminNav";
 import { getPedidosRecentes } from "@/lib/data/pedidos";
+import { exigirAdmin } from "@/lib/admin";
 
 const statusLabel: Record<string, string> = {
   AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
@@ -20,6 +21,7 @@ const statusCor: Record<string, string> = {
 };
 
 export default async function AdminPedidosPage() {
+  await exigirAdmin();
   const pedidos = await getPedidosRecentes();
 
   return (
@@ -55,7 +57,21 @@ export default async function AdminPedidosPage() {
                     <p className="text-xs text-ink/50 mt-0.5">
                       Personalização: {item.personalizacao.tipo}
                       {item.personalizacao.briefing ? ` — ${item.personalizacao.briefing}` : ""}
-                      {item.personalizacao.arteUrl ? " · arte anexada" : " · arte pendente"}
+                      {item.personalizacao.arteUrl ? (
+                        <>
+                          {" · "}
+                          <a
+                            href={item.personalizacao.arteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-pine underline"
+                          >
+                            ver arte enviada
+                          </a>
+                        </>
+                      ) : (
+                        " · arte pendente"
+                      )}
                     </p>
                   )}
                 </div>

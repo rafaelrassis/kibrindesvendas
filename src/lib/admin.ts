@@ -1,7 +1,19 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import { redirect } from "next/navigation";
 import { getUsuarioDaSessao } from "@/lib/data/usuarios";
 import { ErroDeNegocio } from "@/lib/data/erros";
+
+// Guarda das telas /admin. Precisa ser chamada dentro da própria página, antes
+// de qualquer query: barrar só no layout esconde o resultado da tela, mas a
+// página roda de todo jeito e o que ela renderizou vai junto no payload da
+// resposta.
+export async function exigirAdmin() {
+  const usuario = await getUsuarioDaSessao();
+  if (!usuario) redirect("/entrar?next=/admin/produtos");
+  if (!usuario.admin) redirect("/restrito");
+  return usuario;
+}
 
 // Guarda das rotas /api/admin: devolve a resposta de erro quando a sessão não
 // é de um admin, ou null quando pode seguir.

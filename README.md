@@ -6,9 +6,9 @@ Repositório do projeto **Ki Brindes Vendas**.
 
 Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
-sessão por cookie), pedidos gravados no banco e área interna (`/admin`) que
-edita catálogo de verdade. Carrinho e favoritos ainda são mock, em
-`localStorage`; o pagamento continua simulado.
+sessão por cookie), pedidos gravados no banco, upload real da arte do cliente
+e área interna (`/admin`) que edita catálogo de verdade. Carrinho e favoritos
+ainda são mock, em `localStorage`; o pagamento continua simulado.
 
 ## Como começar
 
@@ -76,13 +76,40 @@ npm run db:admin -- voce@exemplo.com            # vira admin
 npm run db:admin -- voce@exemplo.com --remover  # volta a ser cliente
 ```
 
-Sem isso, `/admin` responde "área restrita" e as rotas `/api/admin/*`
-devolvem 401 (sem sessão) ou 403 (sessão sem `admin`) — a checagem fica em
-`src/lib/admin.ts` e é repetida em cada rota, porque proteger só a tela não
-protegeria a API. O link "Admin" no header só aparece pra quem é admin.
+Sem isso, `/admin` manda pra `/restrito` e as rotas `/api/admin/*` devolvem
+401 (sem sessão) ou 403 (sessão sem `admin`). As duas guardas ficam em
+`src/lib/admin.ts`: `exigirAdmin()` nas telas e `bloqueioAdmin()` nas rotas.
+
+`exigirAdmin()` é chamado **dentro de cada página de servidor**, antes de
+qualquer query, e não só no layout: barrar apenas no layout esconde o
+resultado na tela, mas a página roda de todo jeito e o que ela renderizou
+(nome, e-mail e pedidos dos clientes) viaja no payload da resposta. O layout
+continua lá como rede de segurança pras telas que são Client Component.
+
+O link "Admin" no header só aparece pra quem é admin.
 
 Remoções são bloqueadas quando quebrariam histórico: categoria com produtos
 (409) e produto que já está em algum pedido (409).
+
+## Arte enviada pelo cliente
+
+Na via "Enviar arte pronta" de `/personalizar/[id]`, o arquivo sobe na hora
+via `POST /api/upload` (pede sessão) e só conta como arte pronta depois que o
+servidor confirma — o nome aparece na tela na hora, mas o upload pode falhar.
+Aceita PNG, JPG, WEBP e PDF até 15MB, e o formato é decidido pela **assinatura
+do arquivo**, não pelo `type` que o navegador mandou nem pela extensão do nome
+original: um HTML renomeado pra `.png` é recusado.
+
+Os arquivos ficam em `var/uploads/artes/` (fora do git) com nome sorteado, e
+quem serve é `GET /api/artes/[nome]`, que exige sessão. Dois motivos pra não
+usar `public/`: em produção o Next indexa `public/` quando sobe, então arte
+gravada depois disso só apareceria no próximo restart; e arte de cliente não
+deve ficar em URL aberta. A fila em `/admin/pedidos` linka a arte de cada
+item ("ver arte enviada").
+
+⚠️ Disco local não sobrevive a deploy em plataforma serverless (ex.: Vercel):
+na etapa de deploy isso vira um bucket (Vercel Blob, S3), trocando
+`src/lib/artes.ts`.
 
 ## Pedidos
 
@@ -110,7 +137,8 @@ src/
 ├── components/                   # Header, Footer, ProductCard
 └── lib/
     ├── data/                     # queries Prisma (server-only)
-    ├── admin.ts                  # guarda das rotas /api/admin (server-only)
+    ├── admin.ts                  # guardas de /admin e /api/admin (server-only)
+    ├── artes.ts                  # validação e gravação das artes (server-only)
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
     ├── types.ts                  # Produto, Categoria, Variacao
@@ -126,8 +154,10 @@ src/
 - [x] Trocar mock-data por Prisma + PostgreSQL nas telas (Fase 1 da spec)
 - [x] Autenticação real (cadastro, login, sessão em cookie, troca de senha)
 - [x] Admin com CRUD de catálogo no banco + pedidos gravados no checkout
+- [x] Upload real da arte do cliente (validado por assinatura, servido com sessão)
 - [ ] Persistir carrinho e favoritos no banco, e ligar /conta/pedidos no banco
 - [ ] Pagamento de verdade (hoje o pedido nasce PAGO)
+- [ ] Trocar disco local por bucket antes do deploy (artes)
 - [ ] Configurar ambiente de desenvolvimento (variáveis de ambiente, deploy)
 - [ ] Configurar testes e integração contínua
 

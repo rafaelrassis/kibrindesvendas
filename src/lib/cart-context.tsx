@@ -21,6 +21,7 @@ export type ItemCarrinho = {
     resumo: string;
     aceite: boolean;
     aceiteEm?: string;
+    arteUrl?: string;
   };
 };
 

@@ -32,6 +32,7 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
                 create: {
                   tipo: item.personalizacao.via,
                   briefing: item.personalizacao.resumo,
+                  arteUrl: item.personalizacao.arteUrl ?? null,
                   aceiteTermos: !!item.personalizacao.aceite,
                 },
               },
