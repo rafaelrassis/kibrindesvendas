@@ -5,6 +5,7 @@ import { useState } from "react";
 import { getProduto } from "@/lib/mock-data";
 import { useCart } from "@/lib/cart-context";
 import { compararPreco } from "@/lib/compare-price";
+import FavoritoButton from "@/components/FavoritoButton";
 
 export default function ProdutoPage() {
   const { id } = useParams<{ id: string }>();
@@ -13,7 +14,6 @@ export default function ProdutoPage() {
   const { iniciarItem } = useCart();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
-  const [favorito, setFavorito] = useState(false);
 
   if (!produto) {
     return (
@@ -85,13 +85,11 @@ export default function ProdutoPage() {
             >
               {produto.emoji}
             </div>
-            <button
-              onClick={() => setFavorito((v) => !v)}
-              aria-label="Favoritar"
-              className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white shadow flex items-center justify-center text-lg"
-            >
-              {favorito ? "❤️" : "🤍"}
-            </button>
+            <FavoritoButton
+              produtoId={produto.id}
+              tamanho="lg"
+              className="absolute top-3 right-3"
+            />
             <button
               aria-label="Compartilhar"
               className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white shadow flex items-center justify-center text-base"

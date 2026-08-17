@@ -3,6 +3,7 @@ import "./globals.css";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { ContaProvider } from "@/lib/conta-context";
+import { FavoritosProvider } from "@/lib/favoritos-context";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
@@ -20,10 +21,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <ContaProvider>
             <CartProvider>
-              <Header />
-              <main className="flex-1 pb-16 md:pb-0">{children}</main>
-              <Footer />
-              <BottomNav />
+              <FavoritosProvider>
+                <Header />
+                <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                <Footer />
+                <BottomNav />
+              </FavoritosProvider>
             </CartProvider>
           </ContaProvider>
         </AuthProvider>

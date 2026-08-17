@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
+import { useFavoritos } from "@/lib/favoritos-context";
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { item } = useCart();
+  const { total } = useFavoritos();
 
   const itens = [
     { href: "/", label: "Início", icon: "🏠" },
     { href: "/categorias", label: "Departamentos", icon: "📂" },
-    { href: "/favoritos", label: "Favoritos", icon: "🤍" },
-    { href: "/checkout", label: "Sacola", icon: "👜", badge: !!item },
+    { href: "/favoritos", label: "Favoritos", icon: "🤍", badge: total },
+    { href: "/checkout", label: "Sacola", icon: "👜", badge: item ? 1 : 0 },
     { href: "/conta", label: "Conta", icon: "👤" },
   ];
 
@@ -30,9 +32,9 @@ export default function BottomNav() {
               }`}
             >
               <span className="text-lg leading-none">{it.icon}</span>
-              {it.badge && (
+              {!!it.badge && (
                 <span className="absolute top-1 right-[calc(50%-16px)] bg-berry text-white text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
-                  1
+                  {it.badge > 9 ? "9+" : it.badge}
                 </span>
               )}
               {it.label}
