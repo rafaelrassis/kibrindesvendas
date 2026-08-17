@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Endereco } from "@/lib/conta-data";
+import { formatarCep, normalizarCep } from "@/lib/frete";
 
 type Props = {
   inicial: Endereco;
@@ -11,9 +12,38 @@ type Props = {
 
 export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
   const [form, setForm] = useState<Endereco>(inicial);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [erroCep, setErroCep] = useState("");
 
   function campo<K extends keyof Endereco>(chave: K, valor: Endereco[K]) {
     setForm((f) => ({ ...f, [chave]: valor }));
+  }
+
+  // CEP completo preenche rua/bairro/cidade/UF sozinho; o que o cliente digitou
+  // antes não é sobrescrito por campo vazio do ViaCEP (endereço sem logradouro).
+  function preencherPeloCep(valor: string) {
+    const cep = normalizarCep(valor);
+    setErroCep("");
+    if (!cep) return;
+
+    setBuscandoCep(true);
+    fetch(`/api/cep/${cep}`)
+      .then(async (r) => {
+        const dados = await r.json();
+        if (!r.ok) {
+          setErroCep(dados.error ?? "Não foi possível consultar o CEP.");
+          return;
+        }
+        setForm((f) => ({
+          ...f,
+          rua: dados.logradouro || f.rua,
+          bairro: dados.bairro || f.bairro,
+          cidade: dados.cidade || f.cidade,
+          uf: dados.uf || f.uf,
+        }));
+      })
+      .catch(() => setErroCep("Não foi possível consultar o CEP agora."))
+      .finally(() => setBuscandoCep(false));
   }
 
   return (
@@ -43,10 +73,16 @@ export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
       </Campo>
 
       <div className="grid grid-cols-2 gap-3">
-        <Campo label="CEP">
+        <Campo label={buscandoCep ? "CEP (buscando...)" : "CEP"}>
           <input
             value={form.cep}
-            onChange={(e) => campo("cep", e.target.value)}
+            inputMode="numeric"
+            maxLength={9}
+            placeholder="00000-000"
+            onChange={(e) => {
+              campo("cep", formatarCep(e.target.value));
+              preencherPeloCep(e.target.value);
+            }}
             className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
             required
           />
@@ -60,6 +96,8 @@ export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
           />
         </Campo>
       </div>
+
+      {erroCep && <p className="text-xs text-berry -mt-2">{erroCep}</p>}
 
       <Campo label="Rua">
         <input

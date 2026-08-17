@@ -2,24 +2,8 @@ import AdminNav from "@/components/AdminNav";
 import AdminPedidoStatus from "@/components/AdminPedidoStatus";
 import { getPedidosRecentes } from "@/lib/data/pedidos";
 import { exigirAdmin } from "@/lib/admin";
-
-const statusLabel: Record<string, string> = {
-  AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
-  PAGO: "Pago",
-  EM_PRODUCAO: "Em produção",
-  ENVIADO: "Enviado",
-  ENTREGUE: "Entregue",
-  CANCELADO: "Cancelado",
-};
-
-const statusCor: Record<string, string> = {
-  AGUARDANDO_PAGAMENTO: "bg-ink/5 text-ink/50",
-  PAGO: "bg-mustard/20 text-pine-2",
-  EM_PRODUCAO: "bg-mustard/20 text-pine-2",
-  ENVIADO: "bg-pine/10 text-pine",
-  ENTREGUE: "bg-pine/15 text-pine",
-  CANCELADO: "bg-berry/10 text-berry",
-};
+import { CLASSE_STATUS, labelStatus } from "@/lib/status-pedido";
+import { formatarCep } from "@/lib/frete";
 
 export default async function AdminPedidosPage() {
   await exigirAdmin();
@@ -51,8 +35,8 @@ export default async function AdminPedidosPage() {
                       simulado
                     </span>
                   )}
-                  <span className={`text-xs px-2 py-1 rounded-full ${statusCor[p.status]}`}>
-                    {statusLabel[p.status]}
+                  <span className={`text-xs px-2 py-1 rounded-full ${CLASSE_STATUS[p.status]}`}>
+                    {labelStatus(p.status)}
                   </span>
                 </div>
               </div>
@@ -90,8 +74,26 @@ export default async function AdminPedidosPage() {
                 </div>
               ))}
 
+              {/* Sem o endereço aqui a loja não tem como despachar. */}
+              <p className="text-xs text-ink/50 mt-2">
+                {p.enderecoResumo
+                  ? `Enviar pra ${p.enderecoResumo}${
+                      p.enderecoCep ? ` · CEP ${formatarCep(p.enderecoCep)}` : ""
+                    }`
+                  : "Pedido antigo, sem endereço registrado."}
+              </p>
+
+              {p.motivoDevolucao && (
+                <p className="text-xs text-berry mt-1">
+                  Devolução pedida pelo cliente: {p.motivoDevolucao}
+                </p>
+              )}
+
               <p className="font-mono text-sm font-medium mt-2">
-                R$ {Number(p.total).toFixed(2).replace(".", ",")}
+                R$ {Number(p.total).toFixed(2).replace(".", ",")}{" "}
+                <span className="font-sans text-xs font-normal text-ink/50">
+                  (frete R$ {Number(p.frete).toFixed(2).replace(".", ",")})
+                </span>
               </p>
             </div>
           ))}

@@ -80,20 +80,28 @@ model Notificacao {
 }
 
 model Pedido {
-  id            String       @id @default(cuid())
-  usuarioId     String
-  usuario       Usuario      @relation(fields: [usuarioId], references: [id])
-  status        StatusPedido @default(AGUARDANDO_PAGAMENTO)
-  total         Decimal      @db.Decimal(10, 2)
-  itens         ItemPedido[]
+  id              String       @id @default(cuid())
+  usuarioId       String
+  usuario         Usuario      @relation(fields: [usuarioId], references: [id])
+  status          StatusPedido @default(AGUARDANDO_PAGAMENTO)
+  // `total` já inclui o frete: é o valor cobrado do cliente.
+  total           Decimal      @db.Decimal(10, 2)
+  frete           Decimal      @default(0) @db.Decimal(10, 2)
+  // Endereço congelado no momento da compra: o cadastro do cliente pode mudar
+  // depois, mas o pedido tem que continuar mostrando pra onde foi.
+  enderecoCep     String?
+  enderecoResumo  String?
+  // Preenchido quando o cliente pede devolução, pra loja saber o que houve.
+  motivoDevolucao String?
+  itens           ItemPedido[]
   // Sem credencial do Mercado Pago configurada o checkout roda simulado; o
   // campo marca quais pedidos nasceram assim pra não confundir com venda real.
-  pagamentoMock Boolean      @default(true)
+  pagamentoMock   Boolean      @default(true)
   // Id do pagamento no Mercado Pago, preenchido quando o webhook chega. Serve
   // pra conferir um pedido no painel deles quando o cliente reclama.
-  pagamentoId   String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  pagamentoId     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 model ItemPedido {
@@ -125,6 +133,8 @@ enum StatusPedido {
   EM_PRODUCAO
   ENVIADO
   ENTREGUE
+  DEVOLUCAO_SOLICITADA
+  DEVOLVIDO
   CANCELADO
 }
 

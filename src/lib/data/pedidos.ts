@@ -1,23 +1,37 @@
 import "server-only";
-import { StatusPedido } from "@prisma/client";
+import { Prisma, StatusPedido } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ItemCarrinho } from "@/lib/cart-context";
+import type { Pedido } from "@/lib/types";
+import { podeSolicitarDevolucao } from "@/lib/status-pedido";
 import {
   baseUrl,
   pagamentoRealConfigurado,
   paymentClient,
   preferenceClient,
 } from "@/lib/mercadopago";
+import { consultarCep, resumoDoEndereco } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
+
+// Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
+// 56.800000000000004); a coluna é Decimal(10,2), então arredonda antes.
+function emReais(valor: number) {
+  return Math.round(valor * 100) / 100;
+}
 
 // Cria o pedido e devolve pra onde mandar o cliente em seguida: a página
 // hospedada do Mercado Pago quando o pagamento é real, ou direto a tela de
 // confirmação no modo simulado.
-export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
-  const [usuario, produto] = await Promise.all([
+export async function criarPedido(usuarioId: string, item: ItemCarrinho, cep: unknown) {
+  if (!item?.produtoId) throw new ErroDeNegocio("Item do pedido inválido.");
+
+  // O frete é recalculado aqui de propósito: o valor que o navegador mostrou
+  // é só pra visualização, quem define o que vai ser cobrado é o servidor.
+  const [usuario, produto, endereco] = await Promise.all([
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
     prisma.produto.findUnique({ where: { id: item.produtoId } }),
+    consultarCep(cep),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
@@ -27,6 +41,8 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
   }
 
   const pagamentoReal = pagamentoRealConfigurado();
+  const frete = endereco.frete.valor;
+  const total = emReais(Number(produto.preco) + frete);
 
   const pedido = await prisma.$transaction(async (tx) => {
     const criado = await tx.pedido.create({
@@ -34,7 +50,10 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
         usuarioId,
         // Com gateway de verdade o pedido só vira PAGO quando o webhook chega.
         status: pagamentoReal ? "AGUARDANDO_PAGAMENTO" : "PAGO",
-        total: produto.preco,
+        total,
+        frete,
+        enderecoCep: endereco.cep,
+        enderecoResumo: resumoDoEndereco(endereco),
         pagamentoMock: !pagamentoReal,
         itens: {
           create: [
@@ -93,6 +112,15 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
             unit_price: Number(produto.preco),
             currency_id: "BRL",
           },
+          // Frete como item separado: a soma da preferência tem que bater com
+          // o total do pedido, e o cliente vê o valor discriminado na tela do MP.
+          {
+            id: "frete",
+            title: `Frete — ${endereco.cidade}/${endereco.uf}`,
+            quantity: 1,
+            unit_price: frete,
+            currency_id: "BRL",
+          },
         ],
         payer: { name: usuario.nome, email: usuario.email },
         back_urls: {
@@ -119,10 +147,94 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
   }
 }
 
+const COM_ITENS = {
+  itens: { include: { produto: true, personalizacao: true } },
+} satisfies Prisma.PedidoInclude;
+
+type PedidoComItens = Prisma.PedidoGetPayload<{ include: typeof COM_ITENS }>;
+
+// Decimal e Date não sobrevivem ao JSON: a conversão acontece aqui, uma vez,
+// em vez de em cada componente.
+export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
+  return {
+    id: pedido.id,
+    status: pedido.status,
+    total: Number(pedido.total),
+    frete: Number(pedido.frete),
+    enderecoResumo: pedido.enderecoResumo,
+    motivoDevolucao: pedido.motivoDevolucao,
+    pagamentoMock: pedido.pagamentoMock,
+    createdAt: pedido.createdAt.toISOString(),
+    itens: pedido.itens.map((item) => ({
+      id: item.id,
+      quantidade: item.quantidade,
+      precoUnitario: Number(item.precoUnitario),
+      // `variacaoEscolhida` é Json no banco: sempre gravado como objeto simples.
+      variacoes: (item.variacaoEscolhida as Record<string, string> | null) ?? {},
+      produto: {
+        id: item.produto.id,
+        nome: item.produto.nome,
+        emoji: item.produto.emoji,
+        cor: item.produto.cor,
+      },
+      personalizacao: item.personalizacao && {
+        tipo: item.personalizacao.tipo,
+        briefing: item.personalizacao.briefing,
+        arteUrl: item.personalizacao.arteUrl,
+      },
+    })),
+  };
+}
+
 export async function getPedidoDoUsuario(usuarioId: string, id: string) {
   return prisma.pedido.findFirst({
     where: { id, usuarioId },
-    include: { itens: { include: { produto: true, personalizacao: true } } },
+    include: COM_ITENS,
+  });
+}
+
+export async function getPedidosDoUsuario(usuarioId: string) {
+  const pedidos = await prisma.pedido.findMany({
+    where: { usuarioId },
+    orderBy: { createdAt: "desc" },
+    include: COM_ITENS,
+  });
+  return pedidos.map(paraPedidoPublico);
+}
+
+// Devolução é pedida pelo cliente e ainda passa pela loja: o pedido só entra
+// em DEVOLUCAO_SOLICITADA aqui, e quem marca DEVOLVIDO é o admin, depois de
+// receber o produto de volta.
+export async function solicitarDevolucao(usuarioId: string, id: string, motivoBruto: unknown) {
+  const motivo = typeof motivoBruto === "string" ? motivoBruto.trim() : "";
+  if (!motivo) throw new ErroDeNegocio("Descreva o motivo da devolução.");
+
+  const pedido = await prisma.pedido.findFirst({ where: { id, usuarioId } });
+  if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
+
+  if (!podeSolicitarDevolucao(pedido.status)) {
+    throw new ErroDeNegocio(
+      pedido.status === "DEVOLUCAO_SOLICITADA" || pedido.status === "DEVOLVIDO"
+        ? "Este pedido já está em devolução."
+        : "Só dá pra pedir devolução depois que o pedido for entregue."
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const atualizado = await tx.pedido.update({
+      where: { id },
+      data: { status: "DEVOLUCAO_SOLICITADA", motivoDevolucao: motivo },
+      include: COM_ITENS,
+    });
+
+    await notificar(
+      usuarioId,
+      "Devolução solicitada",
+      "Recebemos seu pedido de devolução. Nossa equipe entra em contato com as instruções de postagem.",
+      tx
+    );
+
+    return paraPedidoPublico(atualizado);
   });
 }
 
@@ -143,6 +255,10 @@ const AVISO_POR_STATUS: Partial<Record<StatusPedido, string>> = {
   EM_PRODUCAO: "Seu pedido entrou em produção!",
   ENVIADO: "Seu pedido foi enviado.",
   ENTREGUE: "Seu pedido foi entregue. Esperamos que goste!",
+  // A solicitação feita pelo cliente já avisa por conta própria; este aviso é
+  // pro caso da loja abrir a devolução pelo admin.
+  DEVOLUCAO_SOLICITADA: "Sua devolução foi registrada. Em breve enviamos as instruções de postagem.",
+  DEVOLVIDO: "Recebemos seu produto de volta e a devolução foi concluída.",
   CANCELADO: "Seu pedido foi cancelado.",
 };
 

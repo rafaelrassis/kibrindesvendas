@@ -14,12 +14,13 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useConta } from "@/lib/conta-context";
-import { pedidosMock } from "@/lib/conta-data";
+import { usePedidos } from "@/lib/use-pedidos";
 import ContaMenuItem from "@/components/ContaMenuItem";
 
 export default function ContaPage() {
   const { logado, carregando, usuario, sair } = useAuth();
   const { enderecos } = useConta();
+  const { pedidos, carregando: carregandoPedidos } = usePedidos();
 
   if (carregando) {
     return (
@@ -78,7 +79,13 @@ export default function ContaPage() {
           href="/conta/pedidos"
           icon={Package}
           label="Meus pedidos"
-          sublabel={`${pedidosMock.length} pedido${pedidosMock.length > 1 ? "s" : ""}`}
+          sublabel={
+            carregandoPedidos
+              ? undefined
+              : pedidos.length
+                ? `${pedidos.length} pedido${pedidos.length > 1 ? "s" : ""}`
+                : "Nenhum pedido ainda"
+          }
         />
         <ContaMenuItem href="/favoritos" icon={Heart} label="Favoritos" />
       </div>

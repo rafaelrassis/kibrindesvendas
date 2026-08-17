@@ -2,16 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-// Mesmos valores do enum StatusPedido no schema.
-const OPCOES = [
-  { valor: "AGUARDANDO_PAGAMENTO", label: "Aguardando pagamento" },
-  { valor: "PAGO", label: "Pago" },
-  { valor: "EM_PRODUCAO", label: "Em produção" },
-  { valor: "ENVIADO", label: "Enviado" },
-  { valor: "ENTREGUE", label: "Entregue" },
-  { valor: "CANCELADO", label: "Cancelado" },
-];
+import { LABEL_STATUS, STATUS_PEDIDO } from "@/lib/status-pedido";
 
 export default function AdminPedidoStatus({
   pedidoId,
@@ -55,9 +46,9 @@ export default function AdminPedidoStatus({
         aria-label="Status do pedido"
         className="text-xs border border-line rounded-full px-2 py-1 bg-white disabled:opacity-50"
       >
-        {OPCOES.map((o) => (
-          <option key={o.valor} value={o.valor}>
-            {o.label}
+        {STATUS_PEDIDO.map((status) => (
+          <option key={status} value={status}>
+            {LABEL_STATUS[status]}
           </option>
         ))}
       </select>

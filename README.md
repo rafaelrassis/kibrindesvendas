@@ -8,8 +8,9 @@ Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
 sessão por cookie), pedidos gravados no banco, upload real da arte do cliente,
 favoritos e notificações no perfil, área interna (`/admin`) que edita catálogo
-de verdade e move o pedido de status, e pagamento real pelo Mercado Pago (Pix,
-cartão e boleto). O carrinho ainda é mock, em `localStorage`.
+de verdade e move o pedido de status, pagamento real pelo Mercado Pago (Pix,
+cartão e boleto) e entrega com frete por CEP e devolução pedida pelo cliente.
+O carrinho ainda é mock, em `localStorage`.
 
 ## Como começar
 
@@ -153,8 +154,36 @@ Em dev o Mercado Pago não alcança `localhost`: pra testar o webhook de ponta a
 ponta é preciso um túnel (ex: ngrok) e `NEXT_PUBLIC_BASE_URL` apontando pra
 URL pública dele.
 
-A tela `/conta/pedidos` do cliente ainda mostra a lista mock; ligar ela no
-banco é o próximo passo natural.
+## Entrega e devolução
+
+O checkout pede o CEP antes de deixar pagar. `GET /api/cep/[cep]` consulta o
+ViaCEP, devolve o endereço e o frete calculado por região (`src/lib/frete.ts`),
+e a tela soma tudo: produto + frete = total. Quem já tem endereço padrão salvo
+chega com o CEP preenchido; o mesmo endpoint preenche rua, bairro, cidade e UF
+no cadastro de endereço.
+
+O valor que o navegador mostra é só visual: `POST /api/pedidos` recebe o CEP,
+**não** o frete, e recalcula tudo no servidor antes de gravar — senão bastaria
+editar a requisição pra pagar frete zero. O pedido guarda `frete`,
+`enderecoCep` e `enderecoResumo` congelados no momento da compra (o cadastro do
+cliente muda depois; o pedido tem que continuar mostrando pra onde foi), e a
+fila do admin mostra o endereço de despacho. Com pagamento real o frete vai
+como item separado na preferência do Mercado Pago, pra soma bater com o total.
+
+> A tabela de frete é uma estimativa por região, não cotação de transportadora.
+> A interface (`uf -> { valor, prazoDias }`) já está pronta pra trocar por
+> Correios/Melhor Envio quando houver contrato.
+
+`/conta/pedidos` e `/conta/pedidos/[id]` leem os pedidos reais do banco (a
+lista mock saiu do `conta-data.ts`). Depois que o pedido é marcado como
+`ENTREGUE`, o cliente pode pedir devolução pelo detalhe: `POST
+/api/pedidos/[id]/devolucao` exige um motivo, confere que o pedido é dele e que
+está entregue, move pra `DEVOLUCAO_SOLICITADA` e cria a notificação — tudo em
+transação. Quem marca `DEVOLVIDO` é a loja, pelo `/admin/pedidos`, depois de
+receber o produto de volta; o motivo informado aparece lá no card.
+
+Os rótulos e cores de status vivem em `src/lib/status-pedido.ts`, um lugar só
+pro select do admin, a lista do cliente e o detalhe do pedido.
 
 ## Favoritos e notificações
 
@@ -178,7 +207,9 @@ causou — o aviso não existe sem o pedido:
 - status mudado em `/admin/pedidos` → "Atualização do seu pedido". `PAGO` e
   `AGUARDANDO_PAGAMENTO` não avisam: o primeiro já foi anunciado pelo fluxo de
   pagamento e o segundo é volta atrás interna. Reenviar o mesmo status não
-  repete o aviso.
+  repete o aviso;
+- devolução pedida pelo cliente → "Devolução solicitada" (quem avisa é a
+  própria solicitação, não a mudança de status, pra não duplicar).
 
 O sininho do header mostra as não lidas e a tela `/notificacoes` marca como
 lida no clique; os dois leem o mesmo `notificacoes-context`, então o contador
@@ -194,8 +225,9 @@ src/
 │   ├── categoria/[slug]/         # listagem por categoria
 │   ├── produto/[id]/             # detalhe + variações
 │   ├── personalizar/[id]/        # 3 vias: IA / upload / manual
-│   ├── checkout/                 # resumo + ida pro Mercado Pago
+│   ├── checkout/                 # resumo + frete por CEP + ida pro Mercado Pago
 │   ├── pedido/confirmado/        # status real do pedido
+│   ├── conta/pedidos/            # pedidos reais + pedido de devolução
 │   ├── favoritos/ e notificacoes/ # lista salva e avisos do pedido
 │   ├── suporte/                  # FAQ
 │   ├── entrar/ e cadastro/       # login e criação de conta
@@ -210,8 +242,12 @@ src/
     ├── mercadopago.ts            # clients + assinatura do webhook (server-only)
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
-    ├── types.ts                  # Produto, Categoria, Variacao
+    ├── types.ts                  # Produto, Categoria, Variacao, Pedido
+    ├── frete.ts                  # tabela de frete por UF + formato do CEP
+    ├── status-pedido.ts          # rótulos e cores do StatusPedido
     ├── use-produto.ts            # hooks de catálogo p/ client components
+    ├── use-cep.ts                # consulta de CEP + frete p/ o checkout
+    ├── use-pedidos.ts            # pedidos do usuário logado
     ├── favoritos-context.tsx     # favoritos do usuário (via /api/favoritos)
     ├── notificacoes-context.tsx  # avisos + contador do sininho
     └── mock-data.ts              # seed do banco + FAQs
@@ -267,7 +303,11 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Migrations versionadas e integração contínua (lint + tipos + build)
 - [x] Favoritos no banco e notificações de pedido (criação e mudança de status)
 - [x] Pagamento de verdade (Mercado Pago Checkout Pro + webhook + notificações)
-- [ ] Persistir o carrinho no banco e ligar /conta/pedidos no banco
+- [x] Envio (frete por CEP no checkout) e devolução pedida pelo cliente, com
+      `/conta/pedidos` lendo o banco
+- [ ] Persistir o carrinho no banco
+- [ ] Cotação real de frete (Correios / Melhor Envio) no lugar da tabela por
+      região, e rastreio do envio no detalhe do pedido
 - [ ] Guardar a sacola até o pagamento confirmar (hoje ela é limpa na ida pro
       Mercado Pago, então voltar de um pagamento recusado exige montar de novo)
 - [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)
