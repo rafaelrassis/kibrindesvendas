@@ -29,6 +29,7 @@ model Produto {
   destaque             Boolean      @default(false)
   variacoes            Variacao[]
   itensPedido          ItemPedido[]
+  favoritos            Favorito[]
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 }
@@ -48,13 +49,23 @@ model Usuario {
   senhaHash    String
   admin        Boolean       @default(false) // libera /admin e /api/admin (ver npm run db:admin)
   pedidos      Pedido[]
+  favoritos    Favorito[]
   notificacoes Notificacao[]
   createdAt    DateTime      @default(now())
 }
 
-// Aviso pro cliente sobre o pedido dele. Hoje quem cria é o fluxo de pagamento
-// (confirmação, recusa), já que o retorno do Mercado Pago é assíncrono e o
-// cliente pode nem estar com o site aberto quando ele chega.
+model Favorito {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  produtoId String
+  produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  // Favoritar é idempotente: o par não pode repetir (ver upsert em data/favoritos).
+  @@unique([usuarioId, produtoId])
+}
+
 model Notificacao {
   id        String   @id @default(cuid())
   usuarioId String
@@ -64,6 +75,7 @@ model Notificacao {
   lida      Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  // A tela e o sininho sempre leem por usuário, do mais recente pro mais antigo.
   @@index([usuarioId, createdAt])
 }
 

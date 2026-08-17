@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { registrarUsuario } from "@/lib/data/usuarios";
 import { criarSessao } from "@/lib/session";
+import { corpoJson, respostaDeErro } from "@/lib/api";
 
 export async function POST(req: NextRequest) {
-  const { nome, email, senha } = await req.json();
+  let nome: string | undefined;
+  let email: string | undefined;
+  let senha: string | undefined;
+  try {
+    ({ nome, email, senha } = await corpoJson<{
+      nome?: string;
+      email?: string;
+      senha?: string;
+    }>(req));
+  } catch (e) {
+    return respostaDeErro(e);
+  }
 
   if (!nome?.trim() || !email?.trim() || !senha) {
     return NextResponse.json({ error: "Preencha nome, e-mail e senha." }, { status: 400 });

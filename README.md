@@ -7,9 +7,9 @@ Repositório do projeto **Ki Brindes Vendas**.
 Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
 sessão por cookie), pedidos gravados no banco, upload real da arte do cliente,
-área interna (`/admin`) que edita catálogo de verdade e pagamento real pelo
-Mercado Pago (Pix, cartão e boleto), com notificação do resultado pro cliente.
-Carrinho e favoritos ainda são mock, em `localStorage`.
+favoritos e notificações no perfil, área interna (`/admin`) que edita catálogo
+de verdade e move o pedido de status, e pagamento real pelo Mercado Pago (Pix,
+cartão e boleto). O carrinho ainda é mock, em `localStorage`.
 
 ## Como começar
 
@@ -23,8 +23,8 @@ npm run dev
 ## Banco de dados (Prisma + PostgreSQL)
 
 O schema está modelado em `prisma/schema.prisma` (categorias, produtos,
-variações, usuários, pedidos, itens, personalização e notificações). O catálogo
-das telas vem
+variações, usuários, favoritos, notificações, pedidos, itens e
+personalização). O catálogo das telas vem
 do banco: as queries ficam em `src/lib/data/` e o app **não sobe sem
 `DATABASE_URL`**.
 
@@ -48,8 +48,9 @@ banco sem deixar rastro.
 `src/lib/data/` é server-only (marcado com `server-only`): quem consome direto
 são os Server Components (home, categorias, busca, comparativo, admin/pedidos e
 a edição de produto). As telas que são Client Component — produto,
-personalizar, checkout, favoritos, admin/produtos e admin/categorias — passam
-pelas rotas em `src/app/api/` usando os hooks de `src/lib/use-produto.ts`.
+personalizar, checkout, favoritos, notificações, admin/produtos e
+admin/categorias — passam pelas rotas em `src/app/api/`, pelo hook de
+`src/lib/use-produto.ts` ou pelos contexts de favoritos e notificações.
 
 Toda escrita também mora em `src/lib/data/`: as rotas só autenticam, chamam a
 função e traduzem `ErroDeNegocio` (`src/lib/data/erros.ts`) pro JSON de erro.
@@ -155,6 +156,35 @@ URL pública dele.
 A tela `/conta/pedidos` do cliente ainda mostra a lista mock; ligar ela no
 banco é o próximo passo natural.
 
+## Favoritos e notificações
+
+Favoritos e notificações são do usuário, não do navegador: saíram do
+`localStorage` e viraram as tabelas `Favorito` (par único usuário + produto) e
+`Notificacao`. Quem não está logado vê o convite pra entrar — e o coração de um
+produto manda pro login guardando a página de volta em `?next=`.
+
+O coração muda na hora e só depois confirma com o servidor (`POST
+/api/favoritos` / `DELETE /api/favoritos/[produtoId]`); se a requisição falhar,
+a lista volta pro que está gravado. Favoritar duas vezes é idempotente
+(`upsert`), então clique repetido ou outra aba não viram erro.
+
+As notificações são geradas pelo próprio fluxo, em transação com o que as
+causou — o aviso não existe sem o pedido:
+
+- pedido criado no modo simulado → "Pedido recebido!" (o texto muda quando o
+  produto é personalizável e a arte entra na fila de validação). Com pagamento
+  real quem avisa é o webhook, depois da confirmação: "Pagamento aprovado!" ou
+  "Pagamento não aprovado";
+- status mudado em `/admin/pedidos` → "Atualização do seu pedido". `PAGO` e
+  `AGUARDANDO_PAGAMENTO` não avisam: o primeiro já foi anunciado pelo fluxo de
+  pagamento e o segundo é volta atrás interna. Reenviar o mesmo status não
+  repete o aviso.
+
+O sininho do header mostra as não lidas e a tela `/notificacoes` marca como
+lida no clique; os dois leem o mesmo `notificacoes-context`, então o contador
+zera sem uma segunda requisição. `usuarioId` entra no `where` da escrita — sem
+ele, qualquer sessão marcaria a notificação de outra pessoa passando o id.
+
 ## Estrutura
 
 ```
@@ -166,11 +196,12 @@ src/
 │   ├── personalizar/[id]/        # 3 vias: IA / upload / manual
 │   ├── checkout/                 # resumo + ida pro Mercado Pago
 │   ├── pedido/confirmado/        # status real do pedido
-│   ├── notificacoes/             # avisos de pagamento e produção
+│   ├── favoritos/ e notificacoes/ # lista salva e avisos do pedido
 │   ├── suporte/                  # FAQ
 │   ├── entrar/ e cadastro/       # login e criação de conta
 │   ├── admin/                    # área interna (produtos, categorias, pedidos)
-│   └── api/                      # catálogo, auth, pedidos, webhook e admin (JSON)
+│   └── api/                      # catálogo, auth, pedidos, favoritos,
+│                                  # notificações, webhook e admin (JSON)
 ├── components/                   # Header, Footer, ProductCard
 └── lib/
     ├── data/                     # queries Prisma (server-only)
@@ -181,6 +212,8 @@ src/
     ├── prisma.ts                 # PrismaClient singleton
     ├── types.ts                  # Produto, Categoria, Variacao
     ├── use-produto.ts            # hooks de catálogo p/ client components
+    ├── favoritos-context.tsx     # favoritos do usuário (via /api/favoritos)
+    ├── notificacoes-context.tsx  # avisos + contador do sininho
     └── mock-data.ts              # seed do banco + FAQs
 ```
 
@@ -232,8 +265,9 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Upload real da arte do cliente (validado por assinatura, servido com sessão)
 - [x] Trocar disco local por bucket nas artes (Vercel Blob, privado)
 - [x] Migrations versionadas e integração contínua (lint + tipos + build)
+- [x] Favoritos no banco e notificações de pedido (criação e mudança de status)
 - [x] Pagamento de verdade (Mercado Pago Checkout Pro + webhook + notificações)
-- [ ] Persistir carrinho e favoritos no banco, e ligar /conta/pedidos no banco
+- [ ] Persistir o carrinho no banco e ligar /conta/pedidos no banco
 - [ ] Guardar a sacola até o pagamento confirmar (hoje ela é limpa na ida pro
       Mercado Pago, então voltar de um pagamento recusado exige montar de novo)
 - [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)

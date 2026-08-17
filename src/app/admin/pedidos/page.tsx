@@ -1,4 +1,5 @@
 import AdminNav from "@/components/AdminNav";
+import AdminPedidoStatus from "@/components/AdminPedidoStatus";
 import { getPedidosRecentes } from "@/lib/data/pedidos";
 import { exigirAdmin } from "@/lib/admin";
 
@@ -56,6 +57,9 @@ export default async function AdminPedidosPage() {
                 </div>
               </div>
               <p className="text-xs text-ink/50 mb-2">{p.usuario.email}</p>
+
+              {/* Mudar o status aqui avisa o cliente na tela de notificações */}
+              <AdminPedidoStatus pedidoId={p.id} statusAtual={p.status} />
 
               {p.itens.map((item) => (
                 <div key={item.id} className="text-sm py-1 border-t border-line/60 mt-1">

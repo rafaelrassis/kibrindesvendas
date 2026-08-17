@@ -2,7 +2,6 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
 import { getUsuarioDaSessao } from "@/lib/data/usuarios";
-import { ErroDeNegocio } from "@/lib/data/erros";
 
 // Guarda das telas /admin. Precisa ser chamada dentro da própria página, antes
 // de qualquer query: barrar só no layout esconde o resultado da tela, mas a
@@ -31,11 +30,3 @@ export async function bloqueioAdmin(): Promise<NextResponse | null> {
   return null;
 }
 
-// Traduz os erros esperados da camada de dados pro JSON das rotas; o resto
-// sobe e vira 500, que é o certo pra falha inesperada.
-export function respostaDeErro(e: unknown) {
-  if (e instanceof ErroDeNegocio) {
-    return NextResponse.json({ error: e.message }, { status: e.status });
-  }
-  throw e;
-}

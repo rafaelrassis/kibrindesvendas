@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { atualizarProduto, removerProduto } from "@/lib/data/produtos";
-import { bloqueioAdmin, respostaDeErro } from "@/lib/admin";
+import { bloqueioAdmin } from "@/lib/admin";
+import { corpoJson, respostaDeErro } from "@/lib/api";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const bloqueio = await bloqueioAdmin();
@@ -8,7 +9,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   try {
-    return NextResponse.json(await atualizarProduto(id, await req.json()));
+    return NextResponse.json(await atualizarProduto(id, await corpoJson(req)));
   } catch (e) {
     return respostaDeErro(e);
   }

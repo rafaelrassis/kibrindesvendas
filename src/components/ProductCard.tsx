@@ -70,10 +70,7 @@ export default function ProductCard({
       </Link>
 
       {/* top-10: abaixo do corte diagonal, senão o botão flutua fora do cartão */}
-      <FavoritoButton
-        produtoId={produto.id}
-        className="absolute top-10 right-3 z-10"
-      />
+      <FavoritoButton produto={produto} className="absolute top-10 right-3 z-10" />
     </div>
   );
 }

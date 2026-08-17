@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { criarPedido } from "@/lib/data/pedidos";
+import type { ItemCarrinho } from "@/lib/cart-context";
 import { usuarioIdDaSessao } from "@/lib/session";
-import { respostaDeErro } from "@/lib/admin";
+import { corpoJson, respostaDeErro } from "@/lib/api";
 
 export async function POST(req: NextRequest) {
   const usuarioId = await usuarioIdDaSessao();
@@ -13,7 +14,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { pedido, checkoutUrl } = await criarPedido(usuarioId, await req.json());
+    const { pedido, checkoutUrl } = await criarPedido(
+      usuarioId,
+      await corpoJson<ItemCarrinho>(req)
+    );
     return NextResponse.json({ id: pedido.id, checkoutUrl });
   } catch (e) {
     return respostaDeErro(e);

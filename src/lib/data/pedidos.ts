@@ -1,5 +1,5 @@
 import "server-only";
-import type { StatusPedido } from "@prisma/client";
+import { StatusPedido } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ItemCarrinho } from "@/lib/cart-context";
 import {
@@ -8,8 +8,8 @@ import {
   paymentClient,
   preferenceClient,
 } from "@/lib/mercadopago";
-import { criarNotificacao } from "./notificacoes";
 import { ErroDeNegocio } from "./erros";
+import { notificar } from "./notificacoes";
 
 // Cria o pedido e devolve pra onde mandar o cliente em seguida: a página
 // hospedada do Mercado Pago quando o pagamento é real, ou direto a tela de
@@ -28,44 +28,54 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho) {
 
   const pagamentoReal = pagamentoRealConfigurado();
 
-  const pedido = await prisma.pedido.create({
-    data: {
-      usuarioId,
-      // Com gateway de verdade o pedido só vira PAGO quando o webhook chega.
-      status: pagamentoReal ? "AGUARDANDO_PAGAMENTO" : "PAGO",
-      total: produto.preco,
-      pagamentoMock: !pagamentoReal,
-      itens: {
-        create: [
-          {
-            produtoId: produto.id,
-            quantidade: 1,
-            precoUnitario: produto.preco,
-            variacaoEscolhida: item.variacoesEscolhidas ?? {},
-            ...(item.personalizacao && {
-              personalizacao: {
-                create: {
-                  tipo: item.personalizacao.via,
-                  briefing: item.personalizacao.resumo,
-                  arteUrl: item.personalizacao.arteUrl ?? null,
-                  aceiteTermos: !!item.personalizacao.aceite,
+  const pedido = await prisma.$transaction(async (tx) => {
+    const criado = await tx.pedido.create({
+      data: {
+        usuarioId,
+        // Com gateway de verdade o pedido só vira PAGO quando o webhook chega.
+        status: pagamentoReal ? "AGUARDANDO_PAGAMENTO" : "PAGO",
+        total: produto.preco,
+        pagamentoMock: !pagamentoReal,
+        itens: {
+          create: [
+            {
+              produtoId: produto.id,
+              quantidade: 1,
+              precoUnitario: produto.preco,
+              variacaoEscolhida: item.variacoesEscolhidas ?? {},
+              ...(item.personalizacao && {
+                personalizacao: {
+                  create: {
+                    tipo: item.personalizacao.via,
+                    briefing: item.personalizacao.resumo,
+                    arteUrl: item.personalizacao.arteUrl ?? null,
+                    aceiteTermos: !!item.personalizacao.aceite,
+                  },
                 },
-              },
-            }),
-          },
-        ],
+              }),
+            },
+          ],
+        },
       },
-    },
+    });
+
+    // No modo simulado o pedido já nasce pago, então o aviso sai junto. Com
+    // pagamento real quem avisa é o webhook, depois da confirmação.
+    if (!pagamentoReal) {
+      await notificar(
+        usuarioId,
+        "Pedido recebido!",
+        produto.requerPersonalizacao
+          ? `Recebemos seu pedido de ${produto.nome}. Sua arte entrou na fila de validação da nossa equipe.`
+          : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`,
+        tx
+      );
+    }
+
+    return criado;
   });
 
   if (!pagamentoReal) {
-    await criarNotificacao(
-      usuarioId,
-      "Pedido recebido!",
-      produto.requerPersonalizacao
-        ? `Recebemos seu pedido de ${produto.nome}. Sua arte entrou na fila de validação da nossa equipe.`
-        : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`
-    );
     return { pedido, checkoutUrl: `/pedido/confirmado?id=${pedido.id}` };
   }
 
@@ -127,7 +137,46 @@ export async function getPedidosRecentes(limite = 50) {
   });
 }
 
-const statusPorPagamento: Record<string, StatusPedido> = {
+// Só os status que interessam ao cliente viram aviso: PAGO já é anunciado na
+// confirmação do pagamento e AGUARDANDO_PAGAMENTO é volta atrás interna.
+const AVISO_POR_STATUS: Partial<Record<StatusPedido, string>> = {
+  EM_PRODUCAO: "Seu pedido entrou em produção!",
+  ENVIADO: "Seu pedido foi enviado.",
+  ENTREGUE: "Seu pedido foi entregue. Esperamos que goste!",
+  CANCELADO: "Seu pedido foi cancelado.",
+};
+
+// O status chega do corpo JSON da rota, então é texto até prova em contrário.
+function validarStatus(valor: unknown): StatusPedido {
+  const valores = Object.values(StatusPedido) as string[];
+  if (typeof valor !== "string" || !valores.includes(valor)) {
+    throw new ErroDeNegocio("Status inválido.");
+  }
+  return valor as StatusPedido;
+}
+
+export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
+  const status = validarStatus(statusBruto);
+
+  const pedido = await prisma.pedido.findUnique({ where: { id } });
+  if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
+
+  // Reenviar o mesmo status (dois cliques no select) não gera aviso repetido.
+  if (pedido.status === status) return pedido;
+
+  return prisma.$transaction(async (tx) => {
+    const atualizado = await tx.pedido.update({ where: { id }, data: { status } });
+
+    const aviso = AVISO_POR_STATUS[status];
+    if (aviso) {
+      await notificar(pedido.usuarioId, "Atualização do seu pedido", aviso, tx);
+    }
+
+    return atualizado;
+  });
+}
+
+const STATUS_POR_PAGAMENTO: Record<string, StatusPedido> = {
   approved: "PAGO",
   authorized: "PAGO",
   rejected: "CANCELADO",
@@ -139,7 +188,7 @@ const statusPorPagamento: Record<string, StatusPedido> = {
   in_mediation: "AGUARDANDO_PAGAMENTO",
 };
 
-const avisoPorStatus: Partial<Record<StatusPedido, { titulo: string; mensagem: string }>> = {
+const AVISO_POR_PAGAMENTO: Partial<Record<StatusPedido, { titulo: string; mensagem: string }>> = {
   PAGO: {
     titulo: "Pagamento aprovado!",
     mensagem: "Recebemos seu pagamento. Seu pedido já entrou na fila de produção.",
@@ -161,21 +210,23 @@ export async function registrarRetornoDoPagamento(pagamentoId: string) {
   const pedido = await prisma.pedido.findUnique({ where: { id: pedidoId } });
   if (!pedido) return;
 
-  const status = statusPorPagamento[pagamento.status ?? ""] ?? "AGUARDANDO_PAGAMENTO";
+  const status = STATUS_POR_PAGAMENTO[pagamento.status ?? ""] ?? "AGUARDANDO_PAGAMENTO";
 
-  // O Mercado Pago reenvia o mesmo evento até receber 200, e um pedido já
-  // despachado não pode voltar pra PAGO por causa de uma reentrega.
+  // O Mercado Pago reenvia o mesmo evento até receber 200, e um pedido que a
+  // loja já moveu adiante não pode voltar pra PAGO por causa de uma reentrega.
   if (pedido.status === status || (pedido.status !== "AGUARDANDO_PAGAMENTO" && status === "PAGO")) {
     return;
   }
 
-  await prisma.pedido.update({
-    where: { id: pedido.id },
-    data: { status, pagamentoId: String(pagamento.id ?? pagamentoId) },
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.pedido.update({
+      where: { id: pedido.id },
+      data: { status, pagamentoId: String(pagamento.id ?? pagamentoId) },
+    });
 
-  const aviso = avisoPorStatus[status];
-  if (aviso) {
-    await criarNotificacao(pedido.usuarioId, aviso.titulo, aviso.mensagem);
-  }
+    const aviso = AVISO_POR_PAGAMENTO[status];
+    if (aviso) {
+      await notificar(pedido.usuarioId, aviso.titulo, aviso.mensagem, tx);
+    }
+  });
 }
