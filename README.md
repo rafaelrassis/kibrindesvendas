@@ -28,9 +28,15 @@ do banco: as queries ficam em `src/lib/data/` e o app **não sobe sem
 
 ```bash
 cp .env.example .env          # ajuste DATABASE_URL e SESSION_SECRET
-npm run db:push               # cria as tabelas no banco
+npm run db:deploy             # aplica as migrations existentes
 npm run db:seed               # popula categorias e produtos com o mock-data
 ```
+
+O histórico do schema vive em `prisma/migrations/` (versionado). Depois de
+mexer em `schema.prisma`, `npm run db:migrate` gera a migration nova e aplica
+no banco local; `npm run db:deploy` (`prisma migrate deploy`) só aplica o que
+já existe e é o comando de CI e de produção — nunca `db push`, que altera o
+banco sem deixar rastro.
 
 `npm run db:generate` regenera o Prisma Client. A configuração do CLI fica em
 `prisma.config.ts` (o `package.json#prisma` foi descontinuado no Prisma 7).
@@ -100,16 +106,20 @@ Aceita PNG, JPG, WEBP e PDF até 15MB, e o formato é decidido pela **assinatura
 do arquivo**, não pelo `type` que o navegador mandou nem pela extensão do nome
 original: um HTML renomeado pra `.png` é recusado.
 
-Os arquivos ficam em `var/uploads/artes/` (fora do git) com nome sorteado, e
-quem serve é `GET /api/artes/[nome]`, que exige sessão. Dois motivos pra não
-usar `public/`: em produção o Next indexa `public/` quando sobe, então arte
-gravada depois disso só apareceria no próximo restart; e arte de cliente não
-deve ficar em URL aberta. A fila em `/admin/pedidos` linka a arte de cada
-item ("ver arte enviada").
+Onde o arquivo é gravado depende do ambiente, e quem decide é
+`src/lib/artes.ts`:
 
-⚠️ Disco local não sobrevive a deploy em plataforma serverless (ex.: Vercel):
-na etapa de deploy isso vira um bucket (Vercel Blob, S3), trocando
-`src/lib/artes.ts`.
+- **Produção**, com `BLOB_READ_WRITE_TOKEN`: Vercel Blob, em `artes/<nome>` e
+  com `access: "private"`. O filesystem de um deploy serverless é efêmero e não
+  é compartilhado entre instâncias, então disco não serve.
+- **Dev local**, sem o token: `var/uploads/artes/` (fora do git). Fora de
+  `public/` de propósito — o Next indexa `public/` quando sobe, então arte
+  gravada depois disso só apareceria no próximo restart.
+
+Nos dois casos o nome é sorteado e quem serve é `GET /api/artes/[nome]`, que
+exige sessão: arte de cliente não fica em URL aberta — por isso o blob é
+privado e não público. A fila em `/admin/pedidos` linka a arte de cada item
+("ver arte enviada").
 
 ## Pedidos
 
@@ -146,6 +156,36 @@ src/
     └── mock-data.ts              # seed do banco + FAQs
 ```
 
+## Deploy (Vercel)
+
+1. Importar o repositório no dashboard da Vercel (ele detecta Next.js sozinho).
+2. Provisionar um PostgreSQL (Vercel Postgres, Neon, Supabase — tanto faz) e um
+   Blob Store, e vincular os dois ao projeto.
+3. Preencher as variáveis do projeto: `DATABASE_URL`, `SESSION_SECRET`
+   (`openssl rand -hex 32`, diferente do valor de dev) e
+   `BLOB_READ_WRITE_TOKEN` (o Blob Store já injeta esse ao ser vinculado).
+4. Aplicar as migrations no banco de produção — `npm run db:deploy` com
+   `DATABASE_URL` apontando pra lá. Isso vai **antes** do primeiro deploy: o
+   build prerenderiza páginas que consultam o banco e quebra se as tabelas não
+   existem. Repetir a cada deploy que traga migration nova.
+5. Deploy. O `postinstall` roda `prisma generate`, então o Prisma Client sai
+   correto mesmo com o cache de dependências da Vercel.
+6. Promover a primeira conta a admin com `npm run db:admin -- voce@exemplo.com`
+   apontando pro banco de produção.
+
+Sem `BLOB_READ_WRITE_TOKEN` o upload cai pro disco local — o app sobe, mas as
+artes somem no deploy seguinte. Não deixar assim em produção.
+
+## CI
+
+`.github/workflows/ci.yml` roda em push e pull request pra `main`: sobe um
+Postgres descartável (service container), aplica migrations, popula o seed e
+então roda lint, checagem de tipos e build. O banco não é opcional aqui — as
+páginas prerenderizadas consultam o catálogo durante o `next build`.
+
+`npm run typecheck` roda `next typegen` antes do `tsc --noEmit`, porque os
+tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
+
 ## Próximos passos
 
 - [x] Mock visual do fluxo completo (produto → personalização → checkout)
@@ -155,11 +195,12 @@ src/
 - [x] Autenticação real (cadastro, login, sessão em cookie, troca de senha)
 - [x] Admin com CRUD de catálogo no banco + pedidos gravados no checkout
 - [x] Upload real da arte do cliente (validado por assinatura, servido com sessão)
+- [x] Trocar disco local por bucket nas artes (Vercel Blob, privado)
+- [x] Migrations versionadas e integração contínua (lint + tipos + build)
 - [ ] Persistir carrinho e favoritos no banco, e ligar /conta/pedidos no banco
 - [ ] Pagamento de verdade (hoje o pedido nasce PAGO)
-- [ ] Trocar disco local por bucket antes do deploy (artes)
-- [ ] Configurar ambiente de desenvolvimento (variáveis de ambiente, deploy)
-- [ ] Configurar testes e integração contínua
+- [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)
+- [ ] Testes automatizados (o CI hoje só garante lint, tipos e build)
 
 ## Convenções
 

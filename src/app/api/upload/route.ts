@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { usuarioIdDaSessao } from "@/lib/session";
 import { formatoDoConteudo, salvarArte, TAMANHO_MAXIMO } from "@/lib/artes";
 
-// ⚠️ Armazenamento local em disco — funciona no ambiente atual, mas não é
-// persistente em plataformas serverless (ex: Vercel). Trocar por um bucket
-// (Vercel Blob, S3, etc.) na etapa de deploy.
+// Onde o arquivo é gravado (Vercel Blob em produção, disco em dev) é decisão
+// de `src/lib/artes.ts`; aqui só valida sessão, tamanho e formato.
 export async function POST(req: NextRequest) {
   const usuarioId = await usuarioIdDaSessao();
   if (!usuarioId) {
