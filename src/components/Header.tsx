@@ -13,7 +13,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const pathname = usePathname();
   const home = pathname === "/";
   const { item } = useCart();
-  const { logado, entrar } = useAuth();
+  const { logado } = useAuth();
 
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,13 +99,13 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
               👤
             </Link>
           ) : (
-            <button
-              onClick={entrar}
+            <Link
+              href="/entrar"
               className="flex items-center gap-1.5 text-sm hover:text-mustard transition-colors"
             >
               <span className="text-lg leading-none">🔑</span>
               Entrar
-            </button>
+            </Link>
           )}
         </div>
       </div>

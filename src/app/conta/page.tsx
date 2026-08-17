@@ -11,16 +11,25 @@ import {
   LogOut,
   LogIn,
 } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { useConta } from "@/lib/conta-context";
 import { pedidosMock } from "@/lib/conta-data";
 import ContaMenuItem from "@/components/ContaMenuItem";
 
 export default function ContaPage() {
-  const { logado, entrar, sair } = useAuth();
-  const { perfil, enderecos } = useConta();
+  const { logado, carregando, usuario, sair } = useAuth();
+  const { enderecos } = useConta();
 
-  if (!logado) {
+  if (carregando) {
+    return (
+      <div className="mx-auto max-w-md px-5 py-20 text-center">
+        <p className="text-ink/60 text-sm">Carregando sua conta...</p>
+      </div>
+    );
+  }
+
+  if (!logado || !usuario) {
     return (
       <div className="mx-auto max-w-md px-5 py-20 text-center">
         <p className="text-4xl mb-4">👤</p>
@@ -28,13 +37,13 @@ export default function ContaPage() {
         <p className="text-ink/60 text-sm mb-6">
           Faça login pra ver seus pedidos, endereços e dados salvos.
         </p>
-        <button
-          onClick={entrar}
+        <Link
+          href="/entrar"
           className="bg-pine text-paper px-6 py-2.5 rounded-full text-sm inline-flex items-center gap-2"
         >
           <LogIn size={16} />
-          Entrar (mock)
-        </button>
+          Entrar
+        </Link>
       </div>
     );
   }
@@ -47,8 +56,9 @@ export default function ContaPage() {
           🙂
         </span>
         <div className="min-w-0">
-          <p className="font-display text-xl truncate">{perfil.nome}</p>
-          <p className="text-xs text-paper/70 truncate">{perfil.email}</p>
+          {/* Nome e e-mail vêm da conta real; o resto do perfil segue local. */}
+          <p className="font-display text-xl truncate">{usuario.nome}</p>
+          <p className="text-xs text-paper/70 truncate">{usuario.email}</p>
         </div>
       </div>
 

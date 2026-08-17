@@ -11,10 +11,12 @@ export default function SegurancaPage() {
   const [form, setForm] = useState({ atual: "", nova: "", confirmar: "" });
   const [erro, setErro] = useState("");
   const [salvo, setSalvo] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
-  function salvar(e: React.FormEvent) {
+  async function salvar(e: React.FormEvent) {
     e.preventDefault();
     setSalvo(false);
+    setErro("");
 
     if (form.nova.length < 6) {
       setErro("A nova senha precisa ter pelo menos 6 caracteres.");
@@ -25,9 +27,23 @@ export default function SegurancaPage() {
       return;
     }
 
-    setErro("");
-    setSalvo(true);
-    setForm({ atual: "", nova: "", confirmar: "" });
+    setEnviando(true);
+    try {
+      const r = await fetch("/api/auth/senha", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senhaAtual: form.atual, novaSenha: form.nova }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setErro(data.error ?? "Não foi possível trocar a senha.");
+        return;
+      }
+      setSalvo(true);
+      setForm({ atual: "", nova: "", confirmar: "" });
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
@@ -37,7 +53,7 @@ export default function SegurancaPage() {
       </button>
       <h1 className="font-display text-2xl mb-1">Senha e segurança</h1>
       <p className="text-ink/60 text-sm mb-6">
-        Protótipo — nenhuma senha real é validada aqui.
+        Sua senha atual é validada no servidor antes da troca.
       </p>
 
       <form onSubmit={salvar} className="space-y-4 mb-8">
@@ -74,9 +90,10 @@ export default function SegurancaPage() {
 
         <button
           type="submit"
-          className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2"
+          disabled={enviando}
+          className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2 disabled:opacity-50"
         >
-          Atualizar senha
+          {enviando ? "Salvando..." : "Atualizar senha"}
         </button>
       </form>
 
