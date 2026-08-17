@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Categoria {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  label    String
+  emoji    String
+  produtos Produto[]
+}
+
+model Produto {
+  id                   String       @id
+  nome                 String
+  descricao            String
+  categoriaId          String
+  categoria            Categoria    @relation(fields: [categoriaId], references: [id])
+  preco                Decimal      @db.Decimal(10, 2)
+  precoShopee          Decimal      @db.Decimal(10, 2)
+  requerPersonalizacao Boolean      @default(false)
+  emoji                String
+  cor                  String
+  destaque             Boolean      @default(false)
+  variacoes            Variacao[]
+  itensPedido          ItemPedido[]
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+}
+
+model Variacao {
+  id        String   @id @default(cuid())
+  produtoId String
+  produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  tipo      String
+  valores   String[]
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  pedidos   Pedido[]
+  createdAt DateTime @default(now())
+}
+
+model Pedido {
+  id            String       @id @default(cuid())
+  usuarioId     String
+  usuario       Usuario      @relation(fields: [usuarioId], references: [id])
+  status        StatusPedido @default(AGUARDANDO_PAGAMENTO)
+  total         Decimal      @db.Decimal(10, 2)
+  itens         ItemPedido[]
+  pagamentoMock Boolean      @default(true) // pagamento real fica pra fase final
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model ItemPedido {
+  id                String          @id @default(cuid())
+  pedidoId          String
+  pedido            Pedido          @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produtoId         String
+  produto           Produto         @relation(fields: [produtoId], references: [id])
+  quantidade        Int             @default(1)
+  precoUnitario     Decimal         @db.Decimal(10, 2)
+  variacaoEscolhida Json?
+  personalizacao    Personalizacao?
+}
+
+model Personalizacao {
+  id           String             @id @default(cuid())
+  itemPedidoId String             @unique
+  itemPedido   ItemPedido         @relation(fields: [itemPedidoId], references: [id], onDelete: Cascade)
+  tipo         TipoPersonalizacao
+  arteUrl      String?
+  briefing     String?
+  aceiteTermos Boolean            @default(false)
+  createdAt    DateTime           @default(now())
+}
+
+enum StatusPedido {
+  AGUARDANDO_PAGAMENTO
+  PAGO
+  EM_PRODUCAO
+  ENVIADO
+  ENTREGUE
+  CANCELADO
+}
+
+enum TipoPersonalizacao {
+  IA
+  UPLOAD
+  MANUAL
+}
