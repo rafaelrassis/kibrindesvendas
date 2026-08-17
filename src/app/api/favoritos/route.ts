@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { favoritar, getFavoritos } from "@/lib/data/favoritos";
 import { usuarioIdDaSessao } from "@/lib/session";
-import { respostaDeErro } from "@/lib/admin";
+import { corpoJson, respostaDeErro } from "@/lib/api";
 
 // Visitante sem conta não tem favoritos guardados: lista vazia, sem erro — quem
 // convida a entrar é a tela.
@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { produtoId } = await req.json();
-  if (!produtoId) {
-    return NextResponse.json({ error: "Informe o produto." }, { status: 400 });
-  }
-
   try {
+    const { produtoId } = await corpoJson<{ produtoId?: string }>(req);
+    if (!produtoId) {
+      return NextResponse.json({ error: "Informe o produto." }, { status: 400 });
+    }
+
     await favoritar(usuarioId, produtoId);
     return NextResponse.json({ ok: true });
   } catch (e) {

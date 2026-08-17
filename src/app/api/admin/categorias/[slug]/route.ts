@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { atualizarCategoria, removerCategoria } from "@/lib/data/categorias";
-import { bloqueioAdmin, respostaDeErro } from "@/lib/admin";
+import { bloqueioAdmin } from "@/lib/admin";
+import { corpoJson, respostaDeErro } from "@/lib/api";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const bloqueio = await bloqueioAdmin();
   if (bloqueio) return bloqueio;
 
   const { slug } = await params;
-  const { label, emoji } = await req.json();
-  if (!label?.trim()) {
-    return NextResponse.json({ error: "Informe o nome da categoria." }, { status: 400 });
-  }
 
   try {
+    const { label, emoji } = await corpoJson<{ label?: string; emoji?: string }>(req);
+    if (!label?.trim()) {
+      return NextResponse.json({ error: "Informe o nome da categoria." }, { status: 400 });
+    }
+
     return NextResponse.json(await atualizarCategoria(slug, label, emoji));
   } catch (e) {
     return respostaDeErro(e);

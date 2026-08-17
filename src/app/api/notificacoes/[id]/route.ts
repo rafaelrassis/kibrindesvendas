@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { marcarNotificacaoLida } from "@/lib/data/notificacoes";
 import { usuarioIdDaSessao } from "@/lib/session";
-import { respostaDeErro } from "@/lib/admin";
+import { corpoJson, respostaDeErro } from "@/lib/api";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const usuarioId = await usuarioIdDaSessao();
@@ -10,9 +10,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { id } = await params;
-  const { lida } = await req.json();
 
   try {
+    const { lida } = await corpoJson<{ lida?: boolean }>(req);
     await marcarNotificacaoLida(usuarioId, id, lida ?? true);
     return NextResponse.json({ ok: true });
   } catch (e) {
