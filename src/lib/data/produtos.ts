@@ -10,7 +10,9 @@ type ProdutoComRelacoes = ProdutoDb & {
   variacoes: VariacaoDb[];
 };
 
-function toProduto(p: ProdutoComRelacoes): Produto {
+// Exportado porque outras consultas (favoritos, por exemplo) chegam no produto
+// por outro caminho e precisam do mesmo formato de saída.
+export function toProduto(p: ProdutoComRelacoes): Produto {
   return {
     id: p.id,
     nome: p.nome,
@@ -27,31 +29,31 @@ function toProduto(p: ProdutoComRelacoes): Produto {
   };
 }
 
-const include = { categoria: true, variacoes: true } as const;
+export const relacoesProduto = { categoria: true, variacoes: true } as const;
 
 export async function getProdutos(): Promise<Produto[]> {
-  const produtos = await prisma.produto.findMany({ include, orderBy: { nome: "asc" } });
+  const produtos = await prisma.produto.findMany({ include: relacoesProduto, orderBy: { nome: "asc" } });
   return produtos.map(toProduto);
 }
 
 export async function getDestaques(): Promise<Produto[]> {
   const produtos = await prisma.produto.findMany({
     where: { destaque: true },
-    include,
+    include: relacoesProduto,
     orderBy: { nome: "asc" },
   });
   return produtos.map(toProduto);
 }
 
 export async function getProduto(id: string): Promise<Produto | undefined> {
-  const produto = await prisma.produto.findUnique({ where: { id }, include });
+  const produto = await prisma.produto.findUnique({ where: { id }, include: relacoesProduto });
   return produto ? toProduto(produto) : undefined;
 }
 
 export async function getProdutosPorCategoria(slug: string): Promise<Produto[]> {
   const produtos = await prisma.produto.findMany({
     where: { categoria: { slug } },
-    include,
+    include: relacoesProduto,
     orderBy: { nome: "asc" },
   });
   return produtos.map(toProduto);
@@ -67,7 +69,7 @@ export async function buscarProdutos(termo: string): Promise<Produto[]> {
         { descricao: { contains: q, mode: "insensitive" } },
       ],
     },
-    include,
+    include: relacoesProduto,
     orderBy: { nome: "asc" },
   });
   return produtos.map(toProduto);
@@ -137,7 +139,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
         create: (dados.variacoes ?? []).map((v) => ({ tipo: v.tipo, valores: v.valores })),
       },
     },
-    include,
+    include: relacoesProduto,
   });
   return toProduto(produto);
 }
@@ -179,7 +181,7 @@ export async function atualizarProduto(
           },
         }),
       },
-      include,
+      include: relacoesProduto,
     });
   });
   return toProduto(produto);

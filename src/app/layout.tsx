@@ -4,6 +4,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
 import { ContaProvider } from "@/lib/conta-context";
 import { FavoritosProvider } from "@/lib/favoritos-context";
+import { NotificacoesProvider } from "@/lib/notificacoes-context";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
@@ -25,10 +26,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <ContaProvider>
             <CartProvider>
               <FavoritosProvider>
-                <Header categorias={categorias} />
-                <main className="flex-1 pb-16 md:pb-0">{children}</main>
-                <Footer />
-                <BottomNav />
+                <NotificacoesProvider>
+                  <Header categorias={categorias} />
+                  <main className="flex-1 pb-16 md:pb-0">{children}</main>
+                  <Footer />
+                  <BottomNav />
+                </NotificacoesProvider>
               </FavoritosProvider>
             </CartProvider>
           </ContaProvider>

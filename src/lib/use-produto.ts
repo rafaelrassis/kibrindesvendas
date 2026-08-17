@@ -34,24 +34,3 @@ export function useProduto(id: string | undefined) {
     carregando: id !== undefined && atual === undefined,
   };
 }
-
-export function useProdutos() {
-  const [produtos, setProdutos] = useState<Produto[] | undefined>(undefined);
-
-  useEffect(() => {
-    let ativo = true;
-    fetch("/api/produtos")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((lista: Produto[]) => {
-        if (ativo) setProdutos(lista);
-      })
-      .catch(() => {
-        if (ativo) setProdutos([]);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, []);
-
-  return { produtos: produtos ?? [], carregando: produtos === undefined };
-}

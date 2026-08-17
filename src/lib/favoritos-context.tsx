@@ -1,93 +1,130 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
-  useSyncExternalStore,
+  useState,
   type ReactNode,
 } from "react";
-import { criarStoreLocal } from "./store-local";
-import { useProdutos } from "./use-produto";
+import type { Produto } from "@/lib/types";
+import { useAuth } from "./auth-context";
 
 type FavoritosContextType = {
-  favoritos: string[];
+  produtos: Produto[];
   total: number;
+  carregando: boolean;
   ehFavorito: (produtoId: string) => boolean;
-  alternarFavorito: (produtoId: string) => void;
+  alternarFavorito: (produto: Produto) => void;
 };
 
 const FavoritosContext = createContext<FavoritosContextType | null>(null);
 
-const STORAGE_KEY = "kibrindes-mock-favoritos";
+// A resposta guarda de quem é a lista: assim "carregando" é derivado (a
+// resposta ainda não é da sessão atual) em vez de virar mais um estado.
+type Resposta = { usuarioId: string; produtos: Produto[] };
 
-const store = criarStoreLocal<string[]>(STORAGE_KEY, (bruto) => {
-  if (!bruto) return [];
-  try {
-    const parsed = JSON.parse(bruto);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((id): id is string => typeof id === "string");
-  } catch {
-    return []; // ignora lista mock inválida
-  }
-});
+// Referência fixa: sem conta a lista é sempre a mesma lista vazia.
+const NENHUM: Produto[] = [];
+
+function buscarFavoritos(): Promise<Produto[]> {
+  return fetch("/api/favoritos")
+    .then((r) => (r.ok ? (r.json() as Promise<Produto[]>) : NENHUM))
+    .catch(() => NENHUM);
+}
 
 export function FavoritosProvider({ children }: { children: ReactNode }) {
-  const favoritos = useSyncExternalStore(
-    store.inscrever,
-    store.ler,
-    store.lerNoServidor
-  );
+  const { usuario, carregando: carregandoSessao } = useAuth();
+  const usuarioId = usuario?.id ?? null;
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const alternarFavorito = useCallback((produtoId: string) => {
-    // Lê direto da store: o clique pode vir de um card renderizado antes da
-    // última mudança (outra aba, por exemplo).
-    const atual = store.ler();
-    const proximo = atual.includes(produtoId)
-      ? atual.filter((id) => id !== produtoId)
-      : [produtoId, ...atual]; // mais recentes primeiro
-    store.escrever(JSON.stringify(proximo));
+  // Os favoritos agora moram no banco: a lista só existe depois da resposta.
+  const [resposta, setResposta] = useState<Resposta | undefined>(undefined);
+
+  useEffect(() => {
+    if (!usuarioId) return;
+    let ativo = true;
+    buscarFavoritos().then((produtos) => {
+      if (ativo) setResposta({ usuarioId, produtos });
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [usuarioId]);
+
+  const recarregar = useCallback((usuarioId: string) => {
+    buscarFavoritos().then((produtos) => setResposta({ usuarioId, produtos }));
   }, []);
 
+  // Sem sessão não há favoritos; com sessão, só vale a resposta daquela conta
+  // (trocar de usuário zera a lista até a nova chegar).
+  const produtos =
+    usuarioId === null
+      ? NENHUM
+      : resposta?.usuarioId === usuarioId
+        ? resposta.produtos
+        : undefined;
+
   const ehFavorito = useCallback(
-    (produtoId: string) => favoritos.includes(produtoId),
-    [favoritos]
+    (produtoId: string) => !!produtos?.some((p) => p.id === produtoId),
+    [produtos]
+  );
+
+  const alternarFavorito = useCallback(
+    (produto: Produto) => {
+      if (!usuarioId) {
+        router.push(`/entrar?next=${encodeURIComponent(pathname)}`);
+        return;
+      }
+
+      const salvo = !!produtos?.some((p) => p.id === produto.id);
+
+      // Troca o coração na hora e confirma com o servidor depois; se a
+      // requisição falhar, a lista volta pro que está gravado.
+      setResposta({
+        usuarioId,
+        produtos: salvo
+          ? (produtos ?? NENHUM).filter((p) => p.id !== produto.id)
+          : [produto, ...(produtos ?? NENHUM)], // mais recentes primeiro
+      });
+
+      const requisicao = salvo
+        ? fetch(`/api/favoritos/${produto.id}`, { method: "DELETE" })
+        : fetch("/api/favoritos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ produtoId: produto.id }),
+          });
+
+      requisicao
+        .then((r) => {
+          if (!r.ok) recarregar(usuarioId);
+        })
+        .catch(() => recarregar(usuarioId));
+    },
+    [usuarioId, produtos, router, pathname, recarregar]
   );
 
   const value = useMemo(
     () => ({
-      favoritos,
-      total: favoritos.length,
+      produtos: produtos ?? NENHUM,
+      total: produtos?.length ?? 0,
+      carregando: carregandoSessao || produtos === undefined,
       ehFavorito,
       alternarFavorito,
     }),
-    [favoritos, ehFavorito, alternarFavorito]
+    [produtos, carregandoSessao, ehFavorito, alternarFavorito]
   );
 
-  return (
-    <FavoritosContext.Provider value={value}>
-      {children}
-    </FavoritosContext.Provider>
-  );
+  return <FavoritosContext.Provider value={value}>{children}</FavoritosContext.Provider>;
 }
 
 export function useFavoritos() {
   const ctx = useContext(FavoritosContext);
   if (!ctx) throw new Error("useFavoritos precisa estar dentro de FavoritosProvider");
   return ctx;
-}
-
-export function useFavoritosProdutos() {
-  const { favoritos } = useFavoritos();
-  const { produtos, carregando } = useProdutos();
-
-  // Ignora ids que não existem mais no catálogo (produto saiu do ar) e mantém
-  // a ordem da lista de favoritos: mais recentes primeiro.
-  const salvos = useMemo(() => {
-    const porId = new Map(produtos.map((p) => [p.id, p]));
-    return favoritos.flatMap((id) => porId.get(id) ?? []);
-  }, [favoritos, produtos]);
-
-  return { produtos: salvos, carregando };
 }

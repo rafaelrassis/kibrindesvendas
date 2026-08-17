@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { Categoria } from "@/lib/types";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
+import { useNotificacoes } from "@/lib/notificacoes-context";
 
 export default function Header({ categorias }: { categorias: Categoria[] }) {
   const [termo, setTermo] = useState("");
@@ -14,6 +15,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const home = pathname === "/";
   const { item } = useCart();
   const { logado, usuario } = useAuth();
+  const { naoLidas } = useNotificacoes();
 
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +81,20 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
         </nav>
 
         <div className="flex items-center gap-4 shrink-0">
+          {/* No mobile o sininho fica na linha da busca, aqui ele acompanha a sacola */}
+          <Link
+            href="/notificacoes"
+            aria-label="Notificações"
+            className="relative text-xl hover:text-mustard transition-colors"
+          >
+            🔔
+            {naoLidas > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {naoLidas > 9 ? "9+" : naoLidas}
+              </span>
+            )}
+          </Link>
+
           <Link
             href="/checkout"
             aria-label="Sacola"
@@ -136,9 +152,11 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
           className="md:hidden relative shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
         >
           🔔
-          <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-            3
-          </span>
+          {naoLidas > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {naoLidas > 9 ? "9+" : naoLidas}
+            </span>
+          )}
         </Link>
       </form>
     </header>

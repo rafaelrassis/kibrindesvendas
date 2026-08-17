@@ -2,10 +2,32 @@
 
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
-import { useFavoritosProdutos } from "@/lib/favoritos-context";
+import { useAuth } from "@/lib/auth-context";
+import { useFavoritos } from "@/lib/favoritos-context";
 
 export default function FavoritosPage() {
-  const { produtos, carregando } = useFavoritosProdutos();
+  const { logado, carregando: carregandoSessao } = useAuth();
+  const { produtos, carregando } = useFavoritos();
+
+  // Sem conta não há lista pra mostrar: os favoritos ficam gravados no perfil.
+  if (!carregandoSessao && !logado) {
+    return (
+      <div className="mx-auto max-w-md px-5 py-20 text-center">
+        <p className="text-4xl mb-4">🤍</p>
+        <h1 className="font-display text-2xl mb-2">Seus favoritos</h1>
+        <p className="text-ink/60 text-sm mb-6">
+          Entre na sua conta pra salvar os produtos que você mais gostou e
+          encontrar todos eles aqui.
+        </p>
+        <Link
+          href="/entrar?next=/favoritos"
+          className="inline-block bg-pine text-white text-sm px-5 py-2.5 rounded-full hover:bg-pine-2 transition-colors"
+        >
+          Entrar
+        </Link>
+      </div>
+    );
+  }
 
   if (carregando) {
     return (

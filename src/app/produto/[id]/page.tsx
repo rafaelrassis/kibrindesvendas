@@ -94,7 +94,7 @@ export default function ProdutoPage() {
               {produto.emoji}
             </div>
             <FavoritoButton
-              produtoId={produto.id}
+              produto={produto}
               tamanho="lg"
               className="absolute top-3 right-3"
             />
