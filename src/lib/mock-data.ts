@@ -1,22 +1,9 @@
-export type Variacao = {
-  tipo: string;
-  valores: string[];
-};
+// Tipos vivem em @/lib/types — mantidos re-exportados aqui por compatibilidade.
+import type { Produto } from "./types";
+export type { Variacao, Produto } from "./types";
 
-export type Produto = {
-  id: string;
-  nome: string;
-  descricao: string;
-  categoria: string;
-  categoriaLabel: string;
-  preco: number;
-  precoShopee: number;
-  requerPersonalizacao: boolean;
-  emoji: string;
-  cor: string;
-  variacoes: Variacao[];
-  destaque?: boolean;
-};
+// ⚠️ Este arquivo não é mais a fonte de dados da aplicação (ver src/lib/data/).
+// Fica só como seed inicial do banco (prisma/seed.ts usa estes arrays).
 
 export const categorias = [
   { slug: "imas", label: "Ímãs de geladeira", emoji: "🧲" },

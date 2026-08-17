@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { getProduto } from "./mock-data";
+import { useProduto } from "./use-produto";
 import { criarStoreLocal } from "./store-local";
 
 export type ViaPersonalizacao = "IA" | "UPLOAD" | "MANUAL";
@@ -89,5 +89,6 @@ export function useCart() {
 
 export function useCartProduto() {
   const { item } = useCart();
-  return item ? getProduto(item.produtoId) : undefined;
+  const { produto } = useProduto(item?.produtoId);
+  return item ? produto : undefined;
 }

@@ -8,8 +8,8 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { getProduto, type Produto } from "./mock-data";
 import { criarStoreLocal } from "./store-local";
+import { useProdutos } from "./use-produto";
 
 type FavoritosContextType = {
   favoritos: string[];
@@ -80,12 +80,14 @@ export function useFavoritos() {
 
 export function useFavoritosProdutos() {
   const { favoritos } = useFavoritos();
-  // Ignora ids que não existem mais no mock (produto saiu do catálogo).
-  return useMemo(
-    () =>
-      favoritos
-        .map((id) => getProduto(id))
-        .filter((p): p is Produto => p !== undefined),
-    [favoritos]
-  );
+  const { produtos, carregando } = useProdutos();
+
+  // Ignora ids que não existem mais no catálogo (produto saiu do ar) e mantém
+  // a ordem da lista de favoritos: mais recentes primeiro.
+  const salvos = useMemo(() => {
+    const porId = new Map(produtos.map((p) => [p.id, p]));
+    return favoritos.flatMap((id) => porId.get(id) ?? []);
+  }, [favoritos, produtos]);
+
+  return { produtos: salvos, carregando };
 }

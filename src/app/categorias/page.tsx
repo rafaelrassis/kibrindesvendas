@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { categorias } from "@/lib/mock-data";
+import { getCategorias } from "@/lib/data/categorias";
 
-export default function CategoriasPage() {
+export default async function CategoriasPage() {
+  const categorias = await getCategorias();
   return (
     <div className="mx-auto max-w-6xl px-5 py-10">
       <h1 className="font-display text-2xl mb-6">Categorias</h1>

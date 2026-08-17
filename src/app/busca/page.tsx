@@ -1,5 +1,5 @@
 import ProductCard from "@/components/ProductCard";
-import { produtos } from "@/lib/mock-data";
+import { getProdutos, buscarProdutos } from "@/lib/data/produtos";
 
 export default async function BuscaPage({
   searchParams,
@@ -7,16 +7,9 @@ export default async function BuscaPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q = "" } = await searchParams;
-  const termo = q.trim().toLowerCase();
+  const termo = q.trim();
 
-  const resultados = termo
-    ? produtos.filter(
-        (p) =>
-          p.nome.toLowerCase().includes(termo) ||
-          p.categoriaLabel.toLowerCase().includes(termo) ||
-          p.descricao.toLowerCase().includes(termo)
-      )
-    : produtos;
+  const resultados = termo ? await buscarProdutos(termo) : await getProdutos();
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12">

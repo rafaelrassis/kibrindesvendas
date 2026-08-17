@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getProduto } from "@/lib/mock-data";
+import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
 import { compararPreco } from "@/lib/compare-price";
 
@@ -11,8 +11,18 @@ export default function CheckoutPage() {
   const { item, limpar } = useCart();
   const [processando, setProcessando] = useState(false);
 
-  const produto = item ? getProduto(item.produtoId) : undefined;
+  const { produto, carregando } = useProduto(item?.produtoId);
 
+  if (carregando) {
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center">
+        <p className="text-ink/60">Carregando...</p>
+      </div>
+    );
+  }
+
+  // Sem item na sacola, ou com um item cujo produto saiu do catálogo — nos dois
+  // casos não há o que fechar.
   if (!item || !produto) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-16 text-center">

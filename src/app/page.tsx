@@ -2,11 +2,15 @@ import Link from "next/link";
 import PromoBanner from "@/components/PromoBanner";
 import QuickLinks from "@/components/QuickLinks";
 import ProductShelf from "@/components/ProductShelf";
-import { categorias, produtos } from "@/lib/mock-data";
+import { getCategorias } from "@/lib/data/categorias";
+import { getProdutos, getDestaques } from "@/lib/data/produtos";
 
-export default function Home() {
-  const destaques = produtos.filter((p) => p.destaque);
-  const todos = produtos;
+export default async function Home() {
+  const [destaques, todos, categorias] = await Promise.all([
+    getDestaques(),
+    getProdutos(),
+    getCategorias(),
+  ]);
 
   return (
     <div>

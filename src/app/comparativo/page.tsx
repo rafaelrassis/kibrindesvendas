@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
-import { produtos } from "@/lib/mock-data";
+import { getProdutos } from "@/lib/data/produtos";
+import type { Produto } from "@/lib/types";
 import { compararPreco, formatarPreco } from "@/lib/compare-price";
 
 export const metadata: Metadata = {
@@ -10,11 +11,12 @@ export const metadata: Metadata = {
     "Compare os preços da Shopee com os do site oficial da LeoKibrindes e veja quanto você economiza comprando direto aqui.",
 };
 
-function economiaDe(produto: (typeof produtos)[number]) {
+function economiaDe(produto: Produto) {
   return produto.precoShopee - produto.preco;
 }
 
-export default function ComparativoPage() {
+export default async function ComparativoPage() {
+  const produtos = await getProdutos();
   const maisBaratos = produtos
     .filter((p) => compararPreco(p.precoShopee, p.preco).mostrar)
     .sort((a, b) => economiaDe(b) - economiaDe(a));

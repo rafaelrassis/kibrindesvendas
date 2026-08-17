@@ -5,7 +5,15 @@ import ProductCard from "@/components/ProductCard";
 import { useFavoritosProdutos } from "@/lib/favoritos-context";
 
 export default function FavoritosPage() {
-  const produtos = useFavoritosProdutos();
+  const { produtos, carregando } = useFavoritosProdutos();
+
+  if (carregando) {
+    return (
+      <div className="mx-auto max-w-md px-5 py-20 text-center">
+        <p className="text-ink/60 text-sm">Carregando seus favoritos...</p>
+      </div>
+    );
+  }
 
   if (produtos.length === 0) {
     return (

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { getProduto } from "@/lib/mock-data";
+import { useProduto } from "@/lib/use-produto";
 import { useCart, type ViaPersonalizacao } from "@/lib/cart-context";
 
 const vias: { id: ViaPersonalizacao; label: string; emoji: string; descricao: string }[] = [
@@ -31,7 +31,7 @@ const estilosIA = ["Aquarela", "Cartoon", "Minimalista", "Festa Junina"];
 export default function PersonalizarPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const produto = getProduto(id);
+  const { produto } = useProduto(id);
   const { item, definirPersonalizacao } = useCart();
 
   const [via, setVia] = useState<ViaPersonalizacao>("IA");

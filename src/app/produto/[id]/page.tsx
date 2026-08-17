@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { getProduto } from "@/lib/mock-data";
+import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
 import { compararPreco } from "@/lib/compare-price";
 import FavoritoButton from "@/components/FavoritoButton";
@@ -10,10 +10,18 @@ import FavoritoButton from "@/components/FavoritoButton";
 export default function ProdutoPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const produto = getProduto(id);
+  const { produto, carregando } = useProduto(id);
   const { iniciarItem } = useCart();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
+
+  if (carregando) {
+    return (
+      <div className="mx-auto max-w-3xl px-5 py-16 text-center">
+        <p className="text-ink/60">Carregando...</p>
+      </div>
+    );
+  }
 
   if (!produto) {
     return (

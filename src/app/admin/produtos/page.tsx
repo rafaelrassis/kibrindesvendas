@@ -1,7 +1,8 @@
-import { produtos } from "@/lib/mock-data";
+import { getProdutos } from "@/lib/data/produtos";
 import AdminNav from "@/components/AdminNav";
 
-export default function AdminProdutosPage() {
+export default async function AdminProdutosPage() {
+  const produtos = await getProdutos();
   return (
     <div className="mx-auto max-w-4xl px-5 py-12">
       <h1 className="font-display text-3xl mb-1">Produtos</h1>

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
-import { categorias, getProdutosPorCategoria } from "@/lib/mock-data";
+import { getCategorias } from "@/lib/data/categorias";
+import { getProdutosPorCategoria } from "@/lib/data/produtos";
 
 export default async function CategoriaPage({
   params,
@@ -8,10 +9,11 @@ export default async function CategoriaPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const categorias = await getCategorias();
   const categoria = categorias.find((c) => c.slug === slug);
   if (!categoria) notFound();
 
-  const lista = getProdutosPorCategoria(slug);
+  const lista = await getProdutosPorCategoria(slug);
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12">

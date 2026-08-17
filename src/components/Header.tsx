@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { categorias } from "@/lib/mock-data";
+import type { Categoria } from "@/lib/types";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 
-export default function Header() {
+export default function Header({ categorias }: { categorias: Categoria[] }) {
   const [termo, setTermo] = useState("");
   const router = useRouter();
   const pathname = usePathname();

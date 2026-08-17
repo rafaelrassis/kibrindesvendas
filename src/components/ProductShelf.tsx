@@ -1,4 +1,4 @@
-import type { Produto } from "@/lib/mock-data";
+import type { Produto } from "@/lib/types";
 import Link from "next/link";
 import { compararPreco } from "@/lib/compare-price";
 

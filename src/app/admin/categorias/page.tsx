@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminNav from "@/components/AdminNav";
-import { categorias as categoriasIniciais } from "@/lib/mock-data";
 
 type Categoria = { slug: string; label: string; emoji: string };
 
@@ -16,9 +15,15 @@ function slugify(texto: string) {
 }
 
 export default function AdminCategoriasPage() {
-  const [categorias, setCategorias] = useState<Categoria[]>(categoriasIniciais);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [emEdicao, setEmEdicao] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "", emoji: "" });
+
+  useEffect(() => {
+    fetch("/api/categorias")
+      .then((r) => r.json())
+      .then(setCategorias);
+  }, []);
 
   const iniciarNovo = () => {
     setEmEdicao("__novo__");

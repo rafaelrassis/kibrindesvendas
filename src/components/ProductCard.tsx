@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Produto } from "@/lib/mock-data";
+import type { Produto } from "@/lib/types";
 import { compararPreco, formatarPreco } from "@/lib/compare-price";
 import FavoritoButton from "./FavoritoButton";
 
