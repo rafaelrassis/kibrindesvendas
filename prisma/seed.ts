@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { categorias, produtos } from "../src/lib/mock-data";
+import { banners, categorias, produtos } from "../src/lib/mock-data";
 
 const prisma = new PrismaClient();
 
@@ -9,6 +9,16 @@ async function main() {
       where: { slug: c.slug },
       update: {},
       create: c,
+    });
+  }
+
+  // `update: {}` de propósito: o que a loja editar em /admin/banners não pode
+  // voltar atrás se o seed rodar de novo.
+  for (const b of banners) {
+    await prisma.banner.upsert({
+      where: { id: b.id },
+      update: {},
+      create: b,
     });
   }
 

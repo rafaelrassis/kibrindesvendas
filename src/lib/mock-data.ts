@@ -123,6 +123,38 @@ export const produtos: Produto[] = [
   },
 ];
 
+// Carrossel inicial da home. Depois do seed é tudo editável em /admin/banners,
+// e o seed não mexe mais neles (ver prisma/seed.ts).
+export const banners = [
+  {
+    id: "banner-imas",
+    titulo: "Ímãs personalizados",
+    eyebrow: "Tudo pra presentear",
+    precoTexto: "A partir de R$ 24,90",
+    ctaHref: "/categoria/imas",
+    corFundo: "#9C1C95",
+    ordem: 0,
+  },
+  {
+    id: "banner-canecas",
+    titulo: "Canecas com sua foto",
+    eyebrow: "Novidade",
+    precoTexto: "A partir de R$ 29,90",
+    ctaHref: "/categoria/canecas",
+    corFundo: "#D9A63E",
+    ordem: 1,
+  },
+  {
+    id: "banner-moletons",
+    titulo: "Moletons personalizados",
+    eyebrow: "Fim de semana",
+    precoTexto: "A partir de R$ 89,90",
+    ctaHref: "/categoria/moletons",
+    corFundo: "#7A1674",
+    ordem: 2,
+  },
+];
+
 export const faqs = [
   {
     pergunta: "Quanto tempo leva pra produzir meu pedido?",

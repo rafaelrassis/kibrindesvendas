@@ -8,9 +8,9 @@ Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
 sessão por cookie), pedidos gravados no banco, upload real da arte do cliente,
 favoritos e notificações no perfil, área interna (`/admin`) que edita catálogo
-de verdade e move o pedido de status, pagamento real pelo Mercado Pago (Pix,
-cartão e boleto) e entrega com frete por CEP e devolução pedida pelo cliente.
-O carrinho ainda é mock, em `localStorage`.
+de verdade, move o pedido de status e monta o carrossel da home, pagamento real
+pelo Mercado Pago (Pix, cartão e boleto) e entrega com frete por CEP e
+devolução pedida pelo cliente. O carrinho ainda é mock, em `localStorage`.
 
 ## Como começar
 
@@ -24,8 +24,8 @@ npm run dev
 ## Banco de dados (Prisma + PostgreSQL)
 
 O schema está modelado em `prisma/schema.prisma` (categorias, produtos,
-variações, usuários, favoritos, notificações, pedidos, itens e
-personalização). O catálogo das telas vem
+variações, usuários, favoritos, notificações, pedidos, itens, personalização e
+banners da home). O catálogo das telas vem
 do banco: as queries ficam em `src/lib/data/` e o app **não sobe sem
 `DATABASE_URL`**.
 
@@ -57,7 +57,8 @@ Toda escrita também mora em `src/lib/data/`: as rotas só autenticam, chamam a
 função e traduzem `ErroDeNegocio` (`src/lib/data/erros.ts`) pro JSON de erro.
 
 `src/lib/mock-data.ts` deixou de ser fonte de dados da aplicação: sobrou como
-seed do banco (`prisma/seed.ts`) e como origem das FAQs do `/suporte`.
+seed do banco (`prisma/seed.ts`, catálogo e banners) e como origem das FAQs do
+`/suporte`.
 
 ## Contas e sessão
 
@@ -75,8 +76,8 @@ O resto do perfil (telefone, CPF, endereços, preferências) continua local em
 ## Área interna (`/admin`)
 
 `/admin` edita o catálogo de verdade: cadastro, edição e remoção de produtos
-(com variações), CRUD de categorias e a fila de pedidos com a personalização
-de cada item.
+(com variações), CRUD de categorias, a fila de pedidos com a personalização de
+cada item e os banners da home.
 
 O acesso é restrito por `Usuario.admin`. Depois de criar a conta em
 `/cadastro`, promova ela uma vez:
@@ -101,6 +102,32 @@ O link "Admin" no header só aparece pra quem é admin.
 Remoções são bloqueadas quando quebrariam histórico: categoria com produtos
 (409) e produto que já está em algum pedido (409).
 
+### Banners da home
+
+O carrossel do topo da loja sai do banco (`model Banner`), não do código:
+`/admin/banners` cria, edita, reordena com as setas, desativa sem apagar e
+remove os slides. Cada slide é um título com eyebrow, selo de preço e link de
+destino, sobre uma imagem ou uma cor lisa.
+
+Três coisas são validadas no servidor, em `src/lib/data/banners.ts`, e não só
+no formulário — as três vão parar dentro do HTML da home:
+
+- **link de destino**: só caminho da loja (começa com `/`), pra um banner não
+  virar redirecionamento pra fora;
+- **cor de fundo**: `#RRGGBB`;
+- **imagem**: só URL que o próprio upload devolveu (ver abaixo).
+
+A ordem é gravada de uma vez (`PUT /api/admin/banners` com a lista de ids na
+ordem nova), então nenhuma gravação pela metade deixa dois slides na mesma
+posição. Sem nenhum banner ativo a home simplesmente não mostra o carrossel.
+
+A home é prerenderizada, e por isso declara `revalidate = 60`: o que a loja
+muda em `/admin` aparece no próximo minuto. Sem isso, o HTML gerado no build
+ficaria valendo até o próximo deploy.
+
+O seed cria três banners iniciais (`src/lib/mock-data.ts`) e não mexe mais
+neles depois — rodar `npm run db:seed` de novo não desfaz o que a loja editou.
+
 ## Arte enviada pelo cliente
 
 Na via "Enviar arte pronta" de `/personalizar/[id]`, o arquivo sobe na hora
@@ -124,6 +151,15 @@ Nos dois casos o nome é sorteado e quem serve é `GET /api/artes/[nome]`, que
 exige sessão: arte de cliente não fica em URL aberta — por isso o blob é
 privado e não público. A fila em `/admin/pedidos` linka a arte de cada item
 ("ver arte enviada").
+
+### Imagem da loja (banner) é outro caminho
+
+A imagem do banner precisa abrir pra visitante deslogado, então ela não pode
+dividir depósito com a arte do cliente: sobe por `POST /api/admin/imagens`
+(**só admin**, PNG/JPG/WEBP até 5MB) e é servida por `GET /api/imagens/[nome]`,
+sem sessão e com cache longo — o nome é sorteado e nunca muda. A gravação e a
+checagem por assinatura são as mesmas das artes, compartilhadas em
+`src/lib/arquivos.ts`; o que muda é a pasta (`imagens/`) e quem pode ler.
 
 ## Pedidos e pagamento (Mercado Pago)
 
@@ -231,18 +267,21 @@ src/
 │   ├── favoritos/ e notificacoes/ # lista salva e avisos do pedido
 │   ├── suporte/                  # FAQ
 │   ├── entrar/ e cadastro/       # login e criação de conta
-│   ├── admin/                    # área interna (produtos, categorias, pedidos)
+│   ├── admin/                    # área interna (produtos, categorias,
+│   │                              # pedidos, banners)
 │   └── api/                      # catálogo, auth, pedidos, favoritos,
 │                                  # notificações, webhook e admin (JSON)
 ├── components/                   # Header, Footer, ProductCard
 └── lib/
     ├── data/                     # queries Prisma (server-only)
     ├── admin.ts                  # guardas de /admin e /api/admin (server-only)
-    ├── artes.ts                  # validação e gravação das artes (server-only)
+    ├── arquivos.ts               # assinatura + Blob/disco dos uploads (server-only)
+    ├── artes.ts                  # arte do cliente, privada (server-only)
+    ├── imagens.ts                # imagem da loja, pública (server-only)
     ├── mercadopago.ts            # clients + assinatura do webhook (server-only)
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
-    ├── types.ts                  # Produto, Categoria, Variacao, Pedido
+    ├── types.ts                  # Produto, Categoria, Variacao, Pedido, Banner
     ├── frete.ts                  # tabela de frete por UF + formato do CEP
     ├── status-pedido.ts          # rótulos e cores do StatusPedido
     ├── use-produto.ts            # hooks de catálogo p/ client components
@@ -305,6 +344,7 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Pagamento de verdade (Mercado Pago Checkout Pro + webhook + notificações)
 - [x] Envio (frete por CEP no checkout) e devolução pedida pelo cliente, com
       `/conta/pedidos` lendo o banco
+- [x] Banners da home cadastrados em `/admin/banners`, com imagem pública
 - [ ] Persistir o carrinho no banco
 - [ ] Cotação real de frete (Correios / Melhor Envio) no lugar da tabela por
       região, e rastreio do envio no detalhe do pedido

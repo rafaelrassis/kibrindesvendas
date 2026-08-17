@@ -2,21 +2,28 @@ import Link from "next/link";
 import PromoBanner from "@/components/PromoBanner";
 import QuickLinks from "@/components/QuickLinks";
 import ProductShelf from "@/components/ProductShelf";
+import { getBannersAtivos } from "@/lib/data/banners";
 import { getCategorias } from "@/lib/data/categorias";
 import { getProdutos, getDestaques } from "@/lib/data/produtos";
 
+// A home é prerenderizada no build. Sem isso, banner cadastrado ou produto
+// editado em /admin só apareceria no próximo deploy — a página seguiria
+// servindo o HTML gerado lá atrás.
+export const revalidate = 60;
+
 export default async function Home() {
-  const [destaques, todos, categorias] = await Promise.all([
+  const [destaques, todos, categorias, banners] = await Promise.all([
     getDestaques(),
     getProdutos(),
     getCategorias(),
+    getBannersAtivos(),
   ]);
 
   return (
     <div>
 
       <div className="-mt-4">
-        <PromoBanner />
+        <PromoBanner banners={banners} />
       </div>
 
       <QuickLinks />

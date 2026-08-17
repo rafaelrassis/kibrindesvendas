@@ -24,6 +24,23 @@ export type Categoria = {
   emoji: string;
 };
 
+// Slide do carrossel da home, como a loja recebe.
+export type Banner = {
+  id: string;
+  titulo: string;
+  eyebrow: string;
+  precoTexto: string;
+  ctaHref: string;
+  imagemUrl: string | null;
+  corFundo: string;
+};
+
+// O mesmo slide na área interna, onde posição e visibilidade também aparecem.
+export type BannerAdmin = Banner & {
+  ordem: number;
+  ativo: boolean;
+};
+
 export type ItemPedido = {
   id: string;
   quantidade: number;
