@@ -42,13 +42,29 @@ model Variacao {
 }
 
 model Usuario {
+  id           String        @id @default(cuid())
+  nome         String
+  email        String        @unique
+  senhaHash    String
+  admin        Boolean       @default(false) // libera /admin e /api/admin (ver npm run db:admin)
+  pedidos      Pedido[]
+  notificacoes Notificacao[]
+  createdAt    DateTime      @default(now())
+}
+
+// Aviso pro cliente sobre o pedido dele. Hoje quem cria é o fluxo de pagamento
+// (confirmação, recusa), já que o retorno do Mercado Pago é assíncrono e o
+// cliente pode nem estar com o site aberto quando ele chega.
+model Notificacao {
   id        String   @id @default(cuid())
-  nome      String
-  email     String   @unique
-  senhaHash String
-  admin     Boolean  @default(false) // libera /admin e /api/admin (ver npm run db:admin)
-  pedidos   Pedido[]
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  titulo    String
+  mensagem  String
+  lida      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([usuarioId, createdAt])
 }
 
 model Pedido {
@@ -58,7 +74,12 @@ model Pedido {
   status        StatusPedido @default(AGUARDANDO_PAGAMENTO)
   total         Decimal      @db.Decimal(10, 2)
   itens         ItemPedido[]
-  pagamentoMock Boolean      @default(true) // pagamento real fica pra fase final
+  // Sem credencial do Mercado Pago configurada o checkout roda simulado; o
+  // campo marca quais pedidos nasceram assim pra não confundir com venda real.
+  pagamentoMock Boolean      @default(true)
+  // Id do pagamento no Mercado Pago, preenchido quando o webhook chega. Serve
+  // pra conferir um pedido no painel deles quando o cliente reclama.
+  pagamentoId   String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }

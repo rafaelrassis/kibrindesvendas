@@ -6,9 +6,10 @@ Repositório do projeto **Ki Brindes Vendas**.
 
 Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
-sessão por cookie), pedidos gravados no banco, upload real da arte do cliente
-e área interna (`/admin`) que edita catálogo de verdade. Carrinho e favoritos
-ainda são mock, em `localStorage`; o pagamento continua simulado.
+sessão por cookie), pedidos gravados no banco, upload real da arte do cliente,
+área interna (`/admin`) que edita catálogo de verdade e pagamento real pelo
+Mercado Pago (Pix, cartão e boleto), com notificação do resultado pro cliente.
+Carrinho e favoritos ainda são mock, em `localStorage`.
 
 ## Como começar
 
@@ -22,7 +23,8 @@ npm run dev
 ## Banco de dados (Prisma + PostgreSQL)
 
 O schema está modelado em `prisma/schema.prisma` (categorias, produtos,
-variações, usuários, pedidos, itens e personalização). O catálogo das telas vem
+variações, usuários, pedidos, itens, personalização e notificações). O catálogo
+das telas vem
 do banco: as queries ficam em `src/lib/data/` e o app **não sobe sem
 `DATABASE_URL`**.
 
@@ -121,13 +123,37 @@ exige sessão: arte de cliente não fica em URL aberta — por isso o blob é
 privado e não público. A fila em `/admin/pedidos` linka a arte de cada item
 ("ver arte enviada").
 
-## Pedidos
+## Pedidos e pagamento (Mercado Pago)
 
 `/checkout` grava o pedido via `POST /api/pedidos` em nome do usuário logado
-(quem tem sacola e não tem sessão é mandado pro login antes do resumo). O
-pagamento ainda é simulado — o pedido nasce `PAGO` só pra o fluxo seguir até
-a fila de produção em `/admin/pedidos`. A tela `/conta/pedidos` do cliente
-ainda mostra a lista mock; ligar ela no banco é o próximo passo natural.
+(quem tem sacola e não tem sessão é mandado pro login antes do resumo). A rota
+devolve `checkoutUrl` e o cliente segue pra lá:
+
+- **Com `MERCADOPAGO_ACCESS_TOKEN`** — o pedido nasce `AGUARDANDO_PAGAMENTO` e
+  o `checkoutUrl` é a página hospedada do Mercado Pago (Checkout Pro). Pix,
+  cartão e boleto acontecem lá, então nenhum dado de cartão passa pelo site.
+- **Sem o token** — modo simulado: o pedido nasce `PAGO`, é marcado com
+  `pagamentoMock` e o `checkoutUrl` já é a tela de confirmação. É o modo de
+  dev e demo, e a fila em `/admin/pedidos` mostra o selo "simulado".
+
+Quem confirma o pagamento é o webhook em `POST /api/webhooks/mercadopago`, não
+a volta do cliente ao site: ele recebe o id do pagamento, consulta o Mercado
+Pago (a fonte da verdade), atualiza o status do pedido e cria uma notificação
+pro cliente. Reentregas do mesmo evento são ignoradas, e um pedido que já
+saiu de `AGUARDANDO_PAGAMENTO` não volta pra trás. Com
+`MERCADOPAGO_WEBHOOK_SECRET` configurado a assinatura (`x-signature`) é
+conferida antes de qualquer coisa.
+
+`/pedido/confirmado?id=...` mostra o status real do pedido e, enquanto ele
+estiver aguardando, recarrega sozinha até o webhook chegar (Pix cai em
+segundos; boleto pode levar dias, e aí o aviso chega em `/notificacoes`).
+
+Em dev o Mercado Pago não alcança `localhost`: pra testar o webhook de ponta a
+ponta é preciso um túnel (ex: ngrok) e `NEXT_PUBLIC_BASE_URL` apontando pra
+URL pública dele.
+
+A tela `/conta/pedidos` do cliente ainda mostra a lista mock; ligar ela no
+banco é o próximo passo natural.
 
 ## Estrutura
 
@@ -138,17 +164,19 @@ src/
 │   ├── categoria/[slug]/         # listagem por categoria
 │   ├── produto/[id]/             # detalhe + variações
 │   ├── personalizar/[id]/        # 3 vias: IA / upload / manual
-│   ├── checkout/                 # resumo + pagamento (mock)
-│   ├── pedido/confirmado/
+│   ├── checkout/                 # resumo + ida pro Mercado Pago
+│   ├── pedido/confirmado/        # status real do pedido
+│   ├── notificacoes/             # avisos de pagamento e produção
 │   ├── suporte/                  # FAQ
 │   ├── entrar/ e cadastro/       # login e criação de conta
 │   ├── admin/                    # área interna (produtos, categorias, pedidos)
-│   └── api/                      # catálogo, auth, pedidos e admin (JSON)
+│   └── api/                      # catálogo, auth, pedidos, webhook e admin (JSON)
 ├── components/                   # Header, Footer, ProductCard
 └── lib/
     ├── data/                     # queries Prisma (server-only)
     ├── admin.ts                  # guardas de /admin e /api/admin (server-only)
     ├── artes.ts                  # validação e gravação das artes (server-only)
+    ├── mercadopago.ts            # clients + assinatura do webhook (server-only)
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
     ├── types.ts                  # Produto, Categoria, Variacao
@@ -164,6 +192,11 @@ src/
 3. Preencher as variáveis do projeto: `DATABASE_URL`, `SESSION_SECRET`
    (`openssl rand -hex 32`, diferente do valor de dev) e
    `BLOB_READ_WRITE_TOKEN` (o Blob Store já injeta esse ao ser vinculado).
+   Pro pagamento real, também `MERCADOPAGO_ACCESS_TOKEN`,
+   `MERCADOPAGO_WEBHOOK_SECRET` e `NEXT_PUBLIC_BASE_URL` com o domínio de
+   produção — as duas primeiras saem do painel de desenvolvedor do Mercado
+   Pago, onde a URL de notificação deve ser cadastrada como
+   `https://SEU-DOMINIO/api/webhooks/mercadopago`.
 4. Aplicar as migrations no banco de produção — `npm run db:deploy` com
    `DATABASE_URL` apontando pra lá. Isso vai **antes** do primeiro deploy: o
    build prerenderiza páginas que consultam o banco e quebra se as tabelas não
@@ -174,7 +207,9 @@ src/
    apontando pro banco de produção.
 
 Sem `BLOB_READ_WRITE_TOKEN` o upload cai pro disco local — o app sobe, mas as
-artes somem no deploy seguinte. Não deixar assim em produção.
+artes somem no deploy seguinte. Não deixar assim em produção. Sem
+`MERCADOPAGO_ACCESS_TOKEN` o checkout sobe em modo simulado, ou seja, aprova
+pedido sem cobrar ninguém: também não pode ficar assim em produção.
 
 ## CI
 
@@ -197,8 +232,10 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Upload real da arte do cliente (validado por assinatura, servido com sessão)
 - [x] Trocar disco local por bucket nas artes (Vercel Blob, privado)
 - [x] Migrations versionadas e integração contínua (lint + tipos + build)
+- [x] Pagamento de verdade (Mercado Pago Checkout Pro + webhook + notificações)
 - [ ] Persistir carrinho e favoritos no banco, e ligar /conta/pedidos no banco
-- [ ] Pagamento de verdade (hoje o pedido nasce PAGO)
+- [ ] Guardar a sacola até o pagamento confirmar (hoje ela é limpa na ida pro
+      Mercado Pago, então voltar de um pagamento recusado exige montar de novo)
 - [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)
 - [ ] Testes automatizados (o CI hoje só garante lint, tipos e build)
 

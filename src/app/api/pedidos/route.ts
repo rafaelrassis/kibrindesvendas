@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const pedido = await criarPedido(usuarioId, await req.json());
-    return NextResponse.json({ id: pedido.id });
+    const { pedido, checkoutUrl } = await criarPedido(usuarioId, await req.json());
+    return NextResponse.json({ id: pedido.id, checkoutUrl });
   } catch (e) {
     return respostaDeErro(e);
   }
