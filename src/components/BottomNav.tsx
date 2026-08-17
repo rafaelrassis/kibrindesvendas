@@ -3,19 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
-import { useAuth } from "@/lib/auth-context";
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { item } = useCart();
-  const { logado } = useAuth();
 
   const itens = [
     { href: "/", label: "Início", icon: "🏠" },
     { href: "/categorias", label: "Departamentos", icon: "📂" },
     { href: "/favoritos", label: "Favoritos", icon: "🤍" },
     { href: "/checkout", label: "Sacola", icon: "👜", badge: !!item },
-    { href: logado ? "/admin/produtos" : "/", label: "Conta", icon: "👤" },
+    { href: "/conta", label: "Conta", icon: "👤" },
   ];
 
   return (

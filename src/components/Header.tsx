@@ -13,7 +13,7 @@ export default function Header() {
   const pathname = usePathname();
   const home = pathname === "/";
   const { item } = useCart();
-  const { logado, entrar, sair } = useAuth();
+  const { logado, entrar } = useAuth();
 
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,14 +91,13 @@ export default function Header() {
           </Link>
 
           {logado ? (
-            <button
-              onClick={sair}
+            <Link
+              href="/conta"
               aria-label="Minha conta"
-              title="Sair"
               className="text-xl hover:text-mustard transition-colors"
             >
               👤
-            </button>
+            </Link>
           ) : (
             <button
               onClick={entrar}

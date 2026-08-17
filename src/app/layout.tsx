@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
+import { ContaProvider } from "@/lib/conta-context";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
@@ -17,12 +18,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="pt-BR" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-paper text-ink">
         <AuthProvider>
-          <CartProvider>
-            <Header />
-            <main className="flex-1 pb-16 md:pb-0">{children}</main>
-            <Footer />
-            <BottomNav />
-          </CartProvider>
+          <ContaProvider>
+            <CartProvider>
+              <Header />
+              <main className="flex-1 pb-16 md:pb-0">{children}</main>
+              <Footer />
+              <BottomNav />
+            </CartProvider>
+          </ContaProvider>
         </AuthProvider>
       </body>
     </html>
