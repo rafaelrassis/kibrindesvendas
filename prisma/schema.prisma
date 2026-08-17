@@ -46,6 +46,7 @@ model Usuario {
   nome      String
   email     String   @unique
   senhaHash String
+  admin     Boolean  @default(false) // libera /admin e /api/admin (ver npm run db:admin)
   pedidos   Pedido[]
   createdAt DateTime @default(now())
 }

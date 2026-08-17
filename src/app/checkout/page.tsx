@@ -1,17 +1,28 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
+import { useAuth } from "@/lib/auth-context";
 import { compararPreco } from "@/lib/compare-price";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { item, limpar } = useCart();
+  const { logado, carregando: carregandoAuth } = useAuth();
   const [processando, setProcessando] = useState(false);
+  const [erro, setErro] = useState("");
 
   const { produto, carregando } = useProduto(item?.produtoId);
+
+  // O pedido é gravado no banco em nome do usuário, então quem tem sacola mas
+  // não tem sessão passa pelo login antes de ver o resumo.
+  useEffect(() => {
+    if (!carregandoAuth && !logado && item) {
+      router.replace("/entrar?next=/checkout");
+    }
+  }, [carregandoAuth, logado, item, router]);
 
   if (carregando) {
     return (
@@ -41,11 +52,29 @@ export default function CheckoutPage() {
   const comparacao = compararPreco(produto.precoShopee, produto.preco);
 
   function pagar() {
+    if (!item) return;
+    setErro("");
     setProcessando(true);
-    setTimeout(() => {
-      router.push("/pedido/confirmado");
-      setTimeout(limpar, 300);
-    }, 900);
+
+    fetch("/api/pedidos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item),
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          setErro(data.error ?? "Não foi possível concluir o pedido.");
+          setProcessando(false);
+          return;
+        }
+        router.push(`/pedido/confirmado?id=${data.id}`);
+        setTimeout(limpar, 300);
+      })
+      .catch(() => {
+        setErro("Não foi possível concluir o pedido. Tente novamente.");
+        setProcessando(false);
+      });
   }
 
   return (
@@ -130,6 +159,8 @@ export default function CheckoutPage() {
           Simulação — nenhum pagamento real é processado neste protótipo.
         </p>
       </div>
+
+      {erro && <p className="text-sm text-berry mb-4">{erro}</p>}
 
       <button
         onClick={pagar}

@@ -5,19 +5,13 @@ import AdminNav from "@/components/AdminNav";
 
 type Categoria = { slug: string; label: string; emoji: string };
 
-function slugify(texto: string) {
-  return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 export default function AdminCategoriasPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [emEdicao, setEmEdicao] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "", emoji: "" });
+
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     fetch("/api/categorias")
@@ -40,26 +34,47 @@ export default function AdminCategoriasPage() {
     setForm({ label: "", emoji: "" });
   };
 
-  const salvar = () => {
+  const salvar = async () => {
     if (!form.label.trim()) return;
+    setErro("");
+    setSalvando(true);
 
-    if (emEdicao === "__novo__") {
-      const novaSlug = slugify(form.label);
-      setCategorias((prev) => [
-        ...prev,
-        { slug: novaSlug, label: form.label.trim(), emoji: form.emoji || "🎁" },
-      ]);
-    } else {
-      setCategorias((prev) =>
-        prev.map((c) =>
-          c.slug === emEdicao ? { ...c, label: form.label.trim(), emoji: form.emoji || "🎁" } : c
-        )
-      );
+    try {
+      if (emEdicao === "__novo__") {
+        const r = await fetch("/api/admin/categorias", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const nova = await r.json();
+        if (!r.ok) throw new Error(nova.error);
+        setCategorias((prev) => [...prev, nova]);
+      } else if (emEdicao) {
+        const r = await fetch(`/api/admin/categorias/${emEdicao}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const atualizada = await r.json();
+        if (!r.ok) throw new Error(atualizada.error);
+        setCategorias((prev) => prev.map((c) => (c.slug === emEdicao ? atualizada : c)));
+      }
+      cancelar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
     }
-    cancelar();
   };
 
-  const remover = (slug: string) => {
+  const remover = async (slug: string) => {
+    setErro("");
+    const r = await fetch(`/api/admin/categorias/${slug}`, { method: "DELETE" });
+    const data = await r.json();
+    if (!r.ok) {
+      setErro(data.error ?? "Não foi possível remover.");
+      return;
+    }
     setCategorias((prev) => prev.filter((c) => c.slug !== slug));
     if (emEdicao === slug) cancelar();
   };
@@ -68,8 +83,9 @@ export default function AdminCategoriasPage() {
     <div className="mx-auto max-w-3xl px-5 py-12">
       <h1 className="font-display text-3xl mb-1">Categorias</h1>
       <p className="text-ink/60 mb-2 text-sm">
-        Área interna (mock) — alterações ficam só nesta sessão, não persistem no servidor ainda.
+        Área interna — alterações são gravadas direto no banco.
       </p>
+      {erro && <p className="text-sm text-berry mb-4">{erro}</p>}
       <AdminNav />
 
       <div className="bg-white border border-line rounded-lg overflow-hidden mb-6">
@@ -102,9 +118,10 @@ export default function AdminCategoriasPage() {
                       />
                       <button
                         onClick={salvar}
-                        className="bg-pine text-white px-3 py-1.5 rounded-full text-xs"
+                        disabled={salvando}
+                        className="bg-pine text-white px-3 py-1.5 rounded-full text-xs disabled:opacity-50"
                       >
-                        Salvar
+                        {salvando ? "Salvando..." : "Salvar"}
                       </button>
                       <button
                         onClick={cancelar}
@@ -157,9 +174,10 @@ export default function AdminCategoriasPage() {
                     />
                     <button
                       onClick={salvar}
-                      className="bg-pine text-white px-3 py-1.5 rounded-full text-xs"
+                      disabled={salvando}
+                      className="bg-pine text-white px-3 py-1.5 rounded-full text-xs disabled:opacity-50"
                     >
-                      Adicionar
+                      {salvando ? "Salvando..." : "Adicionar"}
                     </button>
                     <button
                       onClick={cancelar}

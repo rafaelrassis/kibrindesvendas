@@ -13,7 +13,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const pathname = usePathname();
   const home = pathname === "/";
   const { item } = useCart();
-  const { logado } = useAuth();
+  const { logado, usuario } = useAuth();
 
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,12 +68,14 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
           <Link href="/suporte" className="py-2 hover:text-mustard transition-colors">
             Suporte / FAQ
           </Link>
-          <Link
-            href="/admin/produtos"
-            className="py-2 text-white/50 hover:text-mustard transition-colors normal-case"
-          >
-            Admin
-          </Link>
+          {usuario?.admin && (
+            <Link
+              href="/admin/produtos"
+              className="py-2 text-white/50 hover:text-mustard transition-colors normal-case"
+            >
+              Admin
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-4 shrink-0">

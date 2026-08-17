@@ -6,8 +6,9 @@ Repositório do projeto **Ki Brindes Vendas**.
 
 Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
-sessão por cookie). Carrinho e favoritos ainda são mock, em `localStorage`.
-Pedidos e pagamento seguem sem back-end real.
+sessão por cookie), pedidos gravados no banco e área interna (`/admin`) que
+edita catálogo de verdade. Carrinho e favoritos ainda são mock, em
+`localStorage`; o pagamento continua simulado.
 
 ## Como começar
 
@@ -37,10 +38,13 @@ npm run db:seed               # popula categorias e produtos com o mock-data
 ### Como as telas leem os dados
 
 `src/lib/data/` é server-only (marcado com `server-only`): quem consome direto
-são os Server Components (home, categorias, busca, comparativo, admin/produtos).
-As telas que são Client Component — produto, personalizar, checkout, favoritos e
-admin/categorias — passam pelas rotas em `src/app/api/` usando os hooks de
-`src/lib/use-produto.ts`.
+são os Server Components (home, categorias, busca, comparativo, admin/pedidos e
+a edição de produto). As telas que são Client Component — produto,
+personalizar, checkout, favoritos, admin/produtos e admin/categorias — passam
+pelas rotas em `src/app/api/` usando os hooks de `src/lib/use-produto.ts`.
+
+Toda escrita também mora em `src/lib/data/`: as rotas só autenticam, chamam a
+função e traduzem `ErroDeNegocio` (`src/lib/data/erros.ts`) pro JSON de erro.
 
 `src/lib/mock-data.ts` deixou de ser fonte de dados da aplicação: sobrou como
 seed do banco (`prisma/seed.ts`) e como origem das FAQs do `/suporte`.
@@ -58,6 +62,36 @@ inseguro. O ciclo todo fica em `src/lib/session.ts` e nas rotas
 O resto do perfil (telefone, CPF, endereços, preferências) continua local em
 `localStorage`, via `conta-context`.
 
+## Área interna (`/admin`)
+
+`/admin` edita o catálogo de verdade: cadastro, edição e remoção de produtos
+(com variações), CRUD de categorias e a fila de pedidos com a personalização
+de cada item.
+
+O acesso é restrito por `Usuario.admin`. Depois de criar a conta em
+`/cadastro`, promova ela uma vez:
+
+```bash
+npm run db:admin -- voce@exemplo.com            # vira admin
+npm run db:admin -- voce@exemplo.com --remover  # volta a ser cliente
+```
+
+Sem isso, `/admin` responde "área restrita" e as rotas `/api/admin/*`
+devolvem 401 (sem sessão) ou 403 (sessão sem `admin`) — a checagem fica em
+`src/lib/admin.ts` e é repetida em cada rota, porque proteger só a tela não
+protegeria a API. O link "Admin" no header só aparece pra quem é admin.
+
+Remoções são bloqueadas quando quebrariam histórico: categoria com produtos
+(409) e produto que já está em algum pedido (409).
+
+## Pedidos
+
+`/checkout` grava o pedido via `POST /api/pedidos` em nome do usuário logado
+(quem tem sacola e não tem sessão é mandado pro login antes do resumo). O
+pagamento ainda é simulado — o pedido nasce `PAGO` só pra o fluxo seguir até
+a fila de produção em `/admin/pedidos`. A tela `/conta/pedidos` do cliente
+ainda mostra a lista mock; ligar ela no banco é o próximo passo natural.
+
 ## Estrutura
 
 ```
@@ -70,12 +104,13 @@ src/
 │   ├── checkout/                 # resumo + pagamento (mock)
 │   ├── pedido/confirmado/
 │   ├── suporte/                  # FAQ
-│   ├── admin/                    # stubs de produtos e pedidos
 │   ├── entrar/ e cadastro/       # login e criação de conta
-│   └── api/                      # catálogo + auth (JSON p/ client components)
+│   ├── admin/                    # área interna (produtos, categorias, pedidos)
+│   └── api/                      # catálogo, auth, pedidos e admin (JSON)
 ├── components/                   # Header, Footer, ProductCard
 └── lib/
     ├── data/                     # queries Prisma (server-only)
+    ├── admin.ts                  # guarda das rotas /api/admin (server-only)
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
     ├── types.ts                  # Produto, Categoria, Variacao
@@ -90,7 +125,9 @@ src/
 - [x] Modelar o schema Prisma + seed a partir do mock-data
 - [x] Trocar mock-data por Prisma + PostgreSQL nas telas (Fase 1 da spec)
 - [x] Autenticação real (cadastro, login, sessão em cookie, troca de senha)
-- [ ] Persistir carrinho, favoritos e pedidos no banco
+- [x] Admin com CRUD de catálogo no banco + pedidos gravados no checkout
+- [ ] Persistir carrinho e favoritos no banco, e ligar /conta/pedidos no banco
+- [ ] Pagamento de verdade (hoje o pedido nasce PAGO)
 - [ ] Configurar ambiente de desenvolvimento (variáveis de ambiente, deploy)
 - [ ] Configurar testes e integração contínua
 

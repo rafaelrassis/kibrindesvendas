@@ -1,6 +1,12 @@
 import Link from "next/link";
 
-export default function PedidoConfirmadoPage() {
+export default async function PedidoConfirmadoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string }>;
+}) {
+  const { id } = await searchParams;
+
   return (
     <div className="mx-auto max-w-lg px-5 py-20 text-center">
       <div className="text-5xl mb-5">🎁</div>
@@ -11,6 +17,9 @@ export default function PedidoConfirmadoPage() {
         produção.
       </p>
       <div className="bg-white border border-line rounded-lg p-5 text-left text-sm mb-8 space-y-2">
+        {id && (
+          <p><span className="text-ink/50">Pedido:</span> #{id.slice(0, 8)}</p>
+        )}
         <p><span className="text-ink/50">Status:</span> Pago → Em validação</p>
         <p><span className="text-ink/50">Próximo passo:</span> conferência de arte pela loja</p>
         <p><span className="text-ink/50">Se houver problema:</span> contato via WhatsApp</p>

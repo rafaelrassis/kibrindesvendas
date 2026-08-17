@@ -1,7 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { slugify } from "@/lib/slug";
 import type { Produto } from "@/lib/types";
 import type { Produto as ProdutoDb, Variacao as VariacaoDb, Categoria as CategoriaDb } from "@prisma/client";
+import { ErroDeNegocio } from "./erros";
 
 type ProdutoComRelacoes = ProdutoDb & {
   categoria: CategoriaDb;
@@ -69,4 +71,131 @@ export async function buscarProdutos(termo: string): Promise<Produto[]> {
     orderBy: { nome: "asc" },
   });
   return produtos.map(toProduto);
+}
+
+// --- Escrita (admin) -------------------------------------------------------
+
+export type DadosProduto = {
+  nome: string;
+  descricao?: string;
+  categoriaSlug: string;
+  preco: number;
+  precoShopee?: number;
+  requerPersonalizacao?: boolean;
+  emoji?: string;
+  cor?: string;
+  destaque?: boolean;
+  variacoes?: { tipo: string; valores: string[] }[];
+};
+
+const EMOJI_PADRAO = "🎁";
+const COR_PADRAO = "#3F6B4C";
+
+async function categoriaIdPorSlug(slug: string) {
+  const categoria = await prisma.categoria.findUnique({ where: { slug } });
+  if (!categoria) throw new ErroDeNegocio("Categoria não encontrada.", 404);
+  return categoria.id;
+}
+
+function validar(dados: Partial<DadosProduto>) {
+  if (dados.nome !== undefined && !dados.nome.trim()) {
+    throw new ErroDeNegocio("Informe o nome do produto.");
+  }
+  if (dados.preco !== undefined && !(dados.preco > 0)) {
+    throw new ErroDeNegocio("Informe um preço maior que zero.");
+  }
+  if (dados.precoShopee !== undefined && dados.precoShopee < 0) {
+    throw new ErroDeNegocio("O preço da Shopee não pode ser negativo.");
+  }
+}
+
+export async function criarProduto(dados: DadosProduto): Promise<Produto> {
+  if (!dados.nome?.trim() || !dados.categoriaSlug || dados.preco === undefined) {
+    throw new ErroDeNegocio("Preencha nome, categoria e preço.");
+  }
+  validar(dados);
+
+  const categoriaId = await categoriaIdPorSlug(dados.categoriaSlug);
+
+  // O id vem do nome (é ele que aparece na URL do produto); o sufixo evita
+  // colisão entre dois produtos de nome parecido.
+  const id = `${slugify(dados.nome) || "produto"}-${Date.now().toString(36)}`;
+
+  const produto = await prisma.produto.create({
+    data: {
+      id,
+      nome: dados.nome.trim(),
+      descricao: dados.descricao?.trim() ?? "",
+      categoriaId,
+      preco: dados.preco,
+      precoShopee: dados.precoShopee ?? dados.preco,
+      requerPersonalizacao: !!dados.requerPersonalizacao,
+      emoji: dados.emoji || EMOJI_PADRAO,
+      cor: dados.cor || COR_PADRAO,
+      destaque: !!dados.destaque,
+      variacoes: {
+        create: (dados.variacoes ?? []).map((v) => ({ tipo: v.tipo, valores: v.valores })),
+      },
+    },
+    include,
+  });
+  return toProduto(produto);
+}
+
+export async function atualizarProduto(
+  id: string,
+  dados: Partial<DadosProduto>
+): Promise<Produto> {
+  const atual = await prisma.produto.findUnique({ where: { id } });
+  if (!atual) throw new ErroDeNegocio("Produto não encontrado.", 404);
+  validar(dados);
+
+  const categoriaId = dados.categoriaSlug
+    ? await categoriaIdPorSlug(dados.categoriaSlug)
+    : undefined;
+
+  // As variações são substituídas em bloco (o formulário manda a lista
+  // inteira), então apagar e recriar precisa ser atômico.
+  const produto = await prisma.$transaction(async (tx) => {
+    if (dados.variacoes) {
+      await tx.variacao.deleteMany({ where: { produtoId: id } });
+    }
+
+    return tx.produto.update({
+      where: { id },
+      data: {
+        nome: dados.nome?.trim(),
+        descricao: dados.descricao?.trim(),
+        categoriaId,
+        preco: dados.preco,
+        precoShopee: dados.precoShopee,
+        requerPersonalizacao: dados.requerPersonalizacao,
+        emoji: dados.emoji,
+        cor: dados.cor,
+        destaque: dados.destaque,
+        ...(dados.variacoes && {
+          variacoes: {
+            create: dados.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
+          },
+        }),
+      },
+      include,
+    });
+  });
+  return toProduto(produto);
+}
+
+export async function removerProduto(id: string) {
+  const atual = await prisma.produto.findUnique({ where: { id } });
+  if (!atual) throw new ErroDeNegocio("Produto não encontrado.", 404);
+
+  const emUso = await prisma.itemPedido.count({ where: { produtoId: id } });
+  if (emUso > 0) {
+    throw new ErroDeNegocio(
+      `Não é possível remover: produto está em ${emUso} pedido(s).`,
+      409
+    );
+  }
+
+  await prisma.produto.delete({ where: { id } });
 }

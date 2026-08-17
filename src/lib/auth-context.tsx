@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-type Usuario = { id: string; nome: string; email: string };
+type Usuario = { id: string; nome: string; email: string; admin: boolean };
 
 type AuthContextType = {
   logado: boolean;
