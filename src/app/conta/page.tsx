@@ -10,6 +10,7 @@ import {
   HelpCircle,
   LogOut,
   LogIn,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -102,6 +103,13 @@ export default function ContaPage() {
         <ContaMenuItem href="/conta/seguranca" icon={ShieldCheck} label="Senha e segurança" />
         <ContaMenuItem href="/suporte" icon={HelpCircle} label="Ajuda e suporte" />
       </div>
+
+      {/* Só pra quem tem acesso admin — único lugar do site com esse link. */}
+      {usuario.admin && (
+        <div className="space-y-2 mb-6">
+          <ContaMenuItem href="/admin" icon={Settings} label="Painel administrativo" />
+        </div>
+      )}
 
       <button
         onClick={sair}

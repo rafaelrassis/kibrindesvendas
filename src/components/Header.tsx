@@ -15,7 +15,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const pathname = usePathname();
   const home = pathname === "/";
   const { item } = useCart();
-  const { logado, usuario } = useAuth();
+  const { logado } = useAuth();
   const { naoLidas } = useNotificacoes();
 
   const buscar = (e: React.FormEvent) => {
@@ -69,14 +69,6 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
           <Link href="/suporte" className="py-2 hover:text-mustard transition-colors">
             Suporte / FAQ
           </Link>
-          {usuario?.admin && (
-            <Link
-              href="/admin"
-              className="py-2 text-white/50 hover:text-mustard transition-colors normal-case"
-            >
-              Admin
-            </Link>
-          )}
         </nav>
 
         <div className="flex items-center gap-4 shrink-0">
