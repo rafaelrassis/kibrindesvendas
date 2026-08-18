@@ -9,7 +9,7 @@ import { getUsuarioDaSessao } from "@/lib/data/usuarios";
 // resposta.
 export async function exigirAdmin() {
   const usuario = await getUsuarioDaSessao();
-  if (!usuario) redirect("/entrar?next=/admin/produtos");
+  if (!usuario) redirect("/entrar?next=/admin");
   if (!usuario.admin) redirect("/restrito");
   return usuario;
 }

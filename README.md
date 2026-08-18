@@ -7,10 +7,10 @@ Repositório do projeto **Ki Brindes Vendas**.
 Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
 sessão por cookie), pedidos gravados no banco, upload real da arte do cliente,
-favoritos e notificações no perfil, área interna (`/admin`) que edita catálogo
-de verdade, move o pedido de status e monta o carrossel da home, pagamento real
-pelo Mercado Pago (Pix, cartão e boleto) e entrega com frete por CEP e
-devolução pedida pelo cliente. O carrinho ainda é mock, em `localStorage`.
+favoritos e notificações no perfil, área interna (`/admin`) com painel de
+vendas, que edita catálogo de verdade, move o pedido de status e monta o
+carrossel da home, pagamento real pelo Mercado Pago (Pix, cartão e boleto) e
+entrega com frete por CEP e devolução pedida pelo cliente. O carrinho ainda é mock, em `localStorage`.
 
 ## Como começar
 
@@ -47,10 +47,11 @@ banco sem deixar rastro.
 ### Como as telas leem os dados
 
 `src/lib/data/` é server-only (marcado com `server-only`): quem consome direto
-são os Server Components (home, categorias, busca, comparativo, admin/pedidos e
-a edição de produto). As telas que são Client Component — produto,
-personalizar, checkout, favoritos, notificações, admin/produtos e
-admin/categorias — passam pelas rotas em `src/app/api/`, pelo hook de
+são os Server Components (home, categorias, busca, comparativo, o painel e a
+fila de pedidos do admin e a edição de produto). As telas que são Client
+Component — produto, personalizar, checkout, favoritos, notificações,
+admin/produtos e admin/categorias — passam pelas rotas em `src/app/api/`,
+pelo hook de
 `src/lib/use-produto.ts` ou pelos contexts de favoritos e notificações.
 
 Toda escrita também mora em `src/lib/data/`: as rotas só autenticam, chamam a
@@ -75,9 +76,9 @@ O resto do perfil (telefone, CPF, endereços, preferências) continua local em
 
 ## Área interna (`/admin`)
 
-`/admin` edita o catálogo de verdade: cadastro, edição e remoção de produtos
-(com variações), CRUD de categorias, a fila de pedidos com a personalização de
-cada item e os banners da home.
+`/admin` abre no painel de vendas e edita o catálogo de verdade: cadastro,
+edição e remoção de produtos (com variações), CRUD de categorias, a fila de
+pedidos com a personalização de cada item e os banners da home.
 
 O acesso é restrito por `Usuario.admin`. Depois de criar a conta em
 `/cadastro`, promova ela uma vez:
@@ -101,6 +102,26 @@ O link "Admin" no header só aparece pra quem é admin.
 
 Remoções são bloqueadas quando quebrariam histórico: categoria com produtos
 (409) e produto que já está em algum pedido (409).
+
+### Painel (`/admin`)
+
+Os números dos últimos 30 dias: vendas, pedidos pagos, ticket médio e taxa de
+devolução em cartões, mais os gráficos de vendas por dia, pedidos por status e
+os cinco produtos mais vendidos. A consulta fica em `src/lib/data/dashboard.ts`
+e os gráficos (recharts) em `src/components/AdminDashboardCharts.tsx` — a única
+parte da tela que roda no navegador.
+
+Duas decisões que valem saber ao ler os números:
+
+- **Só pedido pago entra no faturamento.** `AGUARDANDO_PAGAMENTO` e
+  `CANCELADO` ficam de fora; devolvido continua contando como venda do período
+  (o dinheiro chegou a entrar) e reaparece na taxa de devolução. O mapa é
+  status por status, então criar um novo `StatusPedido` quebra o build até
+  alguém decidir de que lado ele fica.
+- **O dia é o de Brasília.** O servidor roda em UTC: sem fixar o fuso, um
+  pedido das 21h entraria no gráfico como venda do dia seguinte.
+
+A soma por produto é feita pelo banco (`groupBy`), não em memória.
 
 ### Banners da home
 
@@ -267,8 +288,8 @@ src/
 │   ├── favoritos/ e notificacoes/ # lista salva e avisos do pedido
 │   ├── suporte/                  # FAQ
 │   ├── entrar/ e cadastro/       # login e criação de conta
-│   ├── admin/                    # área interna (produtos, categorias,
-│   │                              # pedidos, banners)
+│   ├── admin/                    # área interna (painel, produtos,
+│   │                              # categorias, pedidos, banners)
 │   └── api/                      # catálogo, auth, pedidos, favoritos,
 │                                  # notificações, webhook e admin (JSON)
 ├── components/                   # Header, Footer, ProductCard
@@ -358,6 +379,8 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Envio (frete por CEP no checkout) e devolução pedida pelo cliente, com
       `/conta/pedidos` lendo o banco
 - [x] Banners da home cadastrados em `/admin/banners`, com imagem pública
+- [x] Painel de vendas em `/admin` (faturamento, ticket médio, devoluções e
+      gráficos dos últimos 30 dias)
 - [ ] Persistir o carrinho no banco
 - [ ] Cotação real de frete (Correios / Melhor Envio) no lugar da tabela por
       região, e rastreio do envio no detalhe do pedido

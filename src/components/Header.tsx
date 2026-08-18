@@ -72,7 +72,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
           </Link>
           {usuario?.admin && (
             <Link
-              href="/admin/produtos"
+              href="/admin"
               className="py-2 text-white/50 hover:text-mustard transition-colors normal-case"
             >
               Admin
