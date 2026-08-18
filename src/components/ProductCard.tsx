@@ -10,7 +10,7 @@ export default function ProductCard({
   produto: Produto;
   comparativo?: boolean;
 }) {
-  const comparacao = compararPreco(produto.precoShopee, produto.preco);
+  const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
 
   return (
     // O favorito fica fora do <Link>: <button> dentro de <a> é HTML inválido e

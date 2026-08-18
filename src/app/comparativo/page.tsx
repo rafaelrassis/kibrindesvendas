@@ -18,12 +18,12 @@ function economiaDe(produto: Produto) {
 export default async function ComparativoPage() {
   const produtos = await getProdutos();
   const maisBaratos = produtos
-    .filter((p) => compararPreco(p.precoShopee, p.preco).mostrar)
+    .filter((p) => compararPreco(p.precoShopee, p.preco, p.vendidoNaShopee).mostrar)
     .sort((a, b) => economiaDe(b) - economiaDe(a));
 
   const destaque = maisBaratos.find((p) => p.destaque) ?? maisBaratos[0];
   const comparacaoDestaque = destaque
-    ? compararPreco(destaque.precoShopee, destaque.preco)
+    ? compararPreco(destaque.precoShopee, destaque.preco, destaque.vendidoNaShopee)
     : { mostrar: false as const };
 
   return (

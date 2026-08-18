@@ -73,7 +73,7 @@ export default function CheckoutResumo({
   }
 
   const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
-  const comparacao = compararPreco(produto.precoShopee, produto.preco);
+  const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
   const frete = endereco?.frete ?? null;
   const total = produto.preco + (frete?.valor ?? 0);
 

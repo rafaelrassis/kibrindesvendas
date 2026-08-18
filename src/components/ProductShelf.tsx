@@ -20,7 +20,7 @@ export default function ProductShelf({
 
       <div className="pl-5 flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide">
         {produtos.map((p) => {
-          const comparacao = compararPreco(p.precoShopee, p.preco);
+          const comparacao = compararPreco(p.precoShopee, p.preco, p.vendidoNaShopee);
           return (
             <Link
               key={p.id}

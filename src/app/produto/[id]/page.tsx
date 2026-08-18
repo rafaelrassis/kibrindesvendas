@@ -31,7 +31,7 @@ export default function ProdutoPage() {
     );
   }
 
-  const comparacao = compararPreco(produto.precoShopee, produto.preco);
+  const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
   const faltaEscolher = produto.variacoes.some((v) => !selecoes[v.tipo]);
 
   function continuar() {

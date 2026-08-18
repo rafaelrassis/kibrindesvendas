@@ -21,6 +21,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     categoriaLabel: p.categoria.label,
     preco: Number(p.preco),
     precoShopee: Number(p.precoShopee),
+    vendidoNaShopee: p.vendidoNaShopee,
     requerPersonalizacao: p.requerPersonalizacao,
     emoji: p.emoji,
     cor: p.cor,
@@ -83,6 +84,7 @@ export type DadosProduto = {
   categoriaSlug: string;
   preco: number;
   precoShopee?: number;
+  vendidoNaShopee?: boolean;
   requerPersonalizacao?: boolean;
   emoji?: string;
   cor?: string;
@@ -131,6 +133,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       categoriaId,
       preco: dados.preco,
       precoShopee: dados.precoShopee ?? dados.preco,
+      vendidoNaShopee: dados.vendidoNaShopee ?? true,
       requerPersonalizacao: !!dados.requerPersonalizacao,
       emoji: dados.emoji || EMOJI_PADRAO,
       cor: dados.cor || COR_PADRAO,
@@ -171,6 +174,7 @@ export async function atualizarProduto(
         categoriaId,
         preco: dados.preco,
         precoShopee: dados.precoShopee,
+        vendidoNaShopee: dados.vendidoNaShopee,
         requerPersonalizacao: dados.requerPersonalizacao,
         emoji: dados.emoji,
         cor: dados.cor,

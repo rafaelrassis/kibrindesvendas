@@ -2,7 +2,17 @@ export type ComparacaoPreco =
   | { mostrar: false }
   | { mostrar: true; tipo: "economia"; percentual: number; economia: number };
 
-export function compararPreco(precoShopee: number, precoKi: number): ComparacaoPreco {
+// Produto fora da Shopee não tem com o que comparar: o preço da Shopee pode
+// ter sobrado de um cadastro antigo, então o comparativo some de vez.
+export function compararPreco(
+  precoShopee: number,
+  precoKi: number,
+  vendidoNaShopee: boolean
+): ComparacaoPreco {
+  if (!vendidoNaShopee) {
+    return { mostrar: false };
+  }
+
   const economia = precoShopee - precoKi;
 
   if (economia <= 0) {

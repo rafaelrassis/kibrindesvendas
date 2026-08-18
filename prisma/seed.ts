@@ -36,6 +36,7 @@ async function main() {
         categoriaId: categoria.id,
         preco: p.preco,
         precoShopee: p.precoShopee,
+        vendidoNaShopee: p.vendidoNaShopee,
         requerPersonalizacao: p.requerPersonalizacao,
         emoji: p.emoji,
         cor: p.cor,

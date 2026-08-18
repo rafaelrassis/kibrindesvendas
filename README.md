@@ -8,7 +8,8 @@ Fluxo completo de compra e personalização lendo catálogo do PostgreSQL via
 Prisma, com contas de usuário reais (cadastro, login e troca de senha em
 sessão por cookie), pedidos gravados no banco, upload real da arte do cliente,
 favoritos e notificações no perfil, área interna (`/admin`) com painel de
-vendas, que edita catálogo de verdade, move o pedido de status e monta o
+vendas, que edita catálogo de verdade (inclusive ligando e desligando o
+comparativo de preço da Shopee por produto), move o pedido de status e monta o
 carrossel da home, pagamento real pelo Mercado Pago (Pix, cartão e boleto) e
 entrega com frete por CEP e devolução pedida pelo cliente. O carrinho ainda é mock, em `localStorage`.
 
@@ -122,6 +123,25 @@ Duas decisões que valem saber ao ler os números:
   pedido das 21h entraria no gráfico como venda do dia seguinte.
 
 A soma por produto é feita pelo banco (`groupBy`), não em memória.
+
+### Comparativo de preço por produto (`vendidoNaShopee`)
+
+O que faz o site mostrar "na Shopee R$ X" e o selo de desconto é
+`compararPreco()` (`src/lib/compare-price.ts`), e ela só compara quando o
+produto **é vendido na Shopee**. Esse liga/desliga é o campo
+`Produto.vendidoNaShopee` (padrão `true`): fica no formulário de produto e
+também como botão direto na lista de `/admin/produtos`, pra loja tirar o
+comparativo de um item sem abrir a edição.
+
+Desligado, o comparativo some da vitrine, do produto, do checkout e da
+`/comparativo` mesmo que `precoShopee` continue preenchido — o preço antigo
+fica guardado pra quando o item voltar pra plataforma, em vez de virar um
+desconto inventado. O único lugar que continua mostrando `precoShopee` é o
+formulário do admin.
+
+Como a regra mora numa função só, ninguém consegue exibir o preço da Shopee
+por outro caminho: as telas leem `comparacao.mostrar` e não `precoShopee`
+direto.
 
 ### Banners da home
 
@@ -381,6 +401,7 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Banners da home cadastrados em `/admin/banners`, com imagem pública
 - [x] Painel de vendas em `/admin` (faturamento, ticket médio, devoluções e
       gráficos dos últimos 30 dias)
+- [x] Comparativo de preço ligado/desligado por produto (`vendidoNaShopee`)
 - [ ] Persistir o carrinho no banco
 - [ ] Cotação real de frete (Correios / Melhor Envio) no lugar da tabela por
       região, e rastreio do envio no detalhe do pedido

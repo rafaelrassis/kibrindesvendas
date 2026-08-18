@@ -23,6 +23,7 @@ model Produto {
   categoria            Categoria    @relation(fields: [categoriaId], references: [id])
   preco                Decimal      @db.Decimal(10, 2)
   precoShopee          Decimal      @db.Decimal(10, 2)
+  vendidoNaShopee      Boolean      @default(true)
   requerPersonalizacao Boolean      @default(false)
   emoji                String
   cor                  String

@@ -38,6 +38,29 @@ export default function AdminProdutosPage() {
     setProdutos((prev) => (prev ?? []).filter((p) => p.id !== id));
   }
 
+  // Troca na tela na hora e desfaz se a gravação falhar — o botão é um liga/
+  // desliga, recarregar a lista inteira a cada clique seria barulho à toa.
+  async function alternarShopee(produto: Produto) {
+    setErro("");
+    const valor = !produto.vendidoNaShopee;
+    const aplicar = (v: boolean) =>
+      setProdutos((prev) =>
+        (prev ?? []).map((p) => (p.id === produto.id ? { ...p, vendidoNaShopee: v } : p))
+      );
+
+    aplicar(valor);
+    const r = await fetch(`/api/admin/produtos/${produto.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vendidoNaShopee: valor }),
+    });
+    if (!r.ok) {
+      aplicar(produto.vendidoNaShopee);
+      const data = await r.json().catch(() => ({}));
+      setErro(data.error ?? "Não foi possível salvar.");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-12">
       <h1 className="font-display text-3xl mb-1">Produtos</h1>
@@ -62,20 +85,21 @@ export default function AdminProdutosPage() {
               <th className="px-4 py-3 font-medium">Categoria</th>
               <th className="px-4 py-3 font-medium">Preço</th>
               <th className="px-4 py-3 font-medium">Personalização</th>
+              <th className="px-4 py-3 font-medium">Vendido na Shopee</th>
               <th className="px-4 py-3 font-medium text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-ink/50">
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/50">
                   Carregando...
                 </td>
               </tr>
             )}
             {produtos?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-ink/50">
+                <td colSpan={6} className="px-4 py-6 text-center text-ink/50">
                   Nenhum produto cadastrado.
                 </td>
               </tr>
@@ -95,6 +119,19 @@ export default function AdminProdutosPage() {
                   >
                     {p.requerPersonalizacao ? "Sim" : "Não"}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => alternarShopee(p)}
+                    aria-pressed={p.vendidoNaShopee}
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      p.vendidoNaShopee
+                        ? "bg-mustard/20 text-pine-2"
+                        : "bg-ink/5 text-ink/50"
+                    }`}
+                  >
+                    {p.vendidoNaShopee ? "Sim" : "Não"}
+                  </button>
                 </td>
                 <td className="px-4 py-3 text-right space-x-3">
                   <Link

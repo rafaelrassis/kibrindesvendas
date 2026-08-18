@@ -20,6 +20,7 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
   const [categoriaSlug, setCategoriaSlug] = useState(produto?.categoria ?? "");
   const [preco, setPreco] = useState(produto?.preco?.toString() ?? "");
   const [precoShopee, setPrecoShopee] = useState(produto?.precoShopee?.toString() ?? "");
+  const [vendidoNaShopee, setVendidoNaShopee] = useState(produto?.vendidoNaShopee ?? true);
   const [emoji, setEmoji] = useState(produto?.emoji ?? "🎁");
   const [cor, setCor] = useState(produto?.cor ?? "#3F6B4C");
   const [requerPersonalizacao, setRequerPersonalizacao] = useState(
@@ -65,6 +66,7 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
       categoriaSlug,
       preco: Number(preco),
       precoShopee: precoShopee ? Number(precoShopee) : Number(preco),
+      vendidoNaShopee,
       requerPersonalizacao,
       emoji,
       cor,
@@ -151,6 +153,21 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
             placeholder="opcional"
           />
         </Campo>
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={vendidoNaShopee}
+            onChange={(e) => setVendidoNaShopee(e.target.checked)}
+          />
+          Também vendido na Shopee
+        </label>
+        <p className="text-xs text-ink/50 mt-1">
+          Desligado, o site nunca mostra o comparativo de preço deste produto, mesmo com
+          o preço da Shopee preenchido.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
