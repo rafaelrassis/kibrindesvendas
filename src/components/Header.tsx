@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -27,18 +28,16 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
       {/* Logo — no mobile aparece só na home; no desktop sempre, junto da nav */}
       {home && (
         <div className="md:hidden mx-auto max-w-6xl px-5 pt-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl leading-none">🎁</span>
-            <span className="font-display text-xl tracking-tight">LeoKibrindes</span>
+          <Link href="/" className="inline-flex items-center">
+            <Image src="/logo.png" alt="LeoKibrindes" width={168} height={54} priority className="h-11 w-auto" />
           </Link>
         </div>
       )}
 
       {/* Linha de navegação — só no desktop, onde a BottomNav não existe */}
       <div className="hidden md:flex mx-auto max-w-6xl px-5 pt-4 items-center justify-between gap-6">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span className="text-2xl leading-none">🎁</span>
-          <span className="font-display text-xl tracking-tight">LeoKibrindes</span>
+        <Link href="/" className="inline-flex items-center shrink-0">
+          <Image src="/logo.png" alt="LeoKibrindes" width={168} height={54} priority className="h-12 w-auto" />
         </Link>
 
         <nav className="flex items-center gap-6 text-sm tracking-wide uppercase">

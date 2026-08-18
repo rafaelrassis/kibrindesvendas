@@ -1,9 +1,11 @@
+import Image from "next/image";
+
 export default function Footer() {
   return (
     <footer className="bg-pine text-paper/70 mt-16">
       <div className="mx-auto max-w-6xl px-5 py-10 flex flex-col md:flex-row justify-between gap-6 text-sm">
         <div>
-          <p className="font-display text-lg text-paper">LeoKibrindes</p>
+          <Image src="/logo.png" alt="LeoKibrindes" width={140} height={45} className="h-9 w-auto mb-2" />
           <p className="mt-1 max-w-xs">
             Presentes personalizados feitos pra durar. Protótipo interno — não é loja real.
           </p>
