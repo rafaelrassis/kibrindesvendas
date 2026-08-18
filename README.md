@@ -369,10 +369,18 @@ banco de produção — separar os bancos por ambiente resolve. E o
 falha no lock e o build para — nesse caso use a URL direta no `DATABASE_URL` do
 projeto.
 
-Sem `BLOB_READ_WRITE_TOKEN` o upload cai pro disco local — o app sobe, mas as
-artes somem no deploy seguinte. Não deixar assim em produção. Sem
+Sem `BLOB_READ_WRITE_TOKEN` o upload cai no ramo do disco local, e na Vercel
+isso **não** degrada em silêncio: o filesystem da função é somente leitura, o
+`mkdir` estoura com `ENOENT: mkdir '/var/task/var'` e o `POST /api/upload`
+devolve 500. Na prática a personalização por upload fica quebrada — e com ela
+a compra de todo produto que exige arte. Conferir logo após o deploy enviando
+um arquivo; se vier 500, é esse token que está faltando. Sem
 `MERCADOPAGO_ACCESS_TOKEN` o checkout sobe em modo simulado, ou seja, aprova
-pedido sem cobrar ninguém: também não pode ficar assim em produção.
+pedido sem cobrar ninguém: também não pode ficar assim em produção. E sem
+`MERCADOPAGO_WEBHOOK_SECRET` o `/api/webhooks/mercadopago` aceita qualquer
+`POST` sem conferir o `x-signature` (ver `assinaturaDoWebhookValida`); o
+pagamento em si continua sendo lido da API do Mercado Pago, então ninguém
+forja um pedido pago, mas a rota fica aberta pra quem souber a URL.
 
 ## Testes
 
