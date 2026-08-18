@@ -30,7 +30,8 @@ type RespostaViaCep = {
 async function calcularFreteReal(
   uf: string,
   cepDestino: string,
-  produtoId?: string
+  produtoId?: string,
+  quantidade = 1
 ): Promise<Frete> {
   const estimativa = calcularFrete(uf);
   if (!produtoId) return estimativa;
@@ -49,7 +50,8 @@ async function calcularFreteReal(
     config.melhorEnvioToken,
     normalizarCep(config.cepOrigem) ?? config.cepOrigem,
     cepDestino,
-    produto
+    produto,
+    quantidade
   );
 
   return cotacao ?? estimativa;
@@ -64,11 +66,15 @@ async function calcularFreteReal(
 // cai direto na estimativa por região.
 export async function consultarCep(
   cepBruto: unknown,
-  produtoIdBruto?: unknown
+  produtoIdBruto?: unknown,
+  quantidadeBruta?: unknown
 ): Promise<EnderecoDeEntrega> {
   const cep = typeof cepBruto === "string" ? normalizarCep(cepBruto) : null;
   if (!cep) throw new ErroDeNegocio("CEP inválido: informe os 8 dígitos.");
   const produtoId = typeof produtoIdBruto === "string" ? produtoIdBruto : undefined;
+  const quantidadeNum = Number(quantidadeBruta);
+  const quantidade =
+    Number.isFinite(quantidadeNum) && quantidadeNum > 0 ? Math.round(quantidadeNum) : 1;
 
   let resposta: Response;
   try {
@@ -98,7 +104,7 @@ export async function consultarCep(
     bairro: dados.bairro ?? "",
     cidade: dados.localidade ?? "",
     uf: dados.uf,
-    frete: await calcularFreteReal(dados.uf, cep, produtoId),
+    frete: await calcularFreteReal(dados.uf, cep, produtoId, quantidade),
   };
 }
 

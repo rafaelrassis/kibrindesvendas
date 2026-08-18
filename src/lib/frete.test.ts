@@ -127,6 +127,33 @@ describe("cotarFreteMelhorEnvio", () => {
     });
   });
 
+  it("manda a quantidade de unidades no `quantity` do produto, sem multiplicar o peso", async () => {
+    let enviado: { products: { weight: number; quantity: number }[] } | null = null;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      enviado = JSON.parse(init.body);
+      return respostaCom([
+        { id: 1, name: "PAC", price: "20.00", delivery_time: 5, company: { name: "Correios" } },
+      ]);
+    });
+
+    await cotarFreteMelhorEnvio("token", "01310100", "60000000", pacote, 3);
+
+    expect(enviado!.products[0]).toMatchObject({ weight: 0.3, quantity: 3 });
+  });
+
+  it("cai pra quantidade 1 quando não é passada ou vem inválida", async () => {
+    let enviado: { products: { quantity: number }[] } | null = null;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      enviado = JSON.parse(init.body);
+      return respostaCom([
+        { id: 1, name: "PAC", price: "20.00", delivery_time: 5, company: { name: "Correios" } },
+      ]);
+    });
+
+    await cotarFreteMelhorEnvio("token", "01310100", "60000000", pacote, 0);
+    expect(enviado!.products[0].quantity).toBe(1);
+  });
+
   it("devolve null quando a API responde erro, pra chamada cair na estimativa", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false }) as Response));
     expect(await cotarFreteMelhorEnvio("token", "01310100", "60000000", pacote)).toBeNull();

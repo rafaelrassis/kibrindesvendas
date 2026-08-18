@@ -32,12 +32,20 @@ export async function criarPedido(
 ) {
   if (!item?.produtoId) throw new ErroDeNegocio("Item do pedido inválido.");
 
+  // Quantidade também não é confiada do navegador: valida aqui e trava o
+  // item nela antes de usar em qualquer cálculo. Item com personalização
+  // fica preso em 1 — não faz sentido pedir n artes num único item.
+  const quantidade = Math.max(1, Math.round(Number(item.quantidade)) || 1);
+  if (item.personalizacao && quantidade !== 1) {
+    throw new ErroDeNegocio("Item personalizado só pode ter quantidade 1.");
+  }
+
   // O frete é recalculado aqui de propósito: o valor que o navegador mostrou
   // é só pra visualização, quem define o que vai ser cobrado é o servidor.
   const [usuario, produto, endereco] = await Promise.all([
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
     prisma.produto.findUnique({ where: { id: item.produtoId } }),
-    consultarCep(cep, item.produtoId),
+    consultarCep(cep, item.produtoId, quantidade),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
@@ -48,14 +56,17 @@ export async function criarPedido(
 
   // O desconto também é recalculado no servidor, pelo mesmo motivo do frete:
   // o que o navegador mostrou é preview, quem decide é a validação aqui.
+  // `valorPedido` já considera a quantidade — cupom percentual incide sobre
+  // o total das unidades, não só sobre uma.
+  const precoTotalProduto = Number(produto.preco) * quantidade;
   const temCupom = typeof cupomCodigo === "string" && cupomCodigo.trim();
   const { cupom, desconto } = temCupom
-    ? await validarCupom(cupomCodigo, Number(produto.preco))
+    ? await validarCupom(cupomCodigo, precoTotalProduto)
     : { cupom: null, desconto: 0 };
 
   const pagamentoReal = pagamentoRealConfigurado();
   const frete = endereco.frete.valor;
-  const subtotal = emReais(Number(produto.preco) - desconto);
+  const subtotal = emReais(precoTotalProduto - desconto);
   const total = emReais(subtotal + frete);
 
   const pedido = await prisma.$transaction(async (tx) => {
@@ -75,7 +86,7 @@ export async function criarPedido(
           create: [
             {
               produtoId: produto.id,
-              quantidade: 1,
+              quantidade,
               precoUnitario: produto.preco,
               variacaoEscolhida: item.variacoesEscolhidas ?? {},
               ...(item.personalizacao && {
@@ -132,7 +143,17 @@ export async function criarPedido(
             // Desconto do cupom já embutido aqui: a soma dos itens da
             // preferência precisa bater com `total`, e o Mercado Pago não
             // aceita item de valor negativo pra representar desconto.
-            title: cupom ? `${produto.nome} (cupom ${cupom.codigo})` : produto.nome,
+            // Vai como 1 item de valor já somado (quantidade × preço − desconto)
+            // em vez de `quantity: quantidade`, porque o desconto do cupom é um
+            // valor único que não dá pra ratear certinho entre unidades sem
+            // gerar diferença de centavos contra `subtotal`.
+            title: [
+              produto.nome,
+              quantidade > 1 ? `(${quantidade}x)` : null,
+              cupom ? `(cupom ${cupom.codigo})` : null,
+            ]
+              .filter(Boolean)
+              .join(" "),
             quantity: 1,
             unit_price: subtotal,
             currency_id: "BRL",

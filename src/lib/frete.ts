@@ -82,11 +82,16 @@ const MIN_ALTURA_CM = 2;
 const MIN_LARGURA_CM = 11;
 const MIN_COMPRIMENTO_CM = 16;
 
+// `quantidade` é o número de unidades do produto no pedido — o Melhor Envio
+// soma o peso de todas as unidades no `quantity` do produto em vez de a
+// gente multiplicar `weight` na mão (dimensões da caixa não multiplicam,
+// só o peso total embarcado).
 export async function cotarFreteMelhorEnvio(
   token: string,
   cepOrigem: string,
   cepDestino: string,
-  pacote: PacoteFrete
+  pacote: PacoteFrete,
+  quantidade = 1
 ): Promise<Frete | null> {
   const body = {
     from: { postal_code: cepOrigem },
@@ -99,7 +104,7 @@ export async function cotarFreteMelhorEnvio(
         length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
         weight: Math.max(pacote.pesoGramas, 1) / 1000,
         insurance_value: 0,
-        quantity: 1,
+        quantity: Math.max(1, Math.round(quantidade) || 1),
       },
     ],
   };

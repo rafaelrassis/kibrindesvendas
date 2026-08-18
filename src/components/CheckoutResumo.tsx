@@ -22,7 +22,7 @@ export default function CheckoutResumo({
   erroInicial?: string;
 }) {
   const router = useRouter();
-  const { item, limpar } = useCart();
+  const { item, limpar, definirQuantidade } = useCart();
   const { logado, carregando: carregandoAuth } = useAuth();
   const { enderecos } = useConta();
   const [processando, setProcessando] = useState(false);
@@ -40,7 +40,12 @@ export default function CheckoutResumo({
   const [cepDigitado, setCepDigitado] = useState<string | null>(null);
   const cep = cepDigitado ?? (cepInicial ? formatarCep(cepInicial) : "");
 
-  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep, item?.produtoId);
+  const quantidade = item?.quantidade ?? 1;
+  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(
+    cep,
+    item?.produtoId,
+    quantidade
+  );
 
   const [codigoCupom, setCodigoCupom] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; desconto: number } | null>(
@@ -86,7 +91,9 @@ export default function CheckoutResumo({
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
   const frete = endereco?.frete ?? null;
   const desconto = cupomAplicado?.desconto ?? 0;
-  const precoProduto = produto.preco;
+  // Preço já multiplicado pela quantidade — é o valor que o cupom valida e
+  // que compõe o subtotal exibido.
+  const precoProduto = produto.preco * quantidade;
   const subtotal = Math.max(0, precoProduto - desconto);
   const total = subtotal + (frete?.valor ?? 0);
 
@@ -99,6 +106,7 @@ export default function CheckoutResumo({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ codigo: codigoCupom, valorPedido: precoProduto }),
+      // (precoProduto já é preço unitário × quantidade)
     })
       .then(async (r) => {
         const data = await r.json();
@@ -178,8 +186,34 @@ export default function CheckoutResumo({
             {item.personalizacao && (
               <p className="text-xs text-pine-2 mt-1">✓ {item.personalizacao.resumo}</p>
             )}
+
+            {/* Personalização é feita uma vez por unidade; item que já exige
+                arte fica travado em 1 pra não pedir n artes diferentes aqui. */}
+            {!produto.requerPersonalizacao && (
+              <div className="flex items-center gap-3 mt-2">
+                <span className="text-xs text-ink/50">Quantidade</span>
+                <div className="flex items-center border border-line rounded-full">
+                  <button
+                    onClick={() => definirQuantidade(quantidade - 1)}
+                    disabled={quantidade <= 1}
+                    className="w-7 h-7 flex items-center justify-center text-sm disabled:opacity-30"
+                    aria-label="Diminuir quantidade"
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center text-sm font-mono">{quantidade}</span>
+                  <button
+                    onClick={() => definirQuantidade(quantidade + 1)}
+                    className="w-7 h-7 flex items-center justify-center text-sm"
+                    aria-label="Aumentar quantidade"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <p className="font-mono font-medium">{reais(produto.preco)}</p>
+          <p className="font-mono font-medium">{reais(precoProduto)}</p>
         </div>
       </div>
 
@@ -289,8 +323,10 @@ export default function CheckoutResumo({
 
       <div className="bg-white border border-line rounded-lg p-5 mb-5">
         <div className="flex justify-between text-sm mb-1.5">
-          <span className="text-ink/60">Produto</span>
-          <span className="font-mono">{reais(produto.preco)}</span>
+          <span className="text-ink/60">
+            Produto{quantidade > 1 ? ` (${quantidade}x)` : ""}
+          </span>
+          <span className="font-mono">{reais(precoProduto)}</span>
         </div>
         {desconto > 0 && (
           <div className="flex justify-between text-sm mb-1.5">

@@ -16,6 +16,9 @@ export type ViaPersonalizacao = "IA" | "UPLOAD" | "MANUAL";
 export type ItemCarrinho = {
   produtoId: string;
   variacoesEscolhidas: Record<string, string>;
+  // Quantas unidades do produto. Entra no peso total cotado no frete e no
+  // subtotal — sempre inteiro e no mínimo 1.
+  quantidade: number;
   // CEP que o cliente já digitou na página do produto, se algum — o
   // checkout começa com ele preenchido em vez de pedir de novo.
   cepInformado?: string;
@@ -36,6 +39,9 @@ type CartContextType = {
     cepInformado?: string
   ) => void;
   definirPersonalizacao: (p: ItemCarrinho["personalizacao"]) => void;
+  // Sempre arredonda pra inteiro e trava em 1 como piso — não existe pedido
+  // de 0 ou fração de unidade.
+  definirQuantidade: (quantidade: number) => void;
   limpar: () => void;
 };
 
@@ -46,7 +52,10 @@ const STORAGE_KEY = "kibrindes-mock-item";
 const store = criarStoreLocal<ItemCarrinho | null>(STORAGE_KEY, (bruto) => {
   if (!bruto) return null;
   try {
-    return JSON.parse(bruto) as ItemCarrinho;
+    const item = JSON.parse(bruto) as ItemCarrinho;
+    // Item salvo antes da quantidade existir (localStorage de sessão
+    // anterior) não tem o campo — assume 1 em vez de virar NaN no cálculo.
+    return { ...item, quantidade: item.quantidade ?? 1 };
   } catch {
     return null; // ignora item mock inválido
   }
@@ -65,7 +74,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const iniciarItem = useCallback(
     (produtoId: string, variacoesEscolhidas: Record<string, string>, cepInformado?: string) => {
-      persist({ produtoId, variacoesEscolhidas, ...(cepInformado && { cepInformado }) });
+      persist({
+        produtoId,
+        variacoesEscolhidas,
+        quantidade: 1,
+        ...(cepInformado && { cepInformado }),
+      });
     },
     [persist]
   );
@@ -79,11 +93,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [persist]
   );
 
+  const definirQuantidade = useCallback(
+    (quantidade: number) => {
+      const atual = store.ler();
+      if (!atual) return;
+      const inteira = Math.max(1, Math.round(quantidade) || 1);
+      persist({ ...atual, quantidade: inteira });
+    },
+    [persist]
+  );
+
   const limpar = useCallback(() => persist(null), [persist]);
 
   const value = useMemo(
-    () => ({ item, iniciarItem, definirPersonalizacao, limpar }),
-    [item, iniciarItem, definirPersonalizacao, limpar]
+    () => ({ item, iniciarItem, definirPersonalizacao, definirQuantidade, limpar }),
+    [item, iniciarItem, definirPersonalizacao, definirQuantidade, limpar]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
