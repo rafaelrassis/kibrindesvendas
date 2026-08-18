@@ -348,11 +348,11 @@ src/
    Pago, onde a URL de notificação deve ser cadastrada como
    `https://SEU-DOMINIO/api/webhooks/mercadopago`.
 4. Deploy. O `postinstall` roda `prisma generate` (Prisma Client correto mesmo
-   com o cache de dependências da Vercel) e o `npm run build` roda
-   `prisma migrate deploy` **antes** do `next build`, então as migrations
-   pendentes são aplicadas no banco de `DATABASE_URL` durante o próprio build.
-   Elas não são opcionais: o build prerenderiza páginas que consultam o banco e
-   quebra com `P2021 table does not exist` se as tabelas não existirem.
+   com o cache de dependências da Vercel) e o `npm run build` aplica as
+   migrations pendentes **antes** do `next build`, via
+   `scripts/migrate-deploy.mjs`. Elas não são opcionais: o build prerenderiza
+   páginas que consultam o banco e quebra com `P2021 table does not exist` se
+   as tabelas não existirem.
 5. Popular o catálogo: `npm run db:seed` com `DATABASE_URL` apontando pro banco
    de produção. Sem isso a loja sobe no ar com catálogo vazio — o build passa,
    mas não há produto nem categoria pra mostrar. O seed é idempotente
@@ -361,13 +361,36 @@ src/
 6. Promover a primeira conta a admin com `npm run db:admin -- voce@exemplo.com`
    apontando pro banco de produção.
 
-Duas ressalvas sobre a migration no build: enquanto preview e produção
-compartilharem o mesmo `DATABASE_URL`, um deploy de preview também migra o
-banco de produção — separar os bancos por ambiente resolve. E o
-`prisma migrate deploy` precisa de conexão **direta** com o Postgres: se o
-`DATABASE_URL` for a URL de pool (pgbouncer do Neon/Supabase), a migration
-falha no lock e o build para — nesse caso use a URL direta no `DATABASE_URL` do
-projeto.
+### A migration no build precisa de conexão direta
+
+O `prisma migrate deploy` começa pegando um advisory lock no Postgres, que é de
+sessão. Pelo pooler (pgbouncer do Neon/Supabase) cada comando pode cair numa
+conexão de servidor diferente, e o lock às vezes fica preso na conexão
+devolvida ao pool: o build seguinte não consegue pegá-lo e morre com
+`P1002 Timed out trying to acquire a postgres advisory lock`. Foi assim que o
+deploy de produção do commit `745138e` quebrou, minutos depois do preview do
+mesmo commit ter migrado o mesmo banco sem erro.
+
+Por isso o build não chama o Prisma direto, e sim `scripts/migrate-deploy.mjs`,
+que:
+
+- roda as migrations pela primeira URL **sem pool** que achar no ambiente —
+  `DIRECT_URL`, `DATABASE_URL_UNPOOLED` ou `POSTGRES_URL_NON_POOLING` (as duas
+  últimas já vêm prontas da integração Neon/Postgres da Vercel). O app em si
+  continua no `DATABASE_URL` com pool, que é o certo pra serverless;
+- tenta de novo, até 3 vezes, quando o erro é de conexão (`P1001`, `P1002`,
+  `P1008`, `P1017`) — o compute do Neon suspende sozinho quando fica ocioso e
+  acordar pode passar dos 10s que o Prisma espera pelo lock. Erro de SQL não
+  entra no retry: falha de primeira, como deve.
+
+**Configure uma dessas variáveis no projeto da Vercel.** Sem nenhuma delas o
+script segue pelo `DATABASE_URL` mesmo (o build não quebra por falta dela, e o
+retry ainda cobre boa parte dos casos), mas aí o lock preso volta a ser
+possível. No Neon a URL direta é a mesma sem o sufixo `-pooler` no host.
+
+Uma ressalva que continua de pé: enquanto preview e produção compartilharem o
+mesmo `DATABASE_URL`, um deploy de preview também migra o banco de produção —
+separar os bancos por ambiente resolve.
 
 Sem `BLOB_READ_WRITE_TOKEN` o upload cai no ramo do disco local, e na Vercel
 isso **não** degrada em silêncio: o filesystem da função é somente leitura, o
