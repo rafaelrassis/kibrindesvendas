@@ -67,6 +67,10 @@ export default function ProductCard({
             Economize {formatarPreco(comparacao.economia)}
           </p>
         )}
+
+        <span className="mt-3 block text-center text-sm font-medium rounded-full bg-pine text-white py-2 group-hover:bg-pine-2 transition-colors">
+          {produto.requerPersonalizacao ? "Personalizar" : "Ver detalhes"}
+        </span>
       </Link>
 
       {/* top-10: abaixo do corte diagonal, senão o botão flutua fora do cartão */}

@@ -1,4 +1,6 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -13,14 +15,56 @@ export default function Footer() {
         <div className="flex gap-10">
           <div>
             <p className="text-paper/50 uppercase text-xs tracking-wide mb-2">Loja</p>
-            <p>Também na Shopee</p>
-            <p>WhatsApp de atendimento</p>
+            <a
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block hover:text-mustard transition-colors"
+            >
+              Também na Shopee
+            </a>
+            <a href="#" target="_blank" rel="noopener noreferrer" className="block hover:text-mustard transition-colors">
+              WhatsApp de atendimento
+            </a>
           </div>
           <div>
             <p className="text-paper/50 uppercase text-xs tracking-wide mb-2">Ajuda</p>
-            <p>Suporte / FAQ</p>
-            <p>Trocas e devoluções</p>
+            <Link href="/suporte" className="block hover:text-mustard transition-colors">
+              Suporte / FAQ
+            </Link>
+            <Link href="/suporte" className="block hover:text-mustard transition-colors">
+              Trocas e devoluções
+            </Link>
           </div>
+        </div>
+      </div>
+
+      {/* Selos de segurança e pagamento */}
+      <div className="border-t border-white/10">
+        <div className="mx-auto max-w-6xl px-5 py-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs">
+          <span className="inline-flex items-center gap-1.5 text-paper/60">
+            <ShieldCheck size={16} className="text-mustard" aria-hidden="true" />
+            Site seguro — SSL
+          </span>
+          <div className="flex items-center gap-2 text-paper/60" aria-label="Formas de pagamento aceitas">
+            <span className="border border-white/20 rounded px-2 py-1">Pix</span>
+            <span className="border border-white/20 rounded px-2 py-1">Visa</span>
+            <span className="border border-white/20 rounded px-2 py-1">Mastercard</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Informações legais — obrigatórias para e-commerce (Lei 8.078/90 e Decreto 7.962/13) */}
+      <div className="border-t border-white/10">
+        <div className="mx-auto max-w-6xl px-5 py-5 text-xs text-paper/50 space-y-1">
+          <p>LeoKibrindes Personalizados — CNPJ: 53.686.886/0001-35</p>
+          <p>Endereço: [Rua, número, bairro, cidade — UF, CEP]</p>
+          <p>
+            E-mail de contato:{" "}
+            <a href="mailto:contato@leokibrindes.com.br" className="hover:text-mustard transition-colors">
+              contato@leokibrindes.com.br
+            </a>
+          </p>
         </div>
       </div>
     </footer>

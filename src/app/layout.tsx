@@ -8,6 +8,7 @@ import { NotificacoesProvider } from "@/lib/notificacoes-context";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import { getCategorias } from "@/lib/data/categorias";
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   <main className="flex-1 pb-16 md:pb-0">{children}</main>
                   <Footer />
                   <BottomNav />
+                  <WhatsAppFloatButton />
                 </NotificacoesProvider>
               </FavoritosProvider>
             </CartProvider>

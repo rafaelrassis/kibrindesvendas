@@ -8,6 +8,7 @@ import type { Categoria } from "@/lib/types";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useNotificacoes } from "@/lib/notificacoes-context";
+import { Search } from "lucide-react";
 
 export default function Header({ categorias }: { categorias: Categoria[] }) {
   const [termo, setTermo] = useState("");
@@ -131,12 +132,20 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
             ←
           </button>
         )}
-        <input
-          value={termo}
-          onChange={(e) => setTermo(e.target.value)}
-          placeholder="Busca na LeoKibrindes"
-          className="flex-1 bg-white text-ink rounded-full px-5 py-3 text-sm outline-none shadow-sm"
-        />
+        <div className="relative flex-1">
+          <Search
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/40"
+            aria-hidden="true"
+          />
+          <input
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            placeholder="Busca na LeoKibrindes"
+            aria-label="Buscar produtos"
+            className="w-full bg-white text-ink rounded-full pl-11 pr-5 py-3 text-sm outline-none shadow-sm"
+          />
+        </div>
         <Link
           href="/notificacoes"
           aria-label="Notificações"
