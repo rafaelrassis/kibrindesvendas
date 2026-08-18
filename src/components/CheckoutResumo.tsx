@@ -348,17 +348,7 @@ export default function CheckoutResumo({
 
       <div className="bg-white border border-line rounded-lg p-5 mb-8">
         <p className="text-sm font-medium mb-3">Pagamento</p>
-        <div className="grid grid-cols-3 gap-2">
-          {["Pix", "Cartão", "Boleto"].map((m) => (
-            <div
-              key={m}
-              className="border border-line rounded-md py-2.5 text-sm text-center text-ink/60"
-            >
-              {m}
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-ink/40 mt-3">
+        <p className="text-xs text-ink/40">
           {pagamentoReal
             ? "Você escolhe a forma de pagamento na próxima tela, no ambiente seguro do Mercado Pago."
             : "Simulação — nenhum pagamento real é processado sem as credenciais do Mercado Pago."}
