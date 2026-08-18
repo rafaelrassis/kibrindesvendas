@@ -178,7 +178,12 @@ model Personalizacao {
 
 // Cupom de desconto, gerenciado em /admin/cupons. `usos` conta quantos
 // pedidos já usaram o código, comparado contra `usoMaximo` (sem limite
-// quando null).
+// quando null) — o incremento é feito em SQL condicional dentro da transação
+// do pedido (ver registrarUsoCupom), pra duas compras simultâneas não
+// passarem do limite.
+//
+// As mesmas regras têm CHECK constraints no banco, que o Prisma não sabe
+// descrever aqui: ver prisma/migrations/20260818230000_travas_cupom.
 model Cupom {
   id                String     @id @default(cuid())
   codigo            String     @unique

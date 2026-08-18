@@ -15,7 +15,8 @@
     "db:seed": "prisma db seed",
     "db:admin": "tsx prisma/promover-admin.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "vitest run --config vitest.config.integration.ts"
   },
   "dependencies": {
     "@prisma/client": "^6",

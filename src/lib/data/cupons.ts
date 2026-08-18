@@ -2,7 +2,16 @@ import "server-only";
 import type { Prisma, Cupom as CupomDb } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Cupom } from "@/lib/types";
+import {
+  calcularDesconto,
+  checarDisponibilidade,
+  dataDeValidadeValida,
+  normalizarCodigo,
+  paraValidoAte,
+} from "@/lib/cupom";
 import { ErroDeNegocio } from "./erros";
+
+export { normalizarCodigo };
 
 export function paraCupomPublico(c: CupomDb): Cupom {
   return {
@@ -19,49 +28,62 @@ export function paraCupomPublico(c: CupomDb): Cupom {
   };
 }
 
-// Normaliza pra maiúsculas sem espaço nas pontas — assim "promo10" e
-// "PROMO10" são o mesmo cupom, tanto pra cadastrar quanto pra aplicar.
-export function normalizarCodigo(codigo: string) {
-  return codigo.trim().toUpperCase();
-}
-
-function calcularDesconto(cupom: CupomDb, valorPedido: number) {
-  const valor = Number(cupom.valor);
-  const desconto = cupom.tipo === "PERCENTUAL" ? (valorPedido * valor) / 100 : valor;
-  // Nunca desconta mais do que o próprio pedido vale.
-  return Math.min(Math.round(desconto * 100) / 100, valorPedido);
-}
-
 // Confere se o cupom pode ser usado nesse pedido e devolve o valor de
 // desconto já calculado. Usado tanto na pré-visualização do checkout quanto,
 // de novo, na hora de gravar o pedido — nunca confiando no valor do cliente.
+// É validação de preview: quem garante o limite de usos sob concorrência é
+// `registrarUsoCupom`, dentro da transação que grava o pedido.
 export async function validarCupom(codigoBruto: unknown, valorPedido: number) {
   const codigo = typeof codigoBruto === "string" ? normalizarCodigo(codigoBruto) : "";
   if (!codigo) throw new ErroDeNegocio("Informe o código do cupom.");
 
   const cupom = await prisma.cupom.findUnique({ where: { codigo } });
-  if (!cupom || !cupom.ativo) throw new ErroDeNegocio("Cupom inválido ou inativo.", 404);
+  if (!cupom) throw new ErroDeNegocio("Cupom inválido ou inativo.", 404);
 
-  if (cupom.validoAte && cupom.validoAte.getTime() < Date.now()) {
-    throw new ErroDeNegocio("Este cupom expirou.");
-  }
-  if (cupom.usoMaximo !== null && cupom.usos >= cupom.usoMaximo) {
-    throw new ErroDeNegocio("Este cupom já atingiu o limite de usos.");
-  }
-  if (valorPedido < Number(cupom.valorMinimoPedido)) {
-    throw new ErroDeNegocio(
-      `Pedido mínimo de R$ ${Number(cupom.valorMinimoPedido).toFixed(2).replace(".", ",")} para este cupom.`
-    );
-  }
+  const indisponivel = checarDisponibilidade(
+    {
+      ativo: cupom.ativo,
+      validoAte: cupom.validoAte,
+      usoMaximo: cupom.usoMaximo,
+      usos: cupom.usos,
+      valorMinimoPedido: Number(cupom.valorMinimoPedido),
+    },
+    valorPedido
+  );
+  if (indisponivel) throw new ErroDeNegocio(indisponivel.mensagem, indisponivel.status);
 
-  return { cupom, desconto: calcularDesconto(cupom, valorPedido) };
+  return { cupom, desconto: calcularDesconto(cupom.tipo, Number(cupom.valor), valorPedido) };
 }
 
-// Chamada dentro da transação que cria o pedido — incrementa o contador de
-// uso na mesma escrita que grava o pedido, pra não deixar o cupom passar do
-// limite em duas compras simultâneas.
+// Chamada dentro da transação que cria o pedido. O limite é reconferido aqui
+// pelo próprio Postgres, na mesma instrução que incrementa: duas compras
+// simultâneas não passam do `usoMaximo` porque a segunda transação trava até
+// a primeira commitar e só então lê o contador já atualizado. Ler o cupom e
+// gravar depois (o que `validarCupom` faz, pro preview) deixaria as duas
+// enxergarem o mesmo valor antigo e as duas passarem.
 export async function registrarUsoCupom(cupomId: string, tx: Prisma.TransactionClient) {
-  await tx.cupom.update({ where: { id: cupomId }, data: { usos: { increment: 1 } } });
+  // Prisma não compara duas colunas em `updateMany` (`usos < "usoMaximo"`),
+  // então a condição vai em SQL cru mesmo.
+  const linhas = await tx.$executeRaw`
+    UPDATE "Cupom"
+    SET usos = usos + 1, "updatedAt" = NOW()
+    WHERE id = ${cupomId}
+      AND ativo = true
+      AND ("usoMaximo" IS NULL OR usos < "usoMaximo")
+  `;
+  if (linhas === 0) {
+    throw new ErroDeNegocio("Este cupom acabou de atingir o limite de usos.", 409);
+  }
+}
+
+// Devolve a vaga quando o pedido que consumiu o cupom não vinga (falha ao
+// abrir o pagamento, por exemplo): quem perdeu o uso foi a infraestrutura, não
+// uma venda. O `usos > 0` evita contador negativo se a reversão rodar duas vezes.
+export async function devolverUsoCupom(codigoBruto: string, tx: Prisma.TransactionClient) {
+  await tx.cupom.updateMany({
+    where: { codigo: normalizarCodigo(codigoBruto), usos: { gt: 0 } },
+    data: { usos: { decrement: 1 } },
+  });
 }
 
 // --- Admin (CRUD) -----------------------------------------------------------
@@ -99,6 +121,18 @@ function validarDados(dados: Partial<DadosCupom>) {
   if (dados.valorMinimoPedido != null && dados.valorMinimoPedido < 0) {
     throw new ErroDeNegocio("O pedido mínimo não pode ser negativo.");
   }
+  if (!dataDeValidadeValida(dados.validoAte)) {
+    throw new ErroDeNegocio("Data de validade inválida.");
+  }
+}
+
+// O código é `@unique` no banco: sem essa checagem o Prisma estoura P2002 e a
+// rota devolve 500 pra um erro que é do formulário.
+async function garantirCodigoLivre(codigo: string, exceto?: string) {
+  const conflito = await prisma.cupom.findUnique({ where: { codigo } });
+  if (conflito && conflito.id !== exceto) {
+    throw new ErroDeNegocio("Já existe um cupom com esse código.", 409);
+  }
 }
 
 export async function criarCupom(dados: DadosCupom): Promise<Cupom> {
@@ -108,8 +142,7 @@ export async function criarCupom(dados: DadosCupom): Promise<Cupom> {
   validarDados(dados);
 
   const codigo = normalizarCodigo(dados.codigo);
-  const existente = await prisma.cupom.findUnique({ where: { codigo } });
-  if (existente) throw new ErroDeNegocio("Já existe um cupom com esse código.", 409);
+  await garantirCodigoLivre(codigo);
 
   const cupom = await prisma.cupom.create({
     data: {
@@ -117,7 +150,7 @@ export async function criarCupom(dados: DadosCupom): Promise<Cupom> {
       tipo: dados.tipo,
       valor: dados.valor,
       ativo: dados.ativo ?? true,
-      validoAte: dados.validoAte ? new Date(dados.validoAte) : null,
+      validoAte: paraValidoAte(dados.validoAte),
       usoMaximo: dados.usoMaximo ?? null,
       valorMinimoPedido: dados.valorMinimoPedido ?? 0,
     },
@@ -130,19 +163,17 @@ export async function atualizarCupom(id: string, dados: Partial<DadosCupom>): Pr
   if (!atual) throw new ErroDeNegocio("Cupom não encontrado.", 404);
   validarDados(dados);
 
+  const codigo = dados.codigo ? normalizarCodigo(dados.codigo) : undefined;
+  if (codigo) await garantirCodigoLivre(codigo, id);
+
   const cupom = await prisma.cupom.update({
     where: { id },
     data: {
-      codigo: dados.codigo ? normalizarCodigo(dados.codigo) : undefined,
+      codigo,
       tipo: dados.tipo,
       valor: dados.valor,
       ativo: dados.ativo,
-      validoAte:
-        dados.validoAte !== undefined
-          ? dados.validoAte
-            ? new Date(dados.validoAte)
-            : null
-          : undefined,
+      validoAte: dados.validoAte !== undefined ? paraValidoAte(dados.validoAte) : undefined,
       usoMaximo: dados.usoMaximo !== undefined ? dados.usoMaximo : undefined,
       valorMinimoPedido: dados.valorMinimoPedido,
     },

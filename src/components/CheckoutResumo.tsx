@@ -48,11 +48,26 @@ export default function CheckoutResumo({
   );
 
   const [codigoCupom, setCodigoCupom] = useState("");
-  const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; desconto: number } | null>(
-    null
-  );
+  // `valorPedido` guarda sobre qual valor esse desconto foi calculado. Mudar a
+  // quantidade muda o valor, e um desconto percentual sobre o total antigo
+  // mostraria na tela um total que o servidor não vai cobrar.
+  const [cupomAplicado, setCupomAplicado] = useState<{
+    codigo: string;
+    desconto: number;
+    valorPedido: number;
+  } | null>(null);
   const [validandoCupom, setValidandoCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
+
+  // Preço já multiplicado pela quantidade — é o valor que o cupom valida e
+  // que compõe o subtotal exibido. Sem produto carregado ainda não há preço,
+  // e o efeito abaixo não tem o que revalidar.
+  const precoProduto = (produto?.preco ?? 0) * quantidade;
+
+  // Cupom validado sobre um valor que não é mais o da tela: o desconto em mãos
+  // está velho até a revalidação abaixo responder. É estado derivado — dá pra
+  // ler direto de `cupomAplicado`, sem um `useState` pra espelhar.
+  const recalculandoCupom = !!cupomAplicado && cupomAplicado.valorPedido !== precoProduto;
 
   // O pedido é gravado no banco em nome do usuário, então quem tem sacola mas
   // não tem sessão passa pelo login antes de ver o resumo.
@@ -61,6 +76,45 @@ export default function CheckoutResumo({
       router.replace("/entrar?next=/checkout");
     }
   }, [carregandoAuth, logado, item, router]);
+
+  // Quantidade mudou com cupom aplicado: revalida no servidor pelo novo valor
+  // em vez de repetir o desconto antigo. Se o cupom não valer mais pra esse
+  // valor (pedido mínimo, por exemplo), ele sai da tela com o motivo — melhor
+  // aqui do que só na hora de pagar, quando o servidor recalcula tudo.
+  useEffect(() => {
+    if (!cupomAplicado || cupomAplicado.valorPedido === precoProduto) return;
+
+    const { codigo } = cupomAplicado;
+    let cancelado = false;
+
+    fetch("/api/cupons/validar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ codigo, valorPedido: precoProduto }),
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        if (cancelado) return;
+        if (!r.ok) {
+          setErroCupom(data.error ?? "O cupom não vale mais para esse pedido.");
+          setCupomAplicado(null);
+          return;
+        }
+        setErroCupom("");
+        setCupomAplicado({ codigo, desconto: data.desconto, valorPedido: precoProduto });
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setErroCupom("Não foi possível recalcular o cupom agora.");
+        setCupomAplicado(null);
+      });
+
+    // Trocar a quantidade de novo no meio da consulta descarta a resposta
+    // antiga, que já nasceu de um valor que não é mais o da tela.
+    return () => {
+      cancelado = true;
+    };
+  }, [cupomAplicado, precoProduto]);
 
   if (carregando) {
     return (
@@ -91,9 +145,6 @@ export default function CheckoutResumo({
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
   const frete = endereco?.frete ?? null;
   const desconto = cupomAplicado?.desconto ?? 0;
-  // Preço já multiplicado pela quantidade — é o valor que o cupom valida e
-  // que compõe o subtotal exibido.
-  const precoProduto = produto.preco * quantidade;
   const subtotal = Math.max(0, precoProduto - desconto);
   const total = subtotal + (frete?.valor ?? 0);
 
@@ -102,11 +153,15 @@ export default function CheckoutResumo({
     setErroCupom("");
     setValidandoCupom(true);
 
+    // Valor congelado aqui: se a quantidade mudar antes da resposta chegar, o
+    // efeito de revalidação vê a diferença e pede o desconto de novo.
+    const valorPedido = precoProduto;
+
     fetch("/api/cupons/validar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigo: codigoCupom, valorPedido: precoProduto }),
-      // (precoProduto já é preço unitário × quantidade)
+      body: JSON.stringify({ codigo: codigoCupom, valorPedido }),
+      // (valorPedido já é preço unitário × quantidade)
     })
       .then(async (r) => {
         const data = await r.json();
@@ -115,7 +170,11 @@ export default function CheckoutResumo({
           setCupomAplicado(null);
           return;
         }
-        setCupomAplicado({ codigo: codigoCupom.trim().toUpperCase(), desconto: data.desconto });
+        setCupomAplicado({
+          codigo: codigoCupom.trim().toUpperCase(),
+          desconto: data.desconto,
+          valorPedido,
+        });
       })
       .catch(() => setErroCupom("Não foi possível aplicar o cupom agora."))
       .finally(() => setValidandoCupom(false));
@@ -295,7 +354,9 @@ export default function CheckoutResumo({
           <div className="flex items-center justify-between bg-pine/5 border border-pine/30 rounded-md px-4 py-2.5">
             <p className="text-sm text-pine-2">
               <span className="font-mono font-medium">{cupomAplicado.codigo}</span> aplicado —{" "}
-              {reais(cupomAplicado.desconto)} de desconto
+              {recalculandoCupom
+                ? "recalculando o desconto..."
+                : `${reais(cupomAplicado.desconto)} de desconto`}
             </p>
             <button onClick={removerCupom} className="text-xs text-berry hover:underline shrink-0">
               Remover
@@ -328,10 +389,15 @@ export default function CheckoutResumo({
           </span>
           <span className="font-mono">{reais(precoProduto)}</span>
         </div>
-        {desconto > 0 && (
+        {(desconto > 0 || recalculandoCupom) && (
           <div className="flex justify-between text-sm mb-1.5">
             <span className="text-ink/60">Desconto ({cupomAplicado?.codigo})</span>
-            <span className="font-mono text-pine-2">-{reais(desconto)}</span>
+            <span className="font-mono text-pine-2">
+              {/* Enquanto a revalidação não volta, o desconto em mãos foi
+                  calculado sobre outra quantidade — mostrar o número velho
+                  aqui é justamente o "total mentiroso" que isto resolve. */}
+              {recalculandoCupom ? "recalculando..." : `-${reais(desconto)}`}
+            </span>
           </div>
         )}
         <div className="flex justify-between text-sm">
@@ -342,7 +408,7 @@ export default function CheckoutResumo({
         </div>
         <div className="flex justify-between font-medium pt-3 mt-3 border-t border-line">
           <span>Total</span>
-          <span className="font-mono">{reais(total)}</span>
+          <span className="font-mono">{recalculandoCupom ? "—" : reais(total)}</span>
         </div>
       </div>
 
@@ -357,12 +423,18 @@ export default function CheckoutResumo({
 
       {erro && <p className="text-sm text-berry mb-4">{erro}</p>}
 
+      {/* Pagar com o desconto sendo recalculado cobraria um total que a tela
+          ainda não mostra — o botão espera a conta fechar. */}
       <button
         onClick={pagar}
-        disabled={precisaArte || processando || !frete}
+        disabled={precisaArte || processando || !frete || recalculandoCupom}
         className="w-full bg-berry text-paper font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-95 transition"
       >
-        {processando ? "Processando pagamento..." : `Pagar ${reais(total)}`}
+        {processando
+          ? "Processando pagamento..."
+          : recalculandoCupom
+            ? "Recalculando o desconto..."
+            : `Pagar ${reais(total)}`}
       </button>
     </div>
   );

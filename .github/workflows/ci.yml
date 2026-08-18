@@ -63,6 +63,12 @@ jobs:
       - name: Testes unitários
         run: npm test
 
+      # As regras que só o Postgres garante (limite de uso do cupom sob
+      # concorrência, reversão do uso, CHECK constraints) rodam contra o banco
+      # do job, que já está migrado. Criam e apagam as próprias linhas.
+      - name: Testes de integração (banco)
+        run: npm run test:db
+
       - name: Cache do build
         uses: actions/cache@v4
         with:

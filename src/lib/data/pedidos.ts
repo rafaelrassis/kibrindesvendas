@@ -13,7 +13,7 @@ import {
 import { consultarCep, resumoDoEndereco } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
-import { normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
+import { devolverUsoCupom, normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
 
 // Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
 // 56.800000000000004); a coluna é Decimal(10,2), então arredonda antes.
@@ -106,7 +106,10 @@ export async function criarPedido(
     });
 
     // Incrementa o uso do cupom na mesma transação que cria o pedido, pra dois
-    // pedidos simultâneos não passarem os dois do limite de usos.
+    // pedidos simultâneos não passarem os dois do limite de usos. Se o último
+    // uso tiver sido levado por outra compra entre a validação e aqui, o erro
+    // derruba a transação inteira: o cliente ouve "cupom esgotado" e não sobra
+    // pedido gravado com um desconto que o cupom não podia mais dar.
     if (cupom) {
       await registrarUsoCupom(cupom.id, tx);
     }
@@ -185,7 +188,19 @@ export async function criarPedido(
     // Sem preferência criada nenhum pagamento chega pra esse pedido, e um
     // registro AGUARDANDO_PAGAMENTO eterno só sujaria a fila da loja.
     console.error("Falha ao criar preferência no Mercado Pago", e);
-    await prisma.pedido.delete({ where: { id: pedido.id } });
+    // O uso do cupom volta junto com o pedido: a vaga foi embora por falha de
+    // infraestrutura, não por uma venda. Uma falha aqui na limpeza não pode
+    // esconder do cliente o motivo real — o erro do pagamento é o que sobe.
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.pedido.delete({ where: { id: pedido.id } });
+        if (pedido.cupomCodigo) {
+          await devolverUsoCupom(pedido.cupomCodigo, tx);
+        }
+      });
+    } catch (erroDaLimpeza) {
+      console.error("Falha ao desfazer o pedido sem preferência", erroDaLimpeza);
+    }
     throw new ErroDeNegocio(
       "Não foi possível abrir o pagamento agora. Tente de novo em instantes.",
       502
