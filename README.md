@@ -169,6 +169,26 @@ ficaria valendo até o próximo deploy.
 O seed cria três banners iniciais (`src/lib/mock-data.ts`) e não mexe mais
 neles depois — rodar `npm run db:seed` de novo não desfaz o que a loja editou.
 
+## Personalização: as duas vias
+
+`/personalizar/[id]` abre com duas saídas, e as duas só liberam o botão de
+pagamento depois de um aceite explícito:
+
+- **Enviar arte pronta** — upload do arquivo final (detalhado na seção
+  seguinte).
+- **Criar com a gente** — abre o WhatsApp da loja com a conversa já começada:
+  a mensagem leva o nome do produto e as variações escolhidas no carrinho, pra
+  ninguém ter que repetir o pedido. Só depois de abrir a conversa é que o
+  aceite aparece e o checkout libera.
+
+O número sai de `NEXT_PUBLIC_WHATSAPP_LOJA` (só dígitos, com DDI — ex:
+`5511999999999`). Sem a variável a tela mostra um aviso no lugar do botão, em
+vez de gerar um link `wa.me` quebrado.
+
+A geração por IA continua no tipo `ViaPersonalizacao` (`src/lib/cart-context.tsx`)
+mas está fora da seleção: o que existia era só uma simulação de prévia, sem IA
+de verdade atrás.
+
 ## Arte enviada pelo cliente
 
 Na via "Enviar arte pronta" de `/personalizar/[id]`, o arquivo sobe na hora
@@ -301,7 +321,7 @@ src/
 │   ├── page.tsx                  # home
 │   ├── categoria/[slug]/         # listagem por categoria
 │   ├── produto/[id]/             # detalhe + variações
-│   ├── personalizar/[id]/        # 3 vias: IA / upload / manual
+│   ├── personalizar/[id]/        # 2 vias: upload da arte / WhatsApp com a loja
 │   ├── checkout/                 # resumo + frete por CEP + ida pro Mercado Pago
 │   ├── pedido/confirmado/        # status real do pedido
 │   ├── conta/pedidos/            # pedidos reais + pedido de devolução
@@ -347,6 +367,8 @@ src/
    produção — as duas primeiras saem do painel de desenvolvedor do Mercado
    Pago, onde a URL de notificação deve ser cadastrada como
    `https://SEU-DOMINIO/api/webhooks/mercadopago`.
+   Pra via "Criar com a gente" da personalização, `NEXT_PUBLIC_WHATSAPP_LOJA`
+   com o número da loja (só dígitos, com DDI).
 4. Deploy. O `postinstall` roda `prisma generate` (Prisma Client correto mesmo
    com o cache de dependências da Vercel) e o `npm run build` aplica as
    migrations pendentes **antes** do `next build`, via

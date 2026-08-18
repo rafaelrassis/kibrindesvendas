@@ -7,12 +7,6 @@ import { useCart, type ViaPersonalizacao } from "@/lib/cart-context";
 
 const vias: { id: ViaPersonalizacao; label: string; emoji: string; descricao: string }[] = [
   {
-    id: "IA",
-    label: "Gerar via IA",
-    emoji: "✨",
-    descricao: "Envie uma foto e/ou descrição, escolha um estilo e gere uma prévia.",
-  },
-  {
     id: "UPLOAD",
     label: "Enviar arte pronta",
     emoji: "📤",
@@ -20,13 +14,17 @@ const vias: { id: ViaPersonalizacao; label: string; emoji: string; descricao: st
   },
   {
     id: "MANUAL",
-    label: "Manual pela loja",
-    emoji: "🖊️",
-    descricao: "Descreva o que quer e nossa equipe desenvolve a arte pra você.",
+    label: "Criar com a gente",
+    emoji: "💬",
+    descricao: "Fala direto com a loja no WhatsApp e a gente desenvolve a arte junto com você.",
   },
+  // "IA" segue existindo no tipo (cart-context) mas escondida da seleção por
+  // enquanto — a geração ainda é só uma simulação, sem IA de verdade por trás.
 ];
 
-const estilosIA = ["Aquarela", "Cartoon", "Minimalista", "Festa Junina"];
+// Número da loja pro atendimento manual — configurado uma vez, vale pra todo
+// mundo por enquanto (sem fila por atendente/categoria ainda).
+const WHATSAPP_LOJA = process.env.NEXT_PUBLIC_WHATSAPP_LOJA;
 
 export default function PersonalizarPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,15 +32,14 @@ export default function PersonalizarPage() {
   const { produto } = useProduto(id);
   const { item, definirPersonalizacao } = useCart();
 
-  const [via, setVia] = useState<ViaPersonalizacao>("IA");
-  const [estilo, setEstilo] = useState(estilosIA[0]);
-  const [descricaoIA, setDescricaoIA] = useState("");
-  const [previewGerado, setPreviewGerado] = useState(false);
+  const [via, setVia] = useState<ViaPersonalizacao>("UPLOAD");
   const [arquivoNome, setArquivoNome] = useState<string | null>(null);
   const [arteUrl, setArteUrl] = useState<string | null>(null);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [erroUpload, setErroUpload] = useState("");
-  const [briefing, setBriefing] = useState("");
+  // Marca que a pessoa já clicou pra abrir a conversa — é o que libera
+  // confirmar e seguir pro pagamento na via manual.
+  const [contatoIniciado, setContatoIniciado] = useState(false);
   const [aceite, setAceite] = useState(false);
 
   if (!produto) {
@@ -69,12 +66,21 @@ export default function PersonalizarPage() {
     );
   }
 
-  // Só vale como arte pronta depois que o arquivo chegou no servidor: o nome
-  // aparece na hora, mas o upload pode falhar.
+  // Só vale como arte pronta depois que o arquivo chegou no servidor (upload)
+  // ou depois que a pessoa abriu a conversa no WhatsApp (manual) — o nome do
+  // arquivo aparece na hora, mas o upload em si pode falhar.
   const artePronta =
-    (via === "IA" && previewGerado) ||
-    (via === "UPLOAD" && !!arteUrl) ||
-    (via === "MANUAL" && briefing.trim().length > 5);
+    (via === "UPLOAD" && !!arteUrl) || (via === "MANUAL" && contatoIniciado);
+
+  const resumoVariacoes = Object.entries(item.variacoesEscolhidas)
+    .map(([tipo, valor]) => `${tipo}: ${valor}`)
+    .join(", ");
+  const mensagemWhatsapp = `Olá! Quero personalizar o produto "${produto.nome}"${
+    resumoVariacoes ? ` (${resumoVariacoes})` : ""
+  }. Vim pelo site e quero desenvolver a arte junto com vocês.`;
+  const linkWhatsapp = WHATSAPP_LOJA
+    ? `https://wa.me/${WHATSAPP_LOJA}?text=${encodeURIComponent(mensagemWhatsapp)}`
+    : null;
 
   async function selecionarArquivo(arquivo: File | undefined) {
     if (!arquivo) return;
@@ -102,11 +108,9 @@ export default function PersonalizarPage() {
   function confirmar() {
     if (!aceite) return;
     const resumo =
-      via === "IA"
-        ? `Prévia gerada por IA — estilo ${estilo}`
-        : via === "UPLOAD"
+      via === "UPLOAD"
         ? `Arte enviada pelo cliente — ${arquivoNome}`
-        : `Briefing pra loja desenvolver: "${briefing}"`;
+        : "Arte combinada com o cliente por WhatsApp";
 
     definirPersonalizacao({
       via,
@@ -146,70 +150,6 @@ export default function PersonalizarPage() {
       </div>
 
       <div className="bg-white border border-line rounded-lg p-6 mb-8">
-        {via === "IA" && (
-          <div className="space-y-5">
-            <div>
-              <label className="text-sm font-medium block mb-2">
-                Descreva ou cole o link da foto de referência
-              </label>
-              <textarea
-                value={descricaoIA}
-                onChange={(e) => setDescricaoIA(e.target.value)}
-                placeholder="Ex: foto do meu cachorro Toby, um vira-lata caramelo..."
-                className="w-full border border-line rounded-md px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-mustard/50"
-              />
-            </div>
-            <div>
-              <p className="text-sm font-medium mb-2">Estilo</p>
-              <div className="flex flex-wrap gap-2">
-                {estilosIA.map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => {
-                      setEstilo(e);
-                      setPreviewGerado(false);
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm border ${
-                      estilo === e
-                        ? "bg-mustard/20 border-mustard text-pine-2"
-                        : "border-line"
-                    }`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={() => setPreviewGerado(true)}
-              disabled={!descricaoIA.trim()}
-              className="bg-pine text-paper text-sm px-5 py-2.5 rounded-full disabled:opacity-40"
-            >
-              Gerar prévia
-            </button>
-
-            {previewGerado && (
-              <div className="pt-2">
-                <div
-                  className="aspect-video rounded-md flex items-center justify-center text-5xl"
-                  style={{ backgroundColor: `${produto.cor}22` }}
-                >
-                  🖼️ {produto.emoji}
-                </div>
-                <p className="text-xs text-ink/50 mt-2">
-                  Simulação — o resultado impresso pode variar levemente, principalmente em produtos têxteis.
-                </p>
-                <button
-                  onClick={() => setPreviewGerado(false)}
-                  className="text-sm text-berry mt-2 underline"
-                >
-                  Gerar outra prévia
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {via === "UPLOAD" && (
           <div className="space-y-4">
             <label className="block border-2 border-dashed border-line rounded-md p-8 text-center cursor-pointer hover:border-mustard transition-colors">
@@ -233,19 +173,42 @@ export default function PersonalizarPage() {
         )}
 
         {via === "MANUAL" && (
-          <div>
-            <label className="text-sm font-medium block mb-2">
-              Descreva o que você quer que a gente crie
-            </label>
-            <textarea
-              value={briefing}
-              onChange={(e) => setBriefing(e.target.value)}
-              placeholder="Ex: quero uma arte com o nome 'Família Silva' e os 4 cachorros da casa..."
-              className="w-full border border-line rounded-md px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-mustard/50"
-            />
-            <p className="text-xs text-ink/50 mt-2">
-              Nossa equipe vai desenvolver a arte e te enviar pra aprovação antes da impressão.
-            </p>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 bg-paper-2 rounded-lg p-4">
+              <span className="text-2xl shrink-0">💬</span>
+              <div>
+                <p className="text-sm font-medium mb-1">Vamos combinar direto com você</p>
+                <p className="text-xs text-ink/60">
+                  Chama a gente no WhatsApp e nossa equipe desenvolve a arte junto com você —
+                  com fotos, referências e aprovação antes de ir pra produção.
+                </p>
+              </div>
+            </div>
+
+            {linkWhatsapp ? (
+              <a
+                href={linkWhatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setContatoIniciado(true)}
+                className="flex items-center justify-center gap-2 bg-[#25D366] text-white font-medium px-5 py-3 rounded-full text-sm hover:brightness-95 transition"
+              >
+                💬 Falar no WhatsApp
+              </a>
+            ) : (
+              // Sem o número configurado (NEXT_PUBLIC_WHATSAPP_LOJA), avisa em
+              // vez de mostrar um botão quebrado.
+              <p className="text-xs text-berry">
+                Atendimento por WhatsApp ainda não configurado — fale com o time técnico.
+              </p>
+            )}
+
+            {contatoIniciado && (
+              <p className="text-xs text-pine-2">
+                ✓ Você abriu a conversa. Quando combinar a arte com a loja, confirme abaixo pra
+                seguir.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -261,7 +224,7 @@ export default function PersonalizarPage() {
           <span className="text-sm text-ink/80">
             {via === "UPLOAD"
               ? "Confirmo que a arte enviada será impressa exatamente como está, e isento a loja de responsabilidade sobre o conteúdo e qualidade do arquivo."
-              : "Confirmo que aprovo esta arte pra seguir pra produção."}
+              : "Confirmo que já entrei em contato pelo WhatsApp pra combinar a arte com a loja."}
           </span>
         </label>
       )}
