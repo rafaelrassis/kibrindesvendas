@@ -16,23 +16,41 @@ model Categoria {
 }
 
 model Produto {
-  id                   String       @id
+  id                   String            @id
   nome                 String
   descricao            String
+  // Texto mais longo, opcional — exibido numa seção própria na página do
+  // produto. `descricao` continua sendo o resumo curto de sempre.
+  descricaoDetalhada   String?
   categoriaId          String
-  categoria            Categoria    @relation(fields: [categoriaId], references: [id])
-  preco                Decimal      @db.Decimal(10, 2)
-  precoShopee          Decimal      @db.Decimal(10, 2)
-  vendidoNaShopee      Boolean      @default(true)
-  requerPersonalizacao Boolean      @default(false)
+  categoria            Categoria         @relation(fields: [categoriaId], references: [id])
+  preco                Decimal           @db.Decimal(10, 2)
+  precoShopee          Decimal           @db.Decimal(10, 2)
+  vendidoNaShopee      Boolean           @default(true)
+  requerPersonalizacao Boolean           @default(false)
   emoji                String
   cor                  String
-  destaque             Boolean      @default(false)
+  destaque             Boolean           @default(false)
   variacoes            Variacao[]
+  // Custo de material é dado interno (usado pra calcular lucro no admin) —
+  // nunca sai pela API pública, só pela rota /api/admin.
+  materiais            MaterialProduto[]
   itensPedido          ItemPedido[]
   favoritos            Favorito[]
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+}
+
+// Uma linha de material/insumo gasto no produto (ex: "Caneca branca", 1un,
+// R$ 8,90). A soma de `quantidade * custoUnitario` de todas as linhas é o
+// custo do produto, usado só internamente pra calcular a margem.
+model MaterialProduto {
+  id            String  @id @default(cuid())
+  produtoId     String
+  produto       Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  nome          String
+  quantidade    Decimal @default(1) @db.Decimal(10, 3)
+  custoUnitario Decimal @db.Decimal(10, 2)
 }
 
 model Variacao {
@@ -113,6 +131,10 @@ model Pedido {
   enderecoResumo  String?
   // Preenchido quando o cliente pede devolução, pra loja saber o que houve.
   motivoDevolucao String?
+  // Cupom aplicado neste pedido, se houver. O código fica congelado aqui
+  // mesmo que o cupom seja editado ou apagado depois.
+  cupomCodigo     String?
+  desconto        Decimal      @default(0) @db.Decimal(10, 2)
   itens           ItemPedido[]
   // Sem credencial do Mercado Pago configurada o checkout roda simulado; o
   // campo marca quais pedidos nasceram assim pra não confundir com venda real.
@@ -145,6 +167,30 @@ model Personalizacao {
   briefing     String?
   aceiteTermos Boolean            @default(false)
   createdAt    DateTime           @default(now())
+}
+
+// Cupom de desconto, gerenciado em /admin/cupons. `usos` conta quantos
+// pedidos já usaram o código, comparado contra `usoMaximo` (sem limite
+// quando null).
+model Cupom {
+  id                String     @id @default(cuid())
+  codigo            String     @unique
+  tipo              TipoCupom
+  // Percentual (0–100) quando tipo=PERCENTUAL, valor em R$ quando tipo=FIXO.
+  valor             Decimal    @db.Decimal(10, 2)
+  ativo             Boolean    @default(true)
+  validoAte         DateTime?
+  usoMaximo         Int?
+  usos              Int        @default(0)
+  // Pedido precisa custar pelo menos isso (produto, sem frete) pro cupom valer.
+  valorMinimoPedido Decimal    @default(0) @db.Decimal(10, 2)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+enum TipoCupom {
+  PERCENTUAL
+  FIXO
 }
 
 enum StatusPedido {

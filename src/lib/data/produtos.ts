@@ -1,8 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
-import type { Produto } from "@/lib/types";
-import type { Produto as ProdutoDb, Variacao as VariacaoDb, Categoria as CategoriaDb } from "@prisma/client";
+import type { Produto, ProdutoAdmin } from "@/lib/types";
+import type {
+  Produto as ProdutoDb,
+  Variacao as VariacaoDb,
+  Categoria as CategoriaDb,
+  MaterialProduto as MaterialProdutoDb,
+} from "@prisma/client";
 import { ErroDeNegocio } from "./erros";
 
 type ProdutoComRelacoes = ProdutoDb & {
@@ -10,13 +15,17 @@ type ProdutoComRelacoes = ProdutoDb & {
   variacoes: VariacaoDb[];
 };
 
+type ProdutoComMateriais = ProdutoComRelacoes & { materiais: MaterialProdutoDb[] };
+
 // Exportado porque outras consultas (favoritos, por exemplo) chegam no produto
-// por outro caminho e precisam do mesmo formato de saída.
+// por outro caminho e precisam do mesmo formato de saída. Nunca inclui custo
+// de material — isso só existe na versão admin, mais abaixo.
 export function toProduto(p: ProdutoComRelacoes): Produto {
   return {
     id: p.id,
     nome: p.nome,
     descricao: p.descricao,
+    descricaoDetalhada: p.descricaoDetalhada,
     categoria: p.categoria.slug,
     categoriaLabel: p.categoria.label,
     preco: Number(p.preco),
@@ -30,7 +39,33 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
   };
 }
 
+// Versão pra /admin: junto do produto normal, calcula o custo de material e a
+// margem — dado sensível que só sai por rota autenticada de admin.
+export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
+  const materiais = p.materiais.map((m) => ({
+    id: m.id,
+    nome: m.nome,
+    quantidade: Number(m.quantidade),
+    custoUnitario: Number(m.custoUnitario),
+  }));
+  const custoTotal = materiais.reduce((soma, m) => soma + m.quantidade * m.custoUnitario, 0);
+  const preco = Number(p.preco);
+  const lucro = Math.round((preco - custoTotal) * 100) / 100;
+  return {
+    ...toProduto(p),
+    materiais,
+    custoTotal: Math.round(custoTotal * 100) / 100,
+    lucro,
+    margemPercentual: preco > 0 ? Math.round((lucro / preco) * 1000) / 10 : null,
+  };
+}
+
 export const relacoesProduto = { categoria: true, variacoes: true } as const;
+export const relacoesProdutoAdmin = {
+  categoria: true,
+  variacoes: true,
+  materiais: true,
+} as const;
 
 export async function getProdutos(): Promise<Produto[]> {
   const produtos = await prisma.produto.findMany({ include: relacoesProduto, orderBy: { nome: "asc" } });
@@ -49,6 +84,24 @@ export async function getDestaques(): Promise<Produto[]> {
 export async function getProduto(id: string): Promise<Produto | undefined> {
   const produto = await prisma.produto.findUnique({ where: { id }, include: relacoesProduto });
   return produto ? toProduto(produto) : undefined;
+}
+
+// --- Leitura (admin) — inclui custo de material e margem ------------------
+
+export async function getProdutosAdmin(): Promise<ProdutoAdmin[]> {
+  const produtos = await prisma.produto.findMany({
+    include: relacoesProdutoAdmin,
+    orderBy: { nome: "asc" },
+  });
+  return produtos.map(toProdutoAdmin);
+}
+
+export async function getProdutoAdmin(id: string): Promise<ProdutoAdmin | undefined> {
+  const produto = await prisma.produto.findUnique({
+    where: { id },
+    include: relacoesProdutoAdmin,
+  });
+  return produto ? toProdutoAdmin(produto) : undefined;
 }
 
 export async function getProdutosPorCategoria(slug: string): Promise<Produto[]> {
@@ -81,6 +134,7 @@ export async function buscarProdutos(termo: string): Promise<Produto[]> {
 export type DadosProduto = {
   nome: string;
   descricao?: string;
+  descricaoDetalhada?: string | null;
   categoriaSlug: string;
   preco: number;
   precoShopee?: number;
@@ -90,6 +144,7 @@ export type DadosProduto = {
   cor?: string;
   destaque?: boolean;
   variacoes?: { tipo: string; valores: string[] }[];
+  materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
 };
 
 const EMOJI_PADRAO = "🎁";
@@ -130,6 +185,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       id,
       nome: dados.nome.trim(),
       descricao: dados.descricao?.trim() ?? "",
+      descricaoDetalhada: dados.descricaoDetalhada?.trim() || null,
       categoriaId,
       preco: dados.preco,
       precoShopee: dados.precoShopee ?? dados.preco,
@@ -140,6 +196,13 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       destaque: !!dados.destaque,
       variacoes: {
         create: (dados.variacoes ?? []).map((v) => ({ tipo: v.tipo, valores: v.valores })),
+      },
+      materiais: {
+        create: (dados.materiais ?? []).map((m) => ({
+          nome: m.nome,
+          quantidade: m.quantidade,
+          custoUnitario: m.custoUnitario,
+        })),
       },
     },
     include: relacoesProduto,
@@ -165,12 +228,19 @@ export async function atualizarProduto(
     if (dados.variacoes) {
       await tx.variacao.deleteMany({ where: { produtoId: id } });
     }
+    if (dados.materiais) {
+      await tx.materialProduto.deleteMany({ where: { produtoId: id } });
+    }
 
     return tx.produto.update({
       where: { id },
       data: {
         nome: dados.nome?.trim(),
         descricao: dados.descricao?.trim(),
+        descricaoDetalhada:
+          dados.descricaoDetalhada !== undefined
+            ? dados.descricaoDetalhada?.trim() || null
+            : undefined,
         categoriaId,
         preco: dados.preco,
         precoShopee: dados.precoShopee,
@@ -182,6 +252,15 @@ export async function atualizarProduto(
         ...(dados.variacoes && {
           variacoes: {
             create: dados.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
+          },
+        }),
+        ...(dados.materiais && {
+          materiais: {
+            create: dados.materiais.map((m) => ({
+              nome: m.nome,
+              quantidade: m.quantidade,
+              custoUnitario: m.custoUnitario,
+            })),
           },
         }),
       },

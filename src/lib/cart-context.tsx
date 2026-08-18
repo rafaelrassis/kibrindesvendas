@@ -16,6 +16,9 @@ export type ViaPersonalizacao = "IA" | "UPLOAD" | "MANUAL";
 export type ItemCarrinho = {
   produtoId: string;
   variacoesEscolhidas: Record<string, string>;
+  // CEP que o cliente já digitou na página do produto, se algum — o
+  // checkout começa com ele preenchido em vez de pedir de novo.
+  cepInformado?: string;
   personalizacao?: {
     via: ViaPersonalizacao;
     resumo: string;
@@ -27,7 +30,11 @@ export type ItemCarrinho = {
 
 type CartContextType = {
   item: ItemCarrinho | null;
-  iniciarItem: (produtoId: string, variacoesEscolhidas: Record<string, string>) => void;
+  iniciarItem: (
+    produtoId: string,
+    variacoesEscolhidas: Record<string, string>,
+    cepInformado?: string
+  ) => void;
   definirPersonalizacao: (p: ItemCarrinho["personalizacao"]) => void;
   limpar: () => void;
 };
@@ -57,8 +64,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const iniciarItem = useCallback(
-    (produtoId: string, variacoesEscolhidas: Record<string, string>) => {
-      persist({ produtoId, variacoesEscolhidas });
+    (produtoId: string, variacoesEscolhidas: Record<string, string>, cepInformado?: string) => {
+      persist({ produtoId, variacoesEscolhidas, ...(cepInformado && { cepInformado }) });
     },
     [persist]
   );

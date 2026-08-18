@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import AdminNav from "@/components/AdminNav";
 import AdminProdutoForm from "@/components/AdminProdutoForm";
-import { getProduto } from "@/lib/data/produtos";
+import { getProdutoAdmin } from "@/lib/data/produtos";
 import { exigirAdmin } from "@/lib/admin";
 
 export default async function EditarProdutoPage({
@@ -12,7 +12,7 @@ export default async function EditarProdutoPage({
   await exigirAdmin();
 
   const { id } = await params;
-  const produto = await getProduto(id);
+  const produto = await getProdutoAdmin(id);
   if (!produto) notFound();
 
   return (

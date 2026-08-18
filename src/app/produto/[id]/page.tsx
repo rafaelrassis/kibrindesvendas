@@ -4,7 +4,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
+import { useConta } from "@/lib/conta-context";
+import { useCep } from "@/lib/use-cep";
 import { compararPreco } from "@/lib/compare-price";
+import { formatarCep, normalizarCep } from "@/lib/frete";
 import FavoritoButton from "@/components/FavoritoButton";
 
 export default function ProdutoPage() {
@@ -12,8 +15,17 @@ export default function ProdutoPage() {
   const router = useRouter();
   const { produto, carregando } = useProduto(id);
   const { iniciarItem } = useCart();
+  const { enderecos } = useConta();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
+
+  // Quem já tem endereço salvo começa com o CEP dele preenchido; digitar por
+  // cima assume o controle do campo (`null` = ainda não mexeu).
+  const enderecoPadrao = enderecos.find((e) => e.padrao) ?? enderecos[0];
+  const cepPadrao = enderecoPadrao ? normalizarCep(enderecoPadrao.cep) : null;
+  const [cepDigitado, setCepDigitado] = useState<string | null>(null);
+  const cep = cepDigitado ?? (cepPadrao ? formatarCep(cepPadrao) : "");
+  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep);
 
   if (carregando) {
     return (
@@ -36,7 +48,10 @@ export default function ProdutoPage() {
 
   function continuar() {
     if (!produto) return;
-    iniciarItem(produto.id, selecoes);
+    // O CEP já consultado aqui segue no item da sacola: o checkout começa com
+    // ele preenchido em vez de pedir de novo.
+    const cepNormalizado = normalizarCep(cep) ?? undefined;
+    iniciarItem(produto.id, selecoes, cepNormalizado);
     if (produto.requerPersonalizacao) {
       router.push(`/personalizar/${produto.id}`);
     } else {
@@ -149,6 +164,36 @@ export default function ProdutoPage() {
             ))}
           </div>
 
+          {/* CEP com cálculo de frete — já vem preenchido com o endereço padrão
+              de quem está logado; digitar por cima da conta */}
+          <div className="bg-paper-2 border border-line rounded-lg p-4 mb-8">
+            <label className="block">
+              <span className="block text-sm font-medium mb-1.5">Calcular frete</span>
+              <input
+                value={cep}
+                inputMode="numeric"
+                maxLength={9}
+                placeholder="00000-000"
+                onChange={(e) => setCepDigitado(formatarCep(e.target.value))}
+                className="w-full max-w-[160px] bg-white border border-line rounded-lg px-4 py-2.5 text-sm outline-none focus:border-pine"
+              />
+            </label>
+            {consultandoCep && <p className="text-xs text-ink/50 mt-2">Calculando...</p>}
+            {erroCep && <p className="text-xs text-berry mt-2">{erroCep}</p>}
+            {endereco && (
+              <p className="text-xs text-pine-2 mt-2">
+                {formatarCep(endereco.cep)} — {endereco.cidade}/{endereco.uf} · R${" "}
+                {endereco.frete.valor.toFixed(2).replace(".", ",")} · até{" "}
+                {endereco.frete.prazoDias} dias úteis
+              </p>
+            )}
+            {!cep && (
+              <p className="text-xs text-ink/40 mt-2">
+                Informe seu CEP pra ver o valor do frete antes de continuar.
+              </p>
+            )}
+          </div>
+
           {/* CTA — só desktop aqui, mobile vai na barra fixa */}
           <button
             onClick={continuar}
@@ -166,6 +211,18 @@ export default function ProdutoPage() {
           )}
         </div>
       </div>
+
+      {/* Descrição detalhada — só aparece se a loja cadastrou */}
+      {produto.descricaoDetalhada && (
+        <div className="mx-auto max-w-5xl px-5 pb-8">
+          <div className="bg-white border border-line rounded-lg p-5">
+            <p className="text-sm font-medium mb-3">Detalhes do produto</p>
+            <p className="text-sm text-ink/70 whitespace-pre-line">
+              {produto.descricaoDetalhada}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Barra fixa de preço + CTA, estilo Magalu (mobile) */}
       <div className="md:hidden fixed bottom-16 inset-x-0 z-20 bg-white border-t border-line px-5 py-3 flex items-center justify-between gap-4">

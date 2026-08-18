@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { criarProduto } from "@/lib/data/produtos";
+import { criarProduto, getProdutosAdmin } from "@/lib/data/produtos";
 import { bloqueioAdmin } from "@/lib/admin";
 import { corpoJson, respostaDeErro } from "@/lib/api";
+
+export async function GET() {
+  const bloqueio = await bloqueioAdmin();
+  if (bloqueio) return bloqueio;
+
+  return NextResponse.json(await getProdutosAdmin());
+}
 
 export async function POST(req: NextRequest) {
   const bloqueio = await bloqueioAdmin();

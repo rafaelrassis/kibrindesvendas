@@ -3,20 +3,24 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import type { Produto } from "@/lib/types";
+import type { ProdutoAdmin } from "@/lib/types";
+
+function reais(valor: number) {
+  return `R$ ${valor.toFixed(2).replace(".", ",")}`;
+}
 
 export default function AdminProdutosPage() {
   // undefined enquanto a lista não chegou — evita "nenhum produto" piscando
   // antes da resposta.
-  const [produtos, setProdutos] = useState<Produto[] | undefined>(undefined);
+  const [produtos, setProdutos] = useState<ProdutoAdmin[] | undefined>(undefined);
   const [erro, setErro] = useState("");
   const carregando = produtos === undefined;
 
   useEffect(() => {
     let ativo = true;
-    fetch("/api/produtos")
+    fetch("/api/admin/produtos")
       .then((r) => (r.ok ? r.json() : []))
-      .then((lista: Produto[]) => {
+      .then((lista: ProdutoAdmin[]) => {
         if (ativo) setProdutos(lista);
       })
       .catch(() => {
@@ -40,7 +44,7 @@ export default function AdminProdutosPage() {
 
   // Troca na tela na hora e desfaz se a gravação falhar — o botão é um liga/
   // desliga, recarregar a lista inteira a cada clique seria barulho à toa.
-  async function alternarShopee(produto: Produto) {
+  async function alternarShopee(produto: ProdutoAdmin) {
     setErro("");
     const valor = !produto.vendidoNaShopee;
     const aplicar = (v: boolean) =>
@@ -84,6 +88,8 @@ export default function AdminProdutosPage() {
               <th className="px-4 py-3 font-medium">Produto</th>
               <th className="px-4 py-3 font-medium">Categoria</th>
               <th className="px-4 py-3 font-medium">Preço</th>
+              <th className="px-4 py-3 font-medium">Custo</th>
+              <th className="px-4 py-3 font-medium">Lucro</th>
               <th className="px-4 py-3 font-medium">Personalização</th>
               <th className="px-4 py-3 font-medium">Vendido na Shopee</th>
               <th className="px-4 py-3 font-medium text-right">Ações</th>
@@ -92,14 +98,14 @@ export default function AdminProdutosPage() {
           <tbody>
             {carregando && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-ink/50">
+                <td colSpan={8} className="px-4 py-6 text-center text-ink/50">
                   Carregando...
                 </td>
               </tr>
             )}
             {produtos?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-ink/50">
+                <td colSpan={8} className="px-4 py-6 text-center text-ink/50">
                   Nenhum produto cadastrado.
                 </td>
               </tr>
@@ -109,6 +115,23 @@ export default function AdminProdutosPage() {
                 <td className="px-4 py-3">{p.emoji} {p.nome}</td>
                 <td className="px-4 py-3 text-ink/60">{p.categoriaLabel}</td>
                 <td className="px-4 py-3 font-mono">R$ {p.preco.toFixed(2).replace(".", ",")}</td>
+                <td className="px-4 py-3 font-mono text-ink/60">
+                  {p.materiais.length > 0 ? reais(p.custoTotal) : (
+                    <span className="text-ink/30">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 font-mono">
+                  {p.materiais.length > 0 ? (
+                    <span className={p.lucro < 0 ? "text-berry" : "text-pine-2"}>
+                      {reais(p.lucro)}
+                      {p.margemPercentual !== null && (
+                        <span className="text-ink/40 text-xs"> ({p.margemPercentual}%)</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-ink/30">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`text-xs px-2 py-1 rounded-full ${

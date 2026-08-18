@@ -2,21 +2,37 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Categoria, Produto } from "@/lib/types";
+import type { Categoria, ProdutoAdmin } from "@/lib/types";
 
 type VariacaoForm = { tipo: string; valores: string };
+type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
 
-function paraVariacaoForm(v: Produto["variacoes"]): VariacaoForm[] {
+function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
   return v.map((x) => ({ tipo: x.tipo, valores: x.valores.join(", ") }));
 }
 
-export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
+function paraMaterialForm(m: ProdutoAdmin["materiais"] | undefined): MaterialForm[] {
+  return (m ?? []).map((x) => ({
+    nome: x.nome,
+    quantidade: String(x.quantidade),
+    custoUnitario: String(x.custoUnitario),
+  }));
+}
+
+function reais(valor: number) {
+  return `R$ ${valor.toFixed(2).replace(".", ",")}`;
+}
+
+export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }) {
   const router = useRouter();
   const editando = !!produto;
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [nome, setNome] = useState(produto?.nome ?? "");
   const [descricao, setDescricao] = useState(produto?.descricao ?? "");
+  const [descricaoDetalhada, setDescricaoDetalhada] = useState(
+    produto?.descricaoDetalhada ?? ""
+  );
   const [categoriaSlug, setCategoriaSlug] = useState(produto?.categoria ?? "");
   const [preco, setPreco] = useState(produto?.preco?.toString() ?? "");
   const [precoShopee, setPrecoShopee] = useState(produto?.precoShopee?.toString() ?? "");
@@ -30,6 +46,7 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
   const [variacoes, setVariacoes] = useState<VariacaoForm[]>(
     produto ? paraVariacaoForm(produto.variacoes) : []
   );
+  const [materiais, setMateriais] = useState<MaterialForm[]>(paraMaterialForm(produto?.materiais));
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
@@ -51,6 +68,25 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
     setVariacoes((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  function atualizarMaterial(i: number, campo: keyof MaterialForm, valor: string) {
+    setMateriais((prev) => prev.map((m, idx) => (idx === i ? { ...m, [campo]: valor } : m)));
+  }
+
+  function removerMaterial(i: number) {
+    setMateriais((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // Cálculo ao vivo, só pra guiar o cadastro — o valor de verdade é
+  // recalculado no servidor a partir do que for salvo.
+  const custoTotal = materiais.reduce((soma, m) => {
+    const qtd = Number(m.quantidade.replace(",", "."));
+    const custo = Number(m.custoUnitario.replace(",", "."));
+    return soma + (Number.isFinite(qtd) && Number.isFinite(custo) ? qtd * custo : 0);
+  }, 0);
+  const precoNum = Number(preco.replace(",", ".")) || 0;
+  const lucro = precoNum - custoTotal;
+  const margem = precoNum > 0 ? (lucro / precoNum) * 100 : null;
+
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
@@ -63,6 +99,7 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
     const payload = {
       nome,
       descricao,
+      descricaoDetalhada: descricaoDetalhada.trim() || null,
       categoriaSlug,
       preco: Number(preco),
       precoShopee: precoShopee ? Number(precoShopee) : Number(preco),
@@ -76,6 +113,13 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
         .map((v) => ({
           tipo: v.tipo.trim(),
           valores: v.valores.split(",").map((x) => x.trim()).filter(Boolean),
+        })),
+      materiais: materiais
+        .filter((m) => m.nome.trim())
+        .map((m) => ({
+          nome: m.nome.trim(),
+          quantidade: Number(m.quantidade.replace(",", ".")) || 0,
+          custoUnitario: Number(m.custoUnitario.replace(",", ".")) || 0,
         })),
     };
 
@@ -116,6 +160,17 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
           className="w-full border border-line rounded px-3 py-2 text-sm"
           rows={3}
         />
+      </Campo>
+
+      <Campo label="Descrição detalhada">
+        <textarea
+          value={descricaoDetalhada}
+          onChange={(e) => setDescricaoDetalhada(e.target.value)}
+          className="w-full border border-line rounded px-3 py-2 text-sm"
+          rows={5}
+          placeholder="Materiais, medidas, cuidados, o que vem incluso... aparece numa seção própria na página do produto."
+        />
+        <p className="text-xs text-ink/50 mt-1">Opcional. Sem isso, a página mostra só a descrição curta.</p>
       </Campo>
 
       <Campo label="Categoria">
@@ -243,6 +298,77 @@ export default function AdminProdutoForm({ produto }: { produto?: Produto }) {
         </button>
       </div>
 
+      <div className="border-t border-line pt-4">
+        <p className="text-sm font-medium mb-1">Custo de material</p>
+        <p className="text-xs text-ink/50 mb-3">
+          Lance tudo que é gasto pra fazer o produto — assim dá pra ver a margem real, não só o
+          preço de venda. Isso nunca aparece pro cliente, só aqui no admin.
+        </p>
+        <div className="space-y-2">
+          {materiais.map((m, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <input
+                value={m.nome}
+                onChange={(e) => atualizarMaterial(i, "nome", e.target.value)}
+                placeholder="Material (ex: Caneca branca)"
+                className="flex-1 border border-line rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={m.quantidade}
+                onChange={(e) => atualizarMaterial(i, "quantidade", e.target.value)}
+                placeholder="Qtd"
+                inputMode="decimal"
+                className="w-16 border border-line rounded px-2 py-2 text-sm"
+              />
+              <input
+                value={m.custoUnitario}
+                onChange={(e) => atualizarMaterial(i, "custoUnitario", e.target.value)}
+                placeholder="Custo un."
+                inputMode="decimal"
+                className="w-24 border border-line rounded px-2 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => removerMaterial(i)}
+                className="text-berry text-xs px-2"
+              >
+                Remover
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            setMateriais((prev) => [...prev, { nome: "", quantidade: "1", custoUnitario: "" }])
+          }
+          className="text-pine text-xs mt-2 hover:underline"
+        >
+          + Adicionar material
+        </button>
+
+        <div className="bg-paper-2 border border-line rounded-lg p-4 mt-4 text-sm space-y-1">
+          <div className="flex justify-between">
+            <span className="text-ink/60">Custo total de material</span>
+            <span className="font-mono">{reais(custoTotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink/60">Lucro por unidade</span>
+            <span className={`font-mono ${lucro < 0 ? "text-berry" : "text-pine-2"}`}>
+              {reais(lucro)}
+            </span>
+          </div>
+          {margem !== null && (
+            <div className="flex justify-between">
+              <span className="text-ink/60">Margem</span>
+              <span className={`font-mono ${lucro < 0 ? "text-berry" : "text-pine-2"}`}>
+                {margem.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {erro && <p className="text-sm text-berry">{erro}</p>}
 
       <button
@@ -264,3 +390,4 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
+

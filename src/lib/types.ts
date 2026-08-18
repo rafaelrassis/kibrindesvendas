@@ -7,6 +7,9 @@ export type Produto = {
   id: string;
   nome: string;
   descricao: string;
+  // Texto mais longo pra seção "Detalhes do produto"; ausente em produtos
+  // antigos que nunca foram editados depois desse campo existir.
+  descricaoDetalhada: string | null;
   categoria: string;
   categoriaLabel: string;
   preco: number;
@@ -18,6 +21,35 @@ export type Produto = {
   cor: string;
   variacoes: Variacao[];
   destaque?: boolean;
+};
+
+export type MaterialProduto = {
+  id: string;
+  nome: string;
+  quantidade: number;
+  custoUnitario: number;
+};
+
+// Versão do produto só pra telas /admin: inclui o custo de material, dado
+// interno que nunca deve sair pela API pública (/api/produtos).
+export type ProdutoAdmin = Produto & {
+  materiais: MaterialProduto[];
+  custoTotal: number;
+  lucro: number;
+  margemPercentual: number | null;
+};
+
+export type Cupom = {
+  id: string;
+  codigo: string;
+  tipo: "PERCENTUAL" | "FIXO";
+  valor: number;
+  ativo: boolean;
+  validoAte: string | null;
+  usoMaximo: number | null;
+  usos: number;
+  valorMinimoPedido: number;
+  createdAt: string;
 };
 
 export type Categoria = {
