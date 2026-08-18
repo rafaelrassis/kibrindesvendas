@@ -13,6 +13,7 @@ import {
 import { consultarCep, resumoDoEndereco } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
+import { normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
 
 // Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
 // 56.800000000000004); a coluna é Decimal(10,2), então arredonda antes.
@@ -23,7 +24,12 @@ function emReais(valor: number) {
 // Cria o pedido e devolve pra onde mandar o cliente em seguida: a página
 // hospedada do Mercado Pago quando o pagamento é real, ou direto a tela de
 // confirmação no modo simulado.
-export async function criarPedido(usuarioId: string, item: ItemCarrinho, cep: unknown) {
+export async function criarPedido(
+  usuarioId: string,
+  item: ItemCarrinho,
+  cep: unknown,
+  cupomCodigo?: unknown
+) {
   if (!item?.produtoId) throw new ErroDeNegocio("Item do pedido inválido.");
 
   // O frete é recalculado aqui de propósito: o valor que o navegador mostrou
@@ -40,9 +46,17 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho, cep: un
     throw new ErroDeNegocio("Falta confirmar a personalização antes de pagar.");
   }
 
+  // O desconto também é recalculado no servidor, pelo mesmo motivo do frete:
+  // o que o navegador mostrou é preview, quem decide é a validação aqui.
+  const temCupom = typeof cupomCodigo === "string" && cupomCodigo.trim();
+  const { cupom, desconto } = temCupom
+    ? await validarCupom(cupomCodigo, Number(produto.preco))
+    : { cupom: null, desconto: 0 };
+
   const pagamentoReal = pagamentoRealConfigurado();
   const frete = endereco.frete.valor;
-  const total = emReais(Number(produto.preco) + frete);
+  const subtotal = emReais(Number(produto.preco) - desconto);
+  const total = emReais(subtotal + frete);
 
   const pedido = await prisma.$transaction(async (tx) => {
     const criado = await tx.pedido.create({
@@ -52,6 +66,8 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho, cep: un
         status: pagamentoReal ? "AGUARDANDO_PAGAMENTO" : "PAGO",
         total,
         frete,
+        desconto,
+        cupomCodigo: cupom ? normalizarCodigo(cupom.codigo) : null,
         enderecoCep: endereco.cep,
         enderecoResumo: resumoDoEndereco(endereco),
         pagamentoMock: !pagamentoReal,
@@ -77,6 +93,12 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho, cep: un
         },
       },
     });
+
+    // Incrementa o uso do cupom na mesma transação que cria o pedido, pra dois
+    // pedidos simultâneos não passarem os dois do limite de usos.
+    if (cupom) {
+      await registrarUsoCupom(cupom.id, tx);
+    }
 
     // No modo simulado o pedido já nasce pago, então o aviso sai junto. Com
     // pagamento real quem avisa é o webhook, depois da confirmação.
@@ -107,9 +129,12 @@ export async function criarPedido(usuarioId: string, item: ItemCarrinho, cep: un
         items: [
           {
             id: produto.id,
-            title: produto.nome,
+            // Desconto do cupom já embutido aqui: a soma dos itens da
+            // preferência precisa bater com `total`, e o Mercado Pago não
+            // aceita item de valor negativo pra representar desconto.
+            title: cupom ? `${produto.nome} (cupom ${cupom.codigo})` : produto.nome,
             quantity: 1,
-            unit_price: Number(produto.preco),
+            unit_price: subtotal,
             currency_id: "BRL",
           },
           // Frete como item separado: a soma da preferência tem que bater com
@@ -161,6 +186,8 @@ export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
     status: pedido.status,
     total: Number(pedido.total),
     frete: Number(pedido.frete),
+    desconto: Number(pedido.desconto),
+    cupomCodigo: pedido.cupomCodigo,
     enderecoResumo: pedido.enderecoResumo,
     motivoDevolucao: pedido.motivoDevolucao,
     pagamentoMock: pedido.pagamentoMock,

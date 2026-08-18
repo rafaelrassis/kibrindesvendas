@@ -91,6 +91,8 @@ export type Pedido = {
   status: string;
   total: number;
   frete: number;
+  desconto: number;
+  cupomCodigo: string | null;
   enderecoResumo: string | null;
   motivoDevolucao: string | null;
   pagamentoMock: boolean;

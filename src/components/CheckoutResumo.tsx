@@ -31,13 +31,23 @@ export default function CheckoutResumo({
   const { produto, carregando } = useProduto(item?.produtoId);
 
   // Quem já tem endereço padrão salvo começa com ele preenchido; digitar por
-  // cima assume o controle do campo (`null` = ainda não mexeu).
+  // cima assume o controle do campo (`null` = ainda não mexeu). O CEP
+  // informado na própria página do produto tem prioridade sobre o endereço
+  // salvo — é a escolha mais recente do cliente.
   const enderecoPadrao = enderecos.find((e) => e.padrao) ?? enderecos[0];
   const cepPadrao = enderecoPadrao ? normalizarCep(enderecoPadrao.cep) : null;
+  const cepInicial = item?.cepInformado ? normalizarCep(item.cepInformado) : cepPadrao;
   const [cepDigitado, setCepDigitado] = useState<string | null>(null);
-  const cep = cepDigitado ?? (cepPadrao ? formatarCep(cepPadrao) : "");
+  const cep = cepDigitado ?? (cepInicial ? formatarCep(cepInicial) : "");
 
   const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep);
+
+  const [codigoCupom, setCodigoCupom] = useState("");
+  const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; desconto: number } | null>(
+    null
+  );
+  const [validandoCupom, setValidandoCupom] = useState(false);
+  const [erroCupom, setErroCupom] = useState("");
 
   // O pedido é gravado no banco em nome do usuário, então quem tem sacola mas
   // não tem sessão passa pelo login antes de ver o resumo.
@@ -75,7 +85,39 @@ export default function CheckoutResumo({
   const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
   const frete = endereco?.frete ?? null;
-  const total = produto.preco + (frete?.valor ?? 0);
+  const desconto = cupomAplicado?.desconto ?? 0;
+  const precoProduto = produto.preco;
+  const subtotal = Math.max(0, precoProduto - desconto);
+  const total = subtotal + (frete?.valor ?? 0);
+
+  function aplicarCupom() {
+    if (!codigoCupom.trim()) return;
+    setErroCupom("");
+    setValidandoCupom(true);
+
+    fetch("/api/cupons/validar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ codigo: codigoCupom, valorPedido: precoProduto }),
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          setErroCupom(data.error ?? "Não foi possível aplicar o cupom.");
+          setCupomAplicado(null);
+          return;
+        }
+        setCupomAplicado({ codigo: codigoCupom.trim().toUpperCase(), desconto: data.desconto });
+      })
+      .catch(() => setErroCupom("Não foi possível aplicar o cupom agora."))
+      .finally(() => setValidandoCupom(false));
+  }
+
+  function removerCupom() {
+    setCupomAplicado(null);
+    setCodigoCupom("");
+    setErroCupom("");
+  }
 
   function pagar() {
     // O botão já fica travado sem item e sem frete; a checagem sobra só pra
@@ -87,8 +129,13 @@ export default function CheckoutResumo({
     fetch("/api/pedidos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // O frete não vai no corpo de propósito: o servidor recalcula pelo CEP.
-      body: JSON.stringify({ item, cep: normalizarCep(cep) }),
+      // Frete e desconto não vão fixos no corpo, de propósito: o servidor
+      // recalcula os dois a partir do CEP e do código do cupom.
+      body: JSON.stringify({
+        item,
+        cep: normalizarCep(cep),
+        cupomCodigo: cupomAplicado?.codigo,
+      }),
     })
       .then(async (r) => {
         const data = await r.json();
@@ -209,10 +256,48 @@ export default function CheckoutResumo({
       )}
 
       <div className="bg-white border border-line rounded-lg p-5 mb-5">
+        <p className="text-sm font-medium mb-3">Cupom de desconto</p>
+        {cupomAplicado ? (
+          <div className="flex items-center justify-between bg-pine/5 border border-pine/30 rounded-md px-4 py-2.5">
+            <p className="text-sm text-pine-2">
+              <span className="font-mono font-medium">{cupomAplicado.codigo}</span> aplicado —{" "}
+              {reais(cupomAplicado.desconto)} de desconto
+            </p>
+            <button onClick={removerCupom} className="text-xs text-berry hover:underline shrink-0">
+              Remover
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              value={codigoCupom}
+              onChange={(e) => setCodigoCupom(e.target.value.toUpperCase())}
+              placeholder="Código do cupom"
+              className="flex-1 bg-white border border-line rounded-lg px-4 py-2.5 text-sm font-mono outline-none focus:border-pine"
+            />
+            <button
+              onClick={aplicarCupom}
+              disabled={validandoCupom || !codigoCupom.trim()}
+              className="bg-pine/10 text-pine-2 font-medium px-5 py-2.5 rounded-lg text-sm disabled:opacity-40 hover:bg-pine/15 transition"
+            >
+              {validandoCupom ? "..." : "Aplicar"}
+            </button>
+          </div>
+        )}
+        {erroCupom && <p className="text-xs text-berry mt-2">{erroCupom}</p>}
+      </div>
+
+      <div className="bg-white border border-line rounded-lg p-5 mb-5">
         <div className="flex justify-between text-sm mb-1.5">
           <span className="text-ink/60">Produto</span>
           <span className="font-mono">{reais(produto.preco)}</span>
         </div>
+        {desconto > 0 && (
+          <div className="flex justify-between text-sm mb-1.5">
+            <span className="text-ink/60">Desconto ({cupomAplicado?.codigo})</span>
+            <span className="font-mono text-pine-2">-{reais(desconto)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm">
           <span className="text-ink/60">Frete</span>
           <span className="font-mono">
