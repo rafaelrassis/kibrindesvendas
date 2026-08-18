@@ -258,7 +258,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           Usados na cotação real de frete pelos Correios. Sem esses dados o cálculo cai
           na estimativa por região.
         </p>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Campo label="Peso (g)">
             <input
               type="number"

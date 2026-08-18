@@ -88,8 +88,8 @@ export default function AdminCategoriasPage() {
       {erro && <p className="text-sm text-berry mb-4">{erro}</p>}
       <AdminNav />
 
-      <div className="bg-white border border-line rounded-lg overflow-hidden mb-6">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-line rounded-lg overflow-x-auto mb-6">
+        <table className="w-full text-sm min-w-[420px]">
           <thead className="bg-paper-2 text-left">
             <tr>
               <th className="px-4 py-3 font-medium">Ícone</th>

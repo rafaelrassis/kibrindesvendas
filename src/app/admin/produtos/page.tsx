@@ -81,8 +81,8 @@ export default function AdminProdutosPage() {
         + Novo produto
       </Link>
 
-      <div className="bg-white border border-line rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-line rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-paper-2 text-left">
             <tr>
               <th className="px-4 py-3 font-medium">Produto</th>
