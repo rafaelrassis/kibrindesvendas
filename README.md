@@ -330,7 +330,8 @@ src/
     ├── use-pedidos.ts            # pedidos do usuário logado
     ├── favoritos-context.tsx     # favoritos do usuário (via /api/favoritos)
     ├── notificacoes-context.tsx  # avisos + contador do sininho
-    └── mock-data.ts              # seed do banco + FAQs
+    ├── mock-data.ts              # seed do banco + FAQs
+    └── *.test.ts                 # testes unitários das funções puras (Vitest)
 ```
 
 ## Deploy (Vercel)
@@ -373,11 +374,28 @@ artes somem no deploy seguinte. Não deixar assim em produção. Sem
 `MERCADOPAGO_ACCESS_TOKEN` o checkout sobe em modo simulado, ou seja, aprova
 pedido sem cobrar ninguém: também não pode ficar assim em produção.
 
+## Testes
+
+```bash
+npm test          # roda uma vez
+npm run test:watch
+```
+
+`npm test` roda os testes unitários (Vitest) das funções puras de negócio em
+`src/lib`: slug de categoria, comparativo de preço com a Shopee, tabela de frete
+por UF (mais normalização do CEP) e as regras do status do pedido — incluindo
+quando a devolução pode ser pedida.
+
+Os testes ficam ao lado do módulo, em `src/lib/*.test.ts`, e o ambiente é `node`:
+nada de banco, servidor ou DOM. Módulos `server-only`, rotas de API e componentes
+ficam **de fora** — só a lógica pura extraída deles. Ainda **não há testes de
+integração/e2e**, que exigiriam Postgres e o app no ar.
+
 ## CI
 
 `.github/workflows/ci.yml` roda em push e pull request pra `main`: sobe um
 Postgres descartável (service container), aplica migrations, popula o seed e
-então roda lint, checagem de tipos e build. O banco não é opcional aqui — as
+então roda lint, checagem de tipos, testes unitários e build. O banco não é opcional aqui — as
 páginas prerenderizadas consultam o catálogo durante o `next build`.
 
 `npm run typecheck` roda `next typegen` antes do `tsc --noEmit`, porque os
@@ -408,7 +426,8 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [ ] Guardar a sacola até o pagamento confirmar (hoje ela é limpa na ida pro
       Mercado Pago, então voltar de um pagamento recusado exige montar de novo)
 - [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)
-- [ ] Testes automatizados (o CI hoje só garante lint, tipos e build)
+- [x] Testes automatizados das funções puras de negócio (Vitest, rodando no CI)
+- [ ] Testes de integração das rotas de API e e2e do fluxo de compra
 
 ## Convenções
 

@@ -58,6 +58,11 @@ jobs:
       - name: Checagem de tipos
         run: npm run typecheck
 
+      # Só funções puras (`src/lib/*.test.ts`): não sobem servidor nem tocam o
+      # banco, então rodam antes do build e falham em segundos.
+      - name: Testes unitários
+        run: npm test
+
       - name: Cache do build
         uses: actions/cache@v4
         with:
