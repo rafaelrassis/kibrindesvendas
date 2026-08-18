@@ -11,7 +11,8 @@ favoritos e notificações no perfil, área interna (`/admin`) com painel de
 vendas, que edita catálogo de verdade (inclusive ligando e desligando o
 comparativo de preço da Shopee por produto), move o pedido de status e monta o
 carrossel da home, pagamento real pelo Mercado Pago (Pix, cartão e boleto) e
-entrega com frete por CEP e devolução pedida pelo cliente. O carrinho ainda é mock, em `localStorage`.
+entrega com frete cotado nos Correios pelo CEP e devolução pedida pelo cliente.
+O carrinho ainda é mock, em `localStorage`.
 
 ## Como começar
 
@@ -79,7 +80,8 @@ O resto do perfil (telefone, CPF, endereços, preferências) continua local em
 
 `/admin` abre no painel de vendas e edita o catálogo de verdade: cadastro,
 edição e remoção de produtos (com variações), CRUD de categorias, a fila de
-pedidos com a personalização de cada item e os banners da home.
+pedidos com a personalização de cada item, os banners da home e as
+configurações operacionais da loja.
 
 O acesso é restrito por `Usuario.admin`. Depois de criar a conta em
 `/cadastro`, promova ela uma vez:
@@ -169,6 +171,15 @@ ficaria valendo até o próximo deploy.
 O seed cria três banners iniciais (`src/lib/mock-data.ts`) e não mexe mais
 neles depois — rodar `npm run db:seed` de novo não desfaz o que a loja editou.
 
+### Configurações da loja (`/admin/configuracoes`)
+
+Tabela de uma linha só (`ConfiguracaoLoja`, id fixo `singleton`) com o que a
+loja precisa mudar sem redeploy: o CEP de onde os Correios buscam a encomenda e
+o token da conta Melhor Envio usada na cotação. O token entra por campo de
+senha e **nunca volta inteiro** pela API — a tela só recebe se está cadastrado
+e os 4 últimos caracteres, o suficiente pra conferir sem expor o segredo.
+Salvar com o campo em branco mantém o token atual em vez de apagá-lo.
+
 ## Personalização: as duas vias
 
 `/personalizar/[id]` abre com duas saídas, e as duas só liberam o botão de
@@ -254,10 +265,17 @@ URL pública dele.
 ## Entrega e devolução
 
 O checkout pede o CEP antes de deixar pagar. `GET /api/cep/[cep]` consulta o
-ViaCEP, devolve o endereço e o frete calculado por região (`src/lib/frete.ts`),
-e a tela soma tudo: produto + frete = total. Quem já tem endereço padrão salvo
-chega com o CEP preenchido; o mesmo endpoint preenche rua, bairro, cidade e UF
-no cadastro de endereço.
+ViaCEP, devolve o endereço e o frete, e a tela soma tudo: produto + frete =
+total. Quem já tem endereço padrão salvo chega com o CEP preenchido; o mesmo
+endpoint preenche rua, bairro, cidade e UF no cadastro de endereço.
+
+Com `?produtoId=`, a rota cota o frete **real** dos Correios pelo Melhor Envio
+(`cotarFreteMelhorEnvio` em `src/lib/frete.ts`): API REST, sem contrato prévio,
+que devolve PAC/SEDEX com preço e prazo da rota. A tela do produto e o checkout
+mandam o id porque conhecem o item; o cadastro de endereço avulso não manda,
+porque ali não há pacote pra cotar. Fica sempre a opção mais barata entre as
+que a API aceitou (as com `error` saem fora, ex: transportadora que não atende
+a rota).
 
 O valor que o navegador mostra é só visual: `POST /api/pedidos` recebe o CEP,
 **não** o frete, e recalcula tudo no servidor antes de gravar — senão bastaria
@@ -267,9 +285,15 @@ cliente muda depois; o pedido tem que continuar mostrando pra onde foi), e a
 fila do admin mostra o endereço de despacho. Com pagamento real o frete vai
 como item separado na preferência do Mercado Pago, pra soma bater com o total.
 
-> A tabela de frete é uma estimativa por região, não cotação de transportadora.
-> A interface (`uf -> { valor, prazoDias }`) já está pronta pra trocar por
-> Correios/Melhor Envio quando houver contrato.
+A cotação real depende de três coisas cadastradas: o token do Melhor Envio e o
+CEP de origem em `/admin/configuracoes`, e o peso/dimensões da embalagem no
+cadastro do produto. Faltando qualquer uma delas — ou se a API não responder em
+8s, devolver erro ou não sobrar nenhuma opção — o cálculo cai na estimativa por
+região (`calcularFrete`, tabela `uf -> { valor, prazoDias }`). O cliente nunca
+fica sem número de frete, e nada nesse caminho pode derrubar o checkout.
+
+> Pacote menor que o mínimo dos Correios (16x11x2cm) é arredondado pra cima
+> antes de cotar, senão a cotação volta vazia.
 
 `/conta/pedidos` e `/conta/pedidos/[id]` leem os pedidos reais do banco (a
 lista mock saiu do `conta-data.ts`). Depois que o pedido é marcado como
@@ -328,8 +352,8 @@ src/
 │   ├── favoritos/ e notificacoes/ # lista salva e avisos do pedido
 │   ├── suporte/                  # FAQ
 │   ├── entrar/ e cadastro/       # login e criação de conta
-│   ├── admin/                    # área interna (painel, produtos,
-│   │                              # categorias, pedidos, banners)
+│   ├── admin/                    # área interna (painel, produtos, categorias,
+│   │                              # pedidos, banners, configurações)
 │   └── api/                      # catálogo, auth, pedidos, favoritos,
 │                                  # notificações, webhook e admin (JSON)
 ├── components/                   # Header, Footer, ProductCard
@@ -343,7 +367,7 @@ src/
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
     ├── types.ts                  # Produto, Categoria, Variacao, Pedido, Banner
-    ├── frete.ts                  # tabela de frete por UF + formato do CEP
+    ├── frete.ts                  # cotação Melhor Envio + tabela por UF + CEP
     ├── status-pedido.ts          # rótulos e cores do StatusPedido
     ├── use-produto.ts            # hooks de catálogo p/ client components
     ├── use-cep.ts                # consulta de CEP + frete p/ o checkout
@@ -435,9 +459,10 @@ npm run test:watch
 ```
 
 `npm test` roda os testes unitários (Vitest) das funções puras de negócio em
-`src/lib`: slug de categoria, comparativo de preço com a Shopee, tabela de frete
-por UF (mais normalização do CEP) e as regras do status do pedido — incluindo
-quando a devolução pode ser pedida.
+`src/lib`: slug de categoria, comparativo de preço com a Shopee, frete (tabela
+por UF, normalização do CEP e a cotação do Melhor Envio, com `fetch` trocado por
+um stub) e as regras do status do pedido — incluindo quando a devolução pode ser
+pedida.
 
 Os testes ficam ao lado do módulo, em `src/lib/*.test.ts`, e o ambiente é `node`:
 nada de banco, servidor ou DOM. Módulos `server-only`, rotas de API e componentes
@@ -474,8 +499,9 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
       gráficos dos últimos 30 dias)
 - [x] Comparativo de preço ligado/desligado por produto (`vendidoNaShopee`)
 - [ ] Persistir o carrinho no banco
-- [ ] Cotação real de frete (Correios / Melhor Envio) no lugar da tabela por
-      região, e rastreio do envio no detalhe do pedido
+- [x] Cotação real de frete (Correios via Melhor Envio) com a tabela por região
+      como fallback, peso/dimensões por produto e token no `/admin/configuracoes`
+- [ ] Rastreio do envio no detalhe do pedido
 - [ ] Guardar a sacola até o pagamento confirmar (hoje ela é limpa na ida pro
       Mercado Pago, então voltar de um pagamento recusado exige montar de novo)
 - [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)

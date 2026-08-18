@@ -48,8 +48,98 @@ const TABELA: Record<Regiao, Frete> = {
 // em vez de sair de graça.
 const PADRAO: Frete = TABELA.NORTE;
 
+// Nome mantido por compatibilidade com quem já importa `calcularFrete`;
+// por baixo dos panos é a estimativa por região, usada como fallback quando
+// a cotação real (Melhor Envio) não está configurada ou falha.
 export function calcularFrete(uf: string): Frete {
   return TABELA[REGIAO_POR_UF[uf.trim().toUpperCase()]] ?? PADRAO;
+}
+
+// --- Cotação real via Melhor Envio (agregador dos Correios) ---------------
+// A loja envia por Correios; em vez de integrar direto com o SIGEP Web
+// (exige contrato e é SOAP/XML), cotamos pelo Melhor Envio: API REST simples,
+// sem contrato prévio, e que já devolve PAC/SEDEX com prazo e preço reais.
+
+export type PacoteFrete = {
+  pesoGramas: number;
+  alturaCm: number;
+  larguraCm: number;
+  comprimentoCm: number;
+};
+
+type ServicoMelhorEnvio = {
+  id: number;
+  name: string;
+  price: string;
+  delivery_time: number;
+  company: { name: string };
+  error?: string;
+};
+
+// Dimensão mínima aceita pelos Correios é 16x11x2cm — pacote menor que isso
+// é rejeitado pela cotação, então arredondamos pra cima antes de enviar.
+const MIN_ALTURA_CM = 2;
+const MIN_LARGURA_CM = 11;
+const MIN_COMPRIMENTO_CM = 16;
+
+export async function cotarFreteMelhorEnvio(
+  token: string,
+  cepOrigem: string,
+  cepDestino: string,
+  pacote: PacoteFrete
+): Promise<Frete | null> {
+  const body = {
+    from: { postal_code: cepOrigem },
+    to: { postal_code: cepDestino },
+    products: [
+      {
+        id: "1",
+        width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
+        height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
+        length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
+        weight: Math.max(pacote.pesoGramas, 1) / 1000,
+        insurance_value: 0,
+        quantity: 1,
+      },
+    ],
+  };
+
+  let resposta: Response;
+  try {
+    resposta = await fetch("https://melhorenvio.com.br/api/v2/me/shipment/calculate", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        // Exigido pelo Melhor Envio pra identificar quem consome a API.
+        "User-Agent": "LeoKibrindes (contato@leokibrindes.com.br)",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    return null;
+  }
+
+  if (!resposta.ok) return null;
+
+  const servicos = (await resposta.json().catch(() => null)) as ServicoMelhorEnvio[] | null;
+  if (!Array.isArray(servicos)) return null;
+
+  // Descarta opções com erro (ex: transportadora não atende a rota) e fica
+  // com a mais barata entre as que sobraram — normalmente o PAC.
+  const validos = servicos.filter((s) => !s.error && s.price);
+  if (validos.length === 0) return null;
+
+  const maisBarato = validos.reduce((menor, s) =>
+    Number(s.price) < Number(menor.price) ? s : menor
+  );
+
+  return {
+    valor: Number(maisBarato.price),
+    prazoDias: maisBarato.delivery_time,
+  };
 }
 
 // Aceita "01310-100" ou "01310100"; devolve null quando não são 8 dígitos.

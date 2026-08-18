@@ -36,6 +36,10 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     cor: p.cor,
     destaque: p.destaque,
     variacoes: p.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
+    pesoGramas: p.pesoGramas,
+    alturaCm: p.alturaCm,
+    larguraCm: p.larguraCm,
+    comprimentoCm: p.comprimentoCm,
   };
 }
 
@@ -145,10 +149,20 @@ export type DadosProduto = {
   destaque?: boolean;
   variacoes?: { tipo: string; valores: string[] }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
+  pesoGramas?: number;
+  alturaCm?: number;
+  larguraCm?: number;
+  comprimentoCm?: number;
 };
 
 const EMOJI_PADRAO = "🎁";
 const COR_PADRAO = "#3F6B4C";
+// Caixa pequena — mesmo padrão do `@default` no schema, usado quando o
+// admin cria o produto sem preencher peso/dimensões.
+const PESO_PADRAO_G = 300;
+const ALTURA_PADRAO_CM = 4;
+const LARGURA_PADRAO_CM = 11;
+const COMPRIMENTO_PADRAO_CM = 16;
 
 async function categoriaIdPorSlug(slug: string) {
   const categoria = await prisma.categoria.findUnique({ where: { slug } });
@@ -194,6 +208,10 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       emoji: dados.emoji || EMOJI_PADRAO,
       cor: dados.cor || COR_PADRAO,
       destaque: !!dados.destaque,
+      pesoGramas: dados.pesoGramas ?? PESO_PADRAO_G,
+      alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
+      larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
+      comprimentoCm: dados.comprimentoCm ?? COMPRIMENTO_PADRAO_CM,
       variacoes: {
         create: (dados.variacoes ?? []).map((v) => ({ tipo: v.tipo, valores: v.valores })),
       },
@@ -249,6 +267,10 @@ export async function atualizarProduto(
         emoji: dados.emoji,
         cor: dados.cor,
         destaque: dados.destaque,
+        pesoGramas: dados.pesoGramas,
+        alturaCm: dados.alturaCm,
+        larguraCm: dados.larguraCm,
+        comprimentoCm: dados.comprimentoCm,
         ...(dados.variacoes && {
           variacoes: {
             create: dados.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),

@@ -40,7 +40,7 @@ export default function CheckoutResumo({
   const [cepDigitado, setCepDigitado] = useState<string | null>(null);
   const cep = cepDigitado ?? (cepInicial ? formatarCep(cepInicial) : "");
 
-  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep);
+  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep, item?.produtoId);
 
   const [codigoCupom, setCodigoCupom] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; desconto: number } | null>(

@@ -21,6 +21,11 @@ export type Produto = {
   cor: string;
   variacoes: Variacao[];
   destaque?: boolean;
+  // Usados na cotação de frete real (Correios via Melhor Envio).
+  pesoGramas: number;
+  alturaCm: number;
+  larguraCm: number;
+  comprimentoCm: number;
 };
 
 export type MaterialProduto = {

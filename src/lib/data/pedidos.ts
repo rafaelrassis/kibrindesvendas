@@ -37,7 +37,7 @@ export async function criarPedido(
   const [usuario, produto, endereco] = await Promise.all([
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
     prisma.produto.findUnique({ where: { id: item.produtoId } }),
-    consultarCep(cep),
+    consultarCep(cep, item.produtoId),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);

@@ -18,7 +18,7 @@ type Resposta = { cep: string; endereco?: EnderecoConsultado; erro?: string };
 
 // Consulta o CEP (endereço + frete) sempre que ele fica completo. CEP
 // incompleto não dispara nada — é o estado normal de quem está digitando.
-export function useCep(valor: string) {
+export function useCep(valor: string, produtoId?: string) {
   const cep = normalizarCep(valor);
   const [resposta, setResposta] = useState<Resposta | undefined>(undefined);
 
@@ -26,7 +26,11 @@ export function useCep(valor: string) {
     if (!cep) return;
     let ativo = true;
 
-    fetch(`/api/cep/${cep}`)
+    const url = produtoId
+      ? `/api/cep/${cep}?produtoId=${encodeURIComponent(produtoId)}`
+      : `/api/cep/${cep}`;
+
+    fetch(url)
       .then(async (r) => {
         const dados = await r.json();
         if (!ativo) return;
@@ -43,7 +47,7 @@ export function useCep(valor: string) {
     return () => {
       ativo = false;
     };
-  }, [cep]);
+  }, [cep, produtoId]);
 
   const atual = cep && resposta?.cep === cep ? resposta : undefined;
 

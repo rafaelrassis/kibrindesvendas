@@ -32,6 +32,10 @@ export const produtos: Produto[] = [
       { tipo: "Formato", valores: ["Redondo", "Quadrado", "Osso"] },
     ],
     destaque: true,
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
   {
     id: "ima-casal-02",
@@ -48,6 +52,10 @@ export const produtos: Produto[] = [
     cor: "#B23A48",
     variacoes: [{ tipo: "Tamanho", valores: ["8x8cm", "10x10cm"] }],
     destaque: true,
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
   {
     id: "ima-familia-03",
@@ -63,6 +71,10 @@ export const produtos: Produto[] = [
     emoji: "👨‍👩‍👧",
     cor: "#3F6B4C",
     variacoes: [{ tipo: "Tamanho", valores: ["10x10cm", "12x12cm"] }],
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
   {
     id: "caneca-pet-01",
@@ -79,6 +91,10 @@ export const produtos: Produto[] = [
     cor: "#8C5A3C",
     variacoes: [{ tipo: "Cor da alça", valores: ["Branca", "Preta", "Vermelha"] }],
     destaque: true,
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
   {
     id: "camiseta-basica-01",
@@ -97,6 +113,10 @@ export const produtos: Produto[] = [
       { tipo: "Tamanho", valores: ["P", "M", "G", "GG"] },
       { tipo: "Cor", valores: ["Branca", "Preta", "Cinza"] },
     ],
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
   {
     id: "camiseta-custom-02",
@@ -116,6 +136,10 @@ export const produtos: Produto[] = [
       { tipo: "Cor", valores: ["Branca", "Preta"] },
     ],
     destaque: true,
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
   {
     id: "moletom-custom-01",
@@ -134,6 +158,10 @@ export const produtos: Produto[] = [
       { tipo: "Tamanho", valores: ["P", "M", "G", "GG"] },
       { tipo: "Cor", valores: ["Cinza mescla", "Preto"] },
     ],
+    pesoGramas: 300,
+    alturaCm: 4,
+    larguraCm: 11,
+    comprimentoCm: 16,
   },
 ];
 

@@ -1,5 +1,6 @@
 import "server-only";
-import { calcularFrete, normalizarCep, type Frete } from "@/lib/frete";
+import { calcularFrete, cotarFreteMelhorEnvio, normalizarCep, type Frete } from "@/lib/frete";
+import { prisma } from "@/lib/prisma";
 import { ErroDeNegocio } from "./erros";
 
 export type EnderecoDeEntrega = {
@@ -23,14 +24,51 @@ type RespostaViaCep = {
   uf?: string;
 };
 
+// Cotação real (Correios via Melhor Envio) quando há produto e token
+// configurado; cai pra estimativa por região quando falta um dos dois ou a
+// API do agregador não responde. Nunca deixa o cliente sem número de frete.
+async function calcularFreteReal(
+  uf: string,
+  cepDestino: string,
+  produtoId?: string
+): Promise<Frete> {
+  const estimativa = calcularFrete(uf);
+  if (!produtoId) return estimativa;
+
+  const [config, produto] = await Promise.all([
+    prisma.configuracaoLoja.findUnique({ where: { id: "singleton" } }),
+    prisma.produto.findUnique({
+      where: { id: produtoId },
+      select: { pesoGramas: true, alturaCm: true, larguraCm: true, comprimentoCm: true },
+    }),
+  ]);
+
+  if (!config?.melhorEnvioToken || !produto) return estimativa;
+
+  const cotacao = await cotarFreteMelhorEnvio(
+    config.melhorEnvioToken,
+    normalizarCep(config.cepOrigem) ?? config.cepOrigem,
+    cepDestino,
+    produto
+  );
+
+  return cotacao ?? estimativa;
+}
+
 // Fonte da verdade do endereço e do frete: a tela do checkout consulta pra
 // mostrar o valor, e o pedido consulta de novo na hora de gravar, pra não
 // confiar no número que voltou do navegador.
 // `cepBruto` é `unknown` porque chega do corpo da requisição: pedido sem CEP
 // nenhum tem que virar 400, não 500 num `.replace` de undefined.
-export async function consultarCep(cepBruto: unknown): Promise<EnderecoDeEntrega> {
+// `produtoIdBruto` é opcional — sem ele (ex: cadastro de endereço avulso)
+// cai direto na estimativa por região.
+export async function consultarCep(
+  cepBruto: unknown,
+  produtoIdBruto?: unknown
+): Promise<EnderecoDeEntrega> {
   const cep = typeof cepBruto === "string" ? normalizarCep(cepBruto) : null;
   if (!cep) throw new ErroDeNegocio("CEP inválido: informe os 8 dígitos.");
+  const produtoId = typeof produtoIdBruto === "string" ? produtoIdBruto : undefined;
 
   let resposta: Response;
   try {
@@ -60,7 +98,7 @@ export async function consultarCep(cepBruto: unknown): Promise<EnderecoDeEntrega
     bairro: dados.bairro ?? "",
     cidade: dados.localidade ?? "",
     uf: dados.uf,
-    frete: calcularFrete(dados.uf),
+    frete: await calcularFreteReal(dados.uf, cep, produtoId),
   };
 }
 

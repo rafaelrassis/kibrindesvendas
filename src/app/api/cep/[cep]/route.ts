@@ -4,11 +4,12 @@ import { respostaDeErro } from "@/lib/api";
 
 // Usada pelo checkout (calcular frete) e pelo cadastro de endereço
 // (preencher rua/bairro/cidade a partir do CEP).
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ cep: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ cep: string }> }) {
   const { cep } = await params;
+  const produtoId = req.nextUrl.searchParams.get("produtoId") ?? undefined;
 
   try {
-    return NextResponse.json(await consultarCep(cep));
+    return NextResponse.json(await consultarCep(cep, produtoId));
   } catch (e) {
     return respostaDeErro(e);
   }

@@ -43,6 +43,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     produto?.requerPersonalizacao ?? false
   );
   const [destaque, setDestaque] = useState(produto?.destaque ?? false);
+  const [pesoGramas, setPesoGramas] = useState(String(produto?.pesoGramas ?? 300));
+  const [alturaCm, setAlturaCm] = useState(String(produto?.alturaCm ?? 4));
+  const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
+  const [comprimentoCm, setComprimentoCm] = useState(String(produto?.comprimentoCm ?? 16));
   const [variacoes, setVariacoes] = useState<VariacaoForm[]>(
     produto ? paraVariacaoForm(produto.variacoes) : []
   );
@@ -108,6 +112,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       emoji,
       cor,
       destaque,
+      pesoGramas: Number(pesoGramas) || 300,
+      alturaCm: Number(alturaCm) || 4,
+      larguraCm: Number(larguraCm) || 11,
+      comprimentoCm: Number(comprimentoCm) || 16,
       variacoes: variacoes
         .filter((v) => v.tipo.trim())
         .map((v) => ({
@@ -242,6 +250,52 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             className="w-full border border-line rounded px-3 py-1 h-10"
           />
         </Campo>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium mb-2">Peso e dimensões (embalagem)</p>
+        <p className="text-xs text-ink/50 mb-2">
+          Usados na cotação real de frete pelos Correios. Sem esses dados o cálculo cai
+          na estimativa por região.
+        </p>
+        <div className="grid grid-cols-4 gap-3">
+          <Campo label="Peso (g)">
+            <input
+              type="number"
+              min={1}
+              value={pesoGramas}
+              onChange={(e) => setPesoGramas(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Altura (cm)">
+            <input
+              type="number"
+              min={1}
+              value={alturaCm}
+              onChange={(e) => setAlturaCm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Largura (cm)">
+            <input
+              type="number"
+              min={1}
+              value={larguraCm}
+              onChange={(e) => setLarguraCm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Comprimento (cm)">
+            <input
+              type="number"
+              min={1}
+              value={comprimentoCm}
+              onChange={(e) => setComprimentoCm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+        </div>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

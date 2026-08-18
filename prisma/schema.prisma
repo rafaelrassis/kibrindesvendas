@@ -31,6 +31,13 @@ model Produto {
   emoji                String
   cor                  String
   destaque             Boolean           @default(false)
+  // Usados no cálculo de frete real (Correios via Melhor Envio). Valores
+  // padrão são de uma caixa pequena — produto sem cadastro específico ainda
+  // recebe uma cotação plausível em vez de falhar.
+  pesoGramas           Int               @default(300)
+  alturaCm             Int               @default(4)
+  larguraCm            Int               @default(11)
+  comprimentoCm        Int               @default(16)
   variacoes            Variacao[]
   // Custo de material é dado interno (usado pra calcular lucro no admin) —
   // nunca sai pela API pública, só pela rota /api/admin.
@@ -208,4 +215,14 @@ enum TipoPersonalizacao {
   IA
   UPLOAD
   MANUAL
+}
+
+// Linha única (id fixo "singleton") com dados operacionais da loja editáveis
+// pelo admin sem precisar de redeploy: CEP de onde os Correios buscam a
+// encomenda e o token da conta Melhor Envio usada pra cotar o frete real.
+model ConfiguracaoLoja {
+  id               String   @id @default("singleton")
+  cepOrigem        String   @default("01310100")
+  melhorEnvioToken String?
+  updatedAt        DateTime @updatedAt
 }
