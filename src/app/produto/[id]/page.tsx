@@ -61,8 +61,8 @@ export default function ProdutoPage() {
 
   return (
     <div className="pb-36 md:pb-0">
-      {/* Voltar */}
-      <div className="mx-auto max-w-5xl px-5 pt-4">
+      {/* Voltar — só desktop; no mobile o header já tem a seta ao lado da busca */}
+      <div className="hidden md:block mx-auto max-w-5xl px-5 pt-4">
         <button
           onClick={() => router.back()}
           className="text-sm text-ink/60 hover:text-ink"
