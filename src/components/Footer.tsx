@@ -2,6 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
+// Mesmas variáveis usadas no resto do site. Sem elas o item vira texto simples:
+// link com href="#" parece clicável e não leva a lugar nenhum.
+const WHATSAPP_LOJA = process.env.NEXT_PUBLIC_WHATSAPP_LOJA;
+const SHOPEE_URL = process.env.NEXT_PUBLIC_SHOPEE_URL;
+
 export default function Footer() {
   return (
     <footer className="bg-pine text-paper/70 mt-16">
@@ -15,17 +20,30 @@ export default function Footer() {
         <div className="flex gap-10">
           <div>
             <p className="text-paper/50 uppercase text-xs tracking-wide mb-2">Loja</p>
-            <a
-              href="#"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block hover:text-mustard transition-colors"
-            >
-              Também na Shopee
-            </a>
-            <a href="#" target="_blank" rel="noopener noreferrer" className="block hover:text-mustard transition-colors">
-              WhatsApp de atendimento
-            </a>
+            {SHOPEE_URL ? (
+              <a
+                href={SHOPEE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block hover:text-mustard transition-colors"
+              >
+                Também na Shopee
+              </a>
+            ) : (
+              <p>Também na Shopee</p>
+            )}
+            {WHATSAPP_LOJA ? (
+              <a
+                href={`https://wa.me/${WHATSAPP_LOJA}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block hover:text-mustard transition-colors"
+              >
+                WhatsApp de atendimento
+              </a>
+            ) : (
+              <p>WhatsApp de atendimento</p>
+            )}
           </div>
           <div>
             <p className="text-paper/50 uppercase text-xs tracking-wide mb-2">Ajuda</p>

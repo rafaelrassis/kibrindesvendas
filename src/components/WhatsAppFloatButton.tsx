@@ -1,11 +1,15 @@
 import { MessageCircle } from "lucide-react";
 
-// TODO: substituir pelo número real de atendimento (formato: 55DDDNUMERO)
-const WHATSAPP_NUMERO = "5511999999999";
-const WHATSAPP_MENSAGEM = "Olá! Vim do site da LeoKibrindes e gostaria de tirar uma dúvida.";
+// Mesmo número do atendimento da personalização (NEXT_PUBLIC_WHATSAPP_LOJA):
+// só dígitos, com DDI. Sem ele o botão não aparece — melhor não ter atalho do
+// que ter um link wa.me quebrado no site todo.
+const WHATSAPP_LOJA = process.env.NEXT_PUBLIC_WHATSAPP_LOJA;
+const MENSAGEM = "Olá! Vim do site da LeoKibrindes e gostaria de tirar uma dúvida.";
 
 export default function WhatsAppFloatButton() {
-  const href = `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(WHATSAPP_MENSAGEM)}`;
+  if (!WHATSAPP_LOJA) return null;
+
+  const href = `https://wa.me/${WHATSAPP_LOJA}?text=${encodeURIComponent(MENSAGEM)}`;
 
   return (
     <a
