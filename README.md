@@ -305,14 +305,27 @@ src/
    produção — as duas primeiras saem do painel de desenvolvedor do Mercado
    Pago, onde a URL de notificação deve ser cadastrada como
    `https://SEU-DOMINIO/api/webhooks/mercadopago`.
-4. Aplicar as migrations no banco de produção — `npm run db:deploy` com
-   `DATABASE_URL` apontando pra lá. Isso vai **antes** do primeiro deploy: o
-   build prerenderiza páginas que consultam o banco e quebra se as tabelas não
-   existem. Repetir a cada deploy que traga migration nova.
-5. Deploy. O `postinstall` roda `prisma generate`, então o Prisma Client sai
-   correto mesmo com o cache de dependências da Vercel.
+4. Deploy. O `postinstall` roda `prisma generate` (Prisma Client correto mesmo
+   com o cache de dependências da Vercel) e o `npm run build` roda
+   `prisma migrate deploy` **antes** do `next build`, então as migrations
+   pendentes são aplicadas no banco de `DATABASE_URL` durante o próprio build.
+   Elas não são opcionais: o build prerenderiza páginas que consultam o banco e
+   quebra com `P2021 table does not exist` se as tabelas não existirem.
+5. Popular o catálogo: `npm run db:seed` com `DATABASE_URL` apontando pro banco
+   de produção. Sem isso a loja sobe no ar com catálogo vazio — o build passa,
+   mas não há produto nem categoria pra mostrar. O seed é idempotente
+   (`upsert` com `update: {}`), então rodar de novo não desfaz o que a loja
+   editou.
 6. Promover a primeira conta a admin com `npm run db:admin -- voce@exemplo.com`
    apontando pro banco de produção.
+
+Duas ressalvas sobre a migration no build: enquanto preview e produção
+compartilharem o mesmo `DATABASE_URL`, um deploy de preview também migra o
+banco de produção — separar os bancos por ambiente resolve. E o
+`prisma migrate deploy` precisa de conexão **direta** com o Postgres: se o
+`DATABASE_URL` for a URL de pool (pgbouncer do Neon/Supabase), a migration
+falha no lock e o build para — nesse caso use a URL direta no `DATABASE_URL` do
+projeto.
 
 Sem `BLOB_READ_WRITE_TOKEN` o upload cai pro disco local — o app sobe, mas as
 artes somem no deploy seguinte. Não deixar assim em produção. Sem
