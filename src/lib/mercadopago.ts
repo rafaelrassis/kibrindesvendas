@@ -5,7 +5,12 @@ import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 // Sem MERCADOPAGO_ACCESS_TOKEN o checkout roda em modo simulado (aprova na
 // hora), que é como o projeto rodava antes e continua sendo o suficiente pra
 // desenvolvimento e demo. Com o token, é cobrança de verdade.
+//
+// SIMULAR_PAGAMENTO=true força o modo simulado mesmo com token configurado
+// (útil pra testar fora de prod sem tocar no token). É só override: nunca
+// liga pagamento real sozinha, então vazar essa env não cobra ninguém.
 export function pagamentoRealConfigurado() {
+  if (process.env.SIMULAR_PAGAMENTO === "true") return false;
   return !!process.env.MERCADOPAGO_ACCESS_TOKEN;
 }
 

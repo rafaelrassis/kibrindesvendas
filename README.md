@@ -285,6 +285,11 @@ devolve `checkoutUrl` e o cliente segue pra lá:
   `pagamentoMock` e o `checkoutUrl` já é a tela de confirmação. É o modo de
   dev e demo, e a fila em `/admin/pedidos` mostra o selo "simulado".
 
+`SIMULAR_PAGAMENTO=true` força esse segundo caso mesmo com o token
+configurado, pra testar o fluxo de compra sem cobrar e sem apagar a
+credencial. É só override: sozinha ela nunca liga o pagamento real. Em
+produção não pode ficar ligada — todo pedido nasceria `PAGO` sem cobrança.
+
 Quem confirma o pagamento é o webhook em `POST /api/webhooks/mercadopago`, não
 a volta do cliente ao site: ele recebe o id do pagamento, consulta o Mercado
 Pago (a fonte da verdade), atualiza o status do pedido e cria uma notificação
@@ -484,8 +489,9 @@ isso **não** degrada em silêncio: o filesystem da função é somente leitura,
 devolve 500. Na prática a personalização por upload fica quebrada — e com ela
 a compra de todo produto que exige arte. Conferir logo após o deploy enviando
 um arquivo; se vier 500, é esse token que está faltando. Sem
-`MERCADOPAGO_ACCESS_TOKEN` o checkout sobe em modo simulado, ou seja, aprova
-pedido sem cobrar ninguém: também não pode ficar assim em produção. E sem
+`MERCADOPAGO_ACCESS_TOKEN` — ou com `SIMULAR_PAGAMENTO=true` — o checkout sobe
+em modo simulado, ou seja, aprova pedido sem cobrar ninguém: também não pode
+ficar assim em produção. E sem
 `MERCADOPAGO_WEBHOOK_SECRET` o `/api/webhooks/mercadopago` aceita qualquer
 `POST` sem conferir o `x-signature` (ver `assinaturaDoWebhookValida`); o
 pagamento em si continua sendo lido da API do Mercado Pago, então ninguém
