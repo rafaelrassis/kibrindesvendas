@@ -21,6 +21,14 @@ const FORMATOS = [
     assinatura: [0x52, 0x49, 0x46, 0x46],
     assinatura2: { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
   },
+  // MP4 não tem assinatura fixa no início (os 4 primeiros bytes são o
+  // tamanho da box, que varia) — o marcador "ftyp" sempre cai no offset 4.
+  {
+    extensao: "mp4",
+    tipo: "video/mp4",
+    assinatura: [] as number[],
+    assinatura2: { offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] },
+  },
 ] as const;
 
 export type Extensao = (typeof FORMATOS)[number]["extensao"];

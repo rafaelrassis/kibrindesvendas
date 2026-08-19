@@ -64,7 +64,7 @@ beforeAll(async () => {
   await prisma.categoria.deleteMany({ where: { id: CATEGORIA_ID } });
 
   await prisma.categoria.create({
-    data: { id: CATEGORIA_ID, slug: CATEGORIA_ID, label: "Teste", emoji: "🧪" },
+    data: { id: CATEGORIA_ID, slug: CATEGORIA_ID, label: "Teste" },
   });
   await prisma.produto.create({
     data: {

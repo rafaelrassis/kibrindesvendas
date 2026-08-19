@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
+import { ehUrlDeImagem } from "@/lib/imagens";
+import { ehUrlDeVideo } from "@/lib/video";
 import type { Produto, ProdutoAdmin } from "@/lib/types";
 import type {
   Produto as ProdutoDb,
@@ -34,6 +36,8 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     requerPersonalizacao: p.requerPersonalizacao,
     emoji: p.emoji,
     cor: p.cor,
+    imagens: p.imagens,
+    video: p.video,
     destaque: p.destaque,
     variacoes: p.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
     pesoGramas: p.pesoGramas,
@@ -146,6 +150,9 @@ export type DadosProduto = {
   requerPersonalizacao?: boolean;
   emoji?: string;
   cor?: string;
+  // Até 4 fotos (ordem = ordem de exibição) e 1 vídeo — ver validarMidia.
+  imagens?: string[];
+  video?: string | null;
   destaque?: boolean;
   variacoes?: { tipo: string; valores: string[] }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
@@ -180,6 +187,17 @@ function validar(dados: Partial<DadosProduto>) {
   if (dados.precoShopee !== undefined && dados.precoShopee < 0) {
     throw new ErroDeNegocio("O preço da Shopee não pode ser negativo.");
   }
+  if (dados.imagens !== undefined) {
+    if (dados.imagens.length > 4) {
+      throw new ErroDeNegocio("No máximo 4 fotos por produto.");
+    }
+    if (dados.imagens.some((url) => !ehUrlDeImagem(url))) {
+      throw new ErroDeNegocio("Foto inválida — envie pelo campo de upload.");
+    }
+  }
+  if (dados.video !== undefined && dados.video && !ehUrlDeVideo(dados.video)) {
+    throw new ErroDeNegocio("Vídeo inválido — envie pelo campo de upload.");
+  }
 }
 
 export async function criarProduto(dados: DadosProduto): Promise<Produto> {
@@ -207,6 +225,8 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       requerPersonalizacao: !!dados.requerPersonalizacao,
       emoji: dados.emoji || EMOJI_PADRAO,
       cor: dados.cor || COR_PADRAO,
+      imagens: dados.imagens ?? [],
+      video: dados.video || null,
       destaque: !!dados.destaque,
       pesoGramas: dados.pesoGramas ?? PESO_PADRAO_G,
       alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
@@ -266,6 +286,8 @@ export async function atualizarProduto(
         requerPersonalizacao: dados.requerPersonalizacao,
         emoji: dados.emoji,
         cor: dados.cor,
+        imagens: dados.imagens,
+        video: dados.video !== undefined ? dados.video || null : undefined,
         destaque: dados.destaque,
         pesoGramas: dados.pesoGramas,
         alturaCm: dados.alturaCm,

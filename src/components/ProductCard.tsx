@@ -21,10 +21,15 @@ export default function ProductCard({
         className="block tag-shape tag-hole bg-white border border-line pt-7 pb-5 px-4 group-hover:shadow-md transition-shadow"
       >
         <div
-          className="relative w-full aspect-square rounded-sm flex items-center justify-center text-5xl mb-4"
+          className="relative w-full aspect-square rounded-sm flex items-center justify-center text-5xl mb-4 overflow-hidden"
           style={{ backgroundColor: `${produto.cor}22` }}
         >
-          <span>{produto.emoji}</span>
+          {produto.imagens[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={produto.imagens[0]} alt={produto.nome} className="w-full h-full object-cover" />
+          ) : (
+            <span>{produto.emoji}</span>
+          )}
           {/* top-6: abaixo do corte diagonal do .tag-shape, senão a etiqueta fica cortada */}
           {comparativo && comparacao.mostrar && (
             <span className="absolute top-6 left-3 bg-berry text-white text-[11px] font-medium px-2 py-0.5 rounded-full">

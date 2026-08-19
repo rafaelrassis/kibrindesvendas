@@ -8,11 +8,13 @@ datasource db {
 }
 
 model Categoria {
-  id       String    @id @default(cuid())
-  slug     String    @unique
-  label    String
-  emoji    String
-  produtos Produto[]
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  label     String
+  // Substitui o emoji antigo: imagem de verdade enviada pelo admin. Sem
+  // imagem cadastrada, a UI cai num ícone genérico.
+  imagemUrl String?
+  produtos  Produto[]
 }
 
 model Produto {
@@ -30,6 +32,10 @@ model Produto {
   requerPersonalizacao Boolean           @default(false)
   emoji                String
   cor                  String
+  // Galeria do produto: até 4 fotos (ordem = ordem de exibição) e 1 vídeo,
+  // opcional. Sem nada aqui, a vitrine cai no emoji + cor de sempre.
+  imagens              String[]          @default([])
+  video                String?
   destaque             Boolean           @default(false)
   // Usados no cálculo de frete real (Correios via Melhor Envio). Valores
   // padrão são de uma caixa pequena — produto sem cadastro específico ainda

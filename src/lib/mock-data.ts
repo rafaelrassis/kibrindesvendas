@@ -5,11 +5,13 @@ export type { Variacao, Produto } from "./types";
 // ⚠️ Este arquivo não é mais a fonte de dados da aplicação (ver src/lib/data/).
 // Fica só como seed inicial do banco (prisma/seed.ts usa estes arrays).
 
+// Sem imagem no seed: a loja sobe a foto de cada categoria pelo /admin, e até
+// lá a vitrine mostra o ícone genérico.
 export const categorias = [
-  { slug: "imas", label: "Ímãs de geladeira", emoji: "🧲" },
-  { slug: "canecas", label: "Canecas", emoji: "☕" },
-  { slug: "camisetas", label: "Camisetas", emoji: "👕" },
-  { slug: "moletons", label: "Moletons", emoji: "🧥" },
+  { slug: "imas", label: "Ímãs de geladeira" },
+  { slug: "canecas", label: "Canecas" },
+  { slug: "camisetas", label: "Camisetas" },
+  { slug: "moletons", label: "Moletons" },
 ];
 
 export const produtos: Produto[] = [
@@ -27,6 +29,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: true,
     emoji: "🐾",
     cor: "#D9A63E",
+    imagens: [],
+    video: null,
     variacoes: [
       { tipo: "Tamanho", valores: ["6x6cm", "8x8cm", "10x10cm"] },
       { tipo: "Formato", valores: ["Redondo", "Quadrado", "Osso"] },
@@ -50,6 +54,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: true,
     emoji: "💑",
     cor: "#B23A48",
+    imagens: [],
+    video: null,
     variacoes: [{ tipo: "Tamanho", valores: ["8x8cm", "10x10cm"] }],
     destaque: true,
     pesoGramas: 300,
@@ -70,6 +76,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: true,
     emoji: "👨‍👩‍👧",
     cor: "#3F6B4C",
+    imagens: [],
+    video: null,
     variacoes: [{ tipo: "Tamanho", valores: ["10x10cm", "12x12cm"] }],
     pesoGramas: 300,
     alturaCm: 4,
@@ -89,6 +97,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: true,
     emoji: "☕",
     cor: "#8C5A3C",
+    imagens: [],
+    video: null,
     variacoes: [{ tipo: "Cor da alça", valores: ["Branca", "Preta", "Vermelha"] }],
     destaque: true,
     pesoGramas: 300,
@@ -109,6 +119,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: false,
     emoji: "👕",
     cor: "#2E4A3D",
+    imagens: [],
+    video: null,
     variacoes: [
       { tipo: "Tamanho", valores: ["P", "M", "G", "GG"] },
       { tipo: "Cor", valores: ["Branca", "Preta", "Cinza"] },
@@ -131,6 +143,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: true,
     emoji: "🎨",
     cor: "#C2385A",
+    imagens: [],
+    video: null,
     variacoes: [
       { tipo: "Tamanho", valores: ["P", "M", "G", "GG"] },
       { tipo: "Cor", valores: ["Branca", "Preta"] },
@@ -154,6 +168,8 @@ export const produtos: Produto[] = [
     requerPersonalizacao: true,
     emoji: "🧥",
     cor: "#1F2E27",
+    imagens: [],
+    video: null,
     variacoes: [
       { tipo: "Tamanho", valores: ["P", "M", "G", "GG"] },
       { tipo: "Cor", valores: ["Cinza mescla", "Preto"] },

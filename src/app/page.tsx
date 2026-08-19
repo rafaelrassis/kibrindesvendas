@@ -45,7 +45,16 @@ export default async function Home() {
               href={`/categoria/${c.slug}`}
               className="bg-white border border-line rounded-lg p-5 text-center hover:shadow-md hover:-translate-y-0.5 transition-all"
             >
-              <div className="text-3xl mb-2">{c.emoji}</div>
+              {c.imagemUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={c.imagemUrl}
+                  alt=""
+                  className="w-14 h-14 mx-auto mb-2 rounded object-cover"
+                />
+              ) : (
+                <div className="text-3xl mb-2">🎁</div>
+              )}
               <p className="text-sm font-medium">{c.label}</p>
             </Link>
           ))}

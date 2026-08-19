@@ -39,6 +39,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [vendidoNaShopee, setVendidoNaShopee] = useState(produto?.vendidoNaShopee ?? true);
   const [emoji, setEmoji] = useState(produto?.emoji ?? "🎁");
   const [cor, setCor] = useState(produto?.cor ?? "#3F6B4C");
+  const [imagens, setImagens] = useState<string[]>(produto?.imagens ?? []);
+  const [video, setVideo] = useState<string | null>(produto?.video ?? null);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [enviandoVideo, setEnviandoVideo] = useState(false);
   const [requerPersonalizacao, setRequerPersonalizacao] = useState(
     produto?.requerPersonalizacao ?? false
   );
@@ -70,6 +74,52 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
   function removerVariacao(i: number) {
     setVariacoes((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // Cada foto sobe na hora e o formulário guarda só a URL que o servidor
+  // devolveu — igual ao banner e à imagem de categoria.
+  async function selecionarFoto(arquivo: File | undefined) {
+    if (!arquivo) return;
+    if (imagens.length >= 4) {
+      setErro("No máximo 4 fotos por produto.");
+      return;
+    }
+    setErro("");
+    setEnviandoFoto(true);
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+    try {
+      const r = await fetch("/api/admin/imagens", { method: "POST", body: form });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar a foto.");
+      setImagens((prev) => [...prev, data.url]);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível enviar a foto.");
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
+  function removerFoto(url: string) {
+    setImagens((prev) => prev.filter((u) => u !== url));
+  }
+
+  async function selecionarVideo(arquivo: File | undefined) {
+    if (!arquivo) return;
+    setErro("");
+    setEnviandoVideo(true);
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+    try {
+      const r = await fetch("/api/admin/videos", { method: "POST", body: form });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar o vídeo.");
+      setVideo(data.url);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível enviar o vídeo.");
+    } finally {
+      setEnviandoVideo(false);
+    }
   }
 
   function atualizarMaterial(i: number, campo: keyof MaterialForm, valor: string) {
@@ -111,6 +161,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       requerPersonalizacao,
       emoji,
       cor,
+      imagens,
+      video,
       destaque,
       pesoGramas: Number(pesoGramas) || 300,
       alturaCm: Number(alturaCm) || 4,
@@ -189,7 +241,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         >
           {categorias.map((c) => (
             <option key={c.slug} value={c.slug}>
-              {c.emoji} {c.label}
+              {c.label}
             </option>
           ))}
         </select>
@@ -233,8 +285,72 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         </p>
       </div>
 
+      <div>
+        <p className="text-sm font-medium mb-1">Fotos e vídeo</p>
+        <p className="text-xs text-ink/50 mb-3">
+          Até 4 fotos e 1 vídeo. Sem nenhum arquivo aqui, o produto usa o emoji + cor abaixo.
+        </p>
+
+        <div className="flex flex-wrap gap-3 mb-3">
+          {imagens.map((url) => (
+            <div key={url} className="relative w-20 h-20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="w-20 h-20 rounded object-cover border border-line" />
+              <button
+                type="button"
+                onClick={() => removerFoto(url)}
+                className="absolute -top-2 -right-2 bg-berry text-white rounded-full w-5 h-5 text-xs leading-none"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {imagens.length < 4 && (
+            <label className="w-20 h-20 border-2 border-dashed border-line rounded flex items-center justify-center text-center cursor-pointer hover:border-mustard transition-colors">
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                disabled={enviandoFoto}
+                onChange={(e) => selecionarFoto(e.target.files?.[0])}
+              />
+              <span className="text-[11px] text-ink/50 px-1">
+                {enviandoFoto ? "Enviando..." : "+ Foto"}
+              </span>
+            </label>
+          )}
+        </div>
+
+        {video ? (
+          <div className="flex items-center gap-3">
+            <video src={video} className="w-20 h-20 rounded object-cover border border-line" muted />
+            <button
+              type="button"
+              onClick={() => setVideo(null)}
+              className="text-berry text-xs hover:underline"
+            >
+              Remover vídeo
+            </button>
+          </div>
+        ) : (
+          <label className="inline-block border-2 border-dashed border-line rounded-md px-4 py-2 text-center cursor-pointer hover:border-mustard transition-colors">
+            <input
+              type="file"
+              accept="video/mp4"
+              className="hidden"
+              disabled={enviandoVideo}
+              onChange={(e) => selecionarVideo(e.target.files?.[0])}
+            />
+            <span className="text-sm text-ink/50">
+              {enviandoVideo ? "Enviando..." : "Clique pra escolher um vídeo (MP4, até 30MB)"}
+            </span>
+          </label>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
-        <Campo label="Emoji">
+        <Campo label="Emoji (usado quando não há fotos)">
           <input
             value={emoji}
             onChange={(e) => setEmoji(e.target.value)}
@@ -427,7 +543,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
       <button
         type="submit"
-        disabled={enviando}
+        disabled={enviando || enviandoFoto || enviandoVideo}
         className="bg-pine text-white px-6 py-2.5 rounded-full text-sm disabled:opacity-50"
       >
         {enviando ? "Salvando..." : editando ? "Salvar alterações" : "Criar produto"}

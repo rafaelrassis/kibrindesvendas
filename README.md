@@ -145,6 +145,31 @@ Como a regra mora numa função só, ninguém consegue exibir o preço da Shopee
 por outro caminho: as telas leem `comparacao.mostrar` e não `precoShopee`
 direto.
 
+### Fotos e vídeo do produto (e imagem da categoria)
+
+O catálogo não depende mais de emoji pra ter cara de loja:
+
+- **Produto** aceita até **4 fotos** (PNG/JPG/WEBP, 5MB cada) e **1 vídeo**
+  (MP4, 30MB), cadastrados no formulário de `/admin/produtos`. A ordem das
+  fotos é a ordem de exibição, e a primeira é a que aparece na vitrine, na
+  busca, nas prateleiras da home e no comparativo. A página do produto monta
+  uma galeria com miniaturas quando há mais de um arquivo, com o vídeo no fim
+  da fila.
+- **Categoria** troca o campo `emoji` por `imagemUrl`: a loja sobe a imagem em
+  `/admin/categorias` e ela aparece na home, em `/categorias`, no menu do
+  header e no topo da página da categoria.
+
+Nos dois casos o cadastro é opcional e o site continua funcionando sem ele:
+produto sem foto cai no emoji + cor de sempre (o campo continua no formulário,
+agora rotulado como reserva) e categoria sem imagem mostra um 🎁 genérico.
+
+O arquivo sobe assim que é escolhido e o formulário guarda só a URL devolvida
+pelo servidor — o mesmo desenho do banner. Por isso a camada de dados
+(`src/lib/data/produtos.ts` e `categorias.ts`) valida a URL antes de gravar
+com `ehUrlDeImagem`/`ehUrlDeVideo`: só passa endereço que **nós** devolvemos
+no upload, nunca um digitado. Ali também mora o limite de 4 fotos, pro teto
+não depender só do que o formulário deixa clicar.
+
 ### Banners da home
 
 O carrossel do topo da loja sai do banco (`model Banner`), não do código:
@@ -224,14 +249,22 @@ exige sessão: arte de cliente não fica em URL aberta — por isso o blob é
 privado e não público. A fila em `/admin/pedidos` linka a arte de cada item
 ("ver arte enviada").
 
-### Imagem da loja (banner) é outro caminho
+### Imagem da loja (banner, categoria, produto) é outro caminho
 
 A imagem do banner precisa abrir pra visitante deslogado, então ela não pode
 dividir depósito com a arte do cliente: sobe por `POST /api/admin/imagens`
 (**só admin**, PNG/JPG/WEBP até 5MB) e é servida por `GET /api/imagens/[nome]`,
 sem sessão e com cache longo — o nome é sorteado e nunca muda. A gravação e a
 checagem por assinatura são as mesmas das artes, compartilhadas em
-`src/lib/arquivos.ts`; o que muda é a pasta (`imagens/`) e quem pode ler.
+`src/lib/arquivos.ts`; o que muda é a pasta (`imagens/`) e quem pode ler. A
+imagem da categoria e as fotos do produto entram por essa mesma porta.
+
+O vídeo do produto segue o mesmo caminho em `src/lib/video.ts`: `POST
+/api/admin/videos` (MP4, até 30MB) e `GET /api/videos/[nome]`, gravando no
+mesmo depósito público. MP4 é o único formato aqui, e ele é reconhecido pelo
+marcador `ftyp` no offset 4 — os quatro primeiros bytes do arquivo são o
+tamanho da box, que varia, então não dá pra conferir assinatura fixa no
+início como nos outros formatos.
 
 ## Pedidos e pagamento (Mercado Pago)
 
@@ -363,6 +396,7 @@ src/
     ├── arquivos.ts               # assinatura + Blob/disco dos uploads (server-only)
     ├── artes.ts                  # arte do cliente, privada (server-only)
     ├── imagens.ts                # imagem da loja, pública (server-only)
+    ├── video.ts                  # vídeo do produto, público (server-only)
     ├── mercadopago.ts            # clients + assinatura do webhook (server-only)
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
@@ -495,6 +529,8 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Envio (frete por CEP no checkout) e devolução pedida pelo cliente, com
       `/conta/pedidos` lendo o banco
 - [x] Banners da home cadastrados em `/admin/banners`, com imagem pública
+- [x] Fotos (até 4) e vídeo do produto e imagem da categoria cadastrados no
+      `/admin`, com o emoji virando reserva de quem ainda não subiu arquivo
 - [x] Painel de vendas em `/admin` (faturamento, ticket médio, devoluções e
       gráficos dos últimos 30 dias)
 - [x] Comparativo de preço ligado/desligado por produto (`vendidoNaShopee`)

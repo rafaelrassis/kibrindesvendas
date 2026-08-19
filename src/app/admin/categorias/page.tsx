@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import AdminNav from "@/components/AdminNav";
 
-type Categoria = { slug: string; label: string; emoji: string };
+type Categoria = { slug: string; label: string; imagemUrl: string | null };
 
 export default function AdminCategoriasPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [emEdicao, setEmEdicao] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "", emoji: "" });
+  const [form, setForm] = useState<{ label: string; imagemUrl: string | null }>({
+    label: "",
+    imagemUrl: null,
+  });
+  const [enviandoImagem, setEnviandoImagem] = useState(false);
 
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -21,17 +25,37 @@ export default function AdminCategoriasPage() {
 
   const iniciarNovo = () => {
     setEmEdicao("__novo__");
-    setForm({ label: "", emoji: "🎁" });
+    setForm({ label: "", imagemUrl: null });
   };
 
   const iniciarEdicao = (c: Categoria) => {
     setEmEdicao(c.slug);
-    setForm({ label: c.label, emoji: c.emoji });
+    setForm({ label: c.label, imagemUrl: c.imagemUrl });
   };
 
   const cancelar = () => {
     setEmEdicao(null);
-    setForm({ label: "", emoji: "" });
+    setForm({ label: "", imagemUrl: null });
+  };
+
+  // A imagem sobe na hora e o formulário guarda só a URL que o servidor
+  // devolveu — igual ao banner da home.
+  const selecionarImagem = async (arquivo: File | undefined) => {
+    if (!arquivo) return;
+    setErro("");
+    setEnviandoImagem(true);
+    const dados = new FormData();
+    dados.append("arquivo", arquivo);
+    try {
+      const r = await fetch("/api/admin/imagens", { method: "POST", body: dados });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar a imagem.");
+      setForm((f) => ({ ...f, imagemUrl: data.url }));
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível enviar a imagem.");
+    } finally {
+      setEnviandoImagem(false);
+    }
   };
 
   const salvar = async () => {
@@ -92,7 +116,7 @@ export default function AdminCategoriasPage() {
         <table className="w-full text-sm min-w-[420px]">
           <thead className="bg-paper-2 text-left">
             <tr>
-              <th className="px-4 py-3 font-medium">Ícone</th>
+              <th className="px-4 py-3 font-medium">Imagem</th>
               <th className="px-4 py-3 font-medium">Nome</th>
               <th className="px-4 py-3 font-medium">Slug</th>
               <th className="px-4 py-3 font-medium text-right">Ações</th>
@@ -103,37 +127,22 @@ export default function AdminCategoriasPage() {
               <tr key={c.slug} className="border-t border-line">
                 {emEdicao === c.slug ? (
                   <td colSpan={4} className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        value={form.emoji}
-                        onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
-                        className="w-14 border border-line rounded px-2 py-1.5 text-center"
-                        maxLength={2}
-                      />
-                      <input
-                        value={form.label}
-                        onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-                        className="flex-1 min-w-[160px] border border-line rounded px-2 py-1.5"
-                        placeholder="Nome da categoria"
-                      />
-                      <button
-                        onClick={salvar}
-                        disabled={salvando}
-                        className="bg-pine text-white px-3 py-1.5 rounded-full text-xs disabled:opacity-50"
-                      >
-                        {salvando ? "Salvando..." : "Salvar"}
-                      </button>
-                      <button
-                        onClick={cancelar}
-                        className="border border-line px-3 py-1.5 rounded-full text-xs"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
+                    <LinhaEdicao
+                      form={form}
+                      setForm={setForm}
+                      enviandoImagem={enviandoImagem}
+                      selecionarImagem={selecionarImagem}
+                      salvar={salvar}
+                      cancelar={cancelar}
+                      salvando={salvando}
+                      rotuloSalvar="Salvar"
+                    />
                   </td>
                 ) : (
                   <>
-                    <td className="px-4 py-3 text-lg">{c.emoji}</td>
+                    <td className="px-4 py-3">
+                      <IconeCategoria imagemUrl={c.imagemUrl} tamanho={36} />
+                    </td>
                     <td className="px-4 py-3">{c.label}</td>
                     <td className="px-4 py-3 text-ink/50 font-mono text-xs">{c.slug}</td>
                     <td className="px-4 py-3 text-right space-x-3">
@@ -158,34 +167,17 @@ export default function AdminCategoriasPage() {
             {emEdicao === "__novo__" && (
               <tr className="border-t border-line">
                 <td colSpan={4} className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      value={form.emoji}
-                      onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
-                      className="w-14 border border-line rounded px-2 py-1.5 text-center"
-                      maxLength={2}
-                    />
-                    <input
-                      autoFocus
-                      value={form.label}
-                      onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-                      className="flex-1 min-w-[160px] border border-line rounded px-2 py-1.5"
-                      placeholder="Nome da nova categoria"
-                    />
-                    <button
-                      onClick={salvar}
-                      disabled={salvando}
-                      className="bg-pine text-white px-3 py-1.5 rounded-full text-xs disabled:opacity-50"
-                    >
-                      {salvando ? "Salvando..." : "Adicionar"}
-                    </button>
-                    <button
-                      onClick={cancelar}
-                      className="border border-line px-3 py-1.5 rounded-full text-xs"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
+                  <LinhaEdicao
+                    form={form}
+                    setForm={setForm}
+                    enviandoImagem={enviandoImagem}
+                    selecionarImagem={selecionarImagem}
+                    salvar={salvar}
+                    cancelar={cancelar}
+                    salvando={salvando}
+                    rotuloSalvar="Adicionar"
+                    autoFocus
+                  />
                 </td>
               </tr>
             )}
@@ -201,6 +193,86 @@ export default function AdminCategoriasPage() {
           + Nova categoria
         </button>
       )}
+    </div>
+  );
+}
+
+// Ícone genérico exibido quando a categoria ainda não tem imagem cadastrada.
+function IconeCategoria({ imagemUrl, tamanho }: { imagemUrl: string | null; tamanho: number }) {
+  if (imagemUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imagemUrl}
+        alt=""
+        width={tamanho}
+        height={tamanho}
+        className="rounded object-cover"
+        style={{ width: tamanho, height: tamanho }}
+      />
+    );
+  }
+  return (
+    <div
+      className="rounded bg-paper-2 border border-line flex items-center justify-center text-ink/30"
+      style={{ width: tamanho, height: tamanho }}
+    >
+      🎁
+    </div>
+  );
+}
+
+function LinhaEdicao({
+  form,
+  setForm,
+  enviandoImagem,
+  selecionarImagem,
+  salvar,
+  cancelar,
+  salvando,
+  rotuloSalvar,
+  autoFocus,
+}: {
+  form: { label: string; imagemUrl: string | null };
+  setForm: React.Dispatch<React.SetStateAction<{ label: string; imagemUrl: string | null }>>;
+  enviandoImagem: boolean;
+  selecionarImagem: (arquivo: File | undefined) => void;
+  salvar: () => void;
+  cancelar: () => void;
+  salvando: boolean;
+  rotuloSalvar: string;
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <IconeCategoria imagemUrl={form.imagemUrl} tamanho={40} />
+      <label className="text-xs text-pine hover:underline cursor-pointer">
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          disabled={enviandoImagem}
+          onChange={(e) => selecionarImagem(e.target.files?.[0])}
+        />
+        {enviandoImagem ? "Enviando..." : form.imagemUrl ? "Trocar" : "Enviar imagem"}
+      </label>
+      <input
+        autoFocus={autoFocus}
+        value={form.label}
+        onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+        className="flex-1 min-w-[160px] border border-line rounded px-2 py-1.5"
+        placeholder="Nome da categoria"
+      />
+      <button
+        onClick={salvar}
+        disabled={salvando || enviandoImagem}
+        className="bg-pine text-white px-3 py-1.5 rounded-full text-xs disabled:opacity-50"
+      >
+        {salvando ? "Salvando..." : rotuloSalvar}
+      </button>
+      <button onClick={cancelar} className="border border-line px-3 py-1.5 rounded-full text-xs">
+        Cancelar
+      </button>
     </div>
   );
 }

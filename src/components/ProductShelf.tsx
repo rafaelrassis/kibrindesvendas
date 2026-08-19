@@ -28,10 +28,15 @@ export default function ProductShelf({
               className="snap-start shrink-0 w-36 bg-white border border-line rounded-lg p-3 hover:shadow-md transition-shadow"
             >
               <div
-                className="w-full aspect-square rounded flex items-center justify-center text-4xl mb-2"
+                className="w-full aspect-square rounded flex items-center justify-center text-4xl mb-2 overflow-hidden"
                 style={{ backgroundColor: `${p.cor}22` }}
               >
-                {p.emoji}
+                {p.imagens[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.imagens[0]} alt={p.nome} className="w-full h-full object-cover" />
+                ) : (
+                  p.emoji
+                )}
               </div>
               <p className="text-xs leading-snug line-clamp-2 mb-1 h-8">{p.nome}</p>
               <p className="font-mono text-sm font-medium">

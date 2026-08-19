@@ -8,12 +8,14 @@ export async function POST(req: NextRequest) {
   if (bloqueio) return bloqueio;
 
   try {
-    const { label, emoji } = await corpoJson<{ label?: string; emoji?: string }>(req);
+    const { label, imagemUrl } = await corpoJson<{ label?: string; imagemUrl?: string | null }>(
+      req
+    );
     if (!label?.trim()) {
       return NextResponse.json({ error: "Informe o nome da categoria." }, { status: 400 });
     }
 
-    return NextResponse.json(await criarCategoria(label, emoji));
+    return NextResponse.json(await criarCategoria(label, imagemUrl));
   } catch (e) {
     return respostaDeErro(e);
   }

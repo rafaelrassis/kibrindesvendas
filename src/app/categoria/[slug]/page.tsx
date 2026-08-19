@@ -19,7 +19,13 @@ export default async function CategoriaPage({
     <div className="mx-auto max-w-6xl px-5 py-12">
       <p className="text-xs uppercase tracking-wide text-ink/50 mb-2">Categoria</p>
       <h1 className="font-display text-3xl mb-1 flex items-center gap-3">
-        <span>{categoria.emoji}</span> {categoria.label}
+        {categoria.imagemUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={categoria.imagemUrl} alt="" className="w-10 h-10 rounded object-cover" />
+        ) : (
+          <span>🎁</span>
+        )}{" "}
+        {categoria.label}
       </h1>
       <p className="text-ink/60 mb-8">{lista.length} produtos</p>
 

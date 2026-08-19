@@ -54,7 +54,12 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
                     href={`/categoria/${c.slug}`}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm normal-case hover:bg-paper-2 transition-colors"
                   >
-                    <span>{c.emoji}</span>
+                    {c.imagemUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.imagemUrl} alt="" className="w-5 h-5 rounded object-cover" />
+                    ) : (
+                      <span>🎁</span>
+                    )}
                     {c.label}
                   </Link>
                 ))}

@@ -1,17 +1,26 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
+import { ehUrlDeImagem } from "@/lib/imagens";
 import type { Categoria } from "@/lib/types";
 import { ErroDeNegocio } from "./erros";
 
-const EMOJI_PADRAO = "🎁";
-
 export async function getCategorias(): Promise<Categoria[]> {
   const categorias = await prisma.categoria.findMany({ orderBy: { label: "asc" } });
-  return categorias.map((c) => ({ slug: c.slug, label: c.label, emoji: c.emoji }));
+  return categorias.map((c) => ({ slug: c.slug, label: c.label, imagemUrl: c.imagemUrl }));
 }
 
-export async function criarCategoria(label: string, emoji?: string): Promise<Categoria> {
+// A imagem só é aceita se vier do nosso próprio upload (/api/admin/imagens) —
+// nunca um endereço digitado. Vazio/ausente é válido: cai no ícone padrão.
+function validarImagem(imagemUrl?: string | null) {
+  const valor = imagemUrl?.trim() || null;
+  if (valor && !ehUrlDeImagem(valor)) {
+    throw new ErroDeNegocio("Imagem inválida — envie pelo campo de upload.");
+  }
+  return valor;
+}
+
+export async function criarCategoria(label: string, imagemUrl?: string | null): Promise<Categoria> {
   const slug = slugify(label);
   if (!slug) throw new ErroDeNegocio("Informe um nome válido para a categoria.");
 
@@ -19,15 +28,15 @@ export async function criarCategoria(label: string, emoji?: string): Promise<Cat
   if (jaExiste) throw new ErroDeNegocio("Já existe uma categoria com esse nome.", 409);
 
   const categoria = await prisma.categoria.create({
-    data: { slug, label: label.trim(), emoji: emoji || EMOJI_PADRAO },
+    data: { slug, label: label.trim(), imagemUrl: validarImagem(imagemUrl) },
   });
-  return { slug: categoria.slug, label: categoria.label, emoji: categoria.emoji };
+  return { slug: categoria.slug, label: categoria.label, imagemUrl: categoria.imagemUrl };
 }
 
 export async function atualizarCategoria(
   slug: string,
   label: string,
-  emoji?: string
+  imagemUrl?: string | null
 ): Promise<Categoria> {
   const atual = await prisma.categoria.findUnique({ where: { slug } });
   if (!atual) throw new ErroDeNegocio("Categoria não encontrada.", 404);
@@ -36,9 +45,9 @@ export async function atualizarCategoria(
   // muda só o rótulo — trocar o slug quebraria links já compartilhados.
   const categoria = await prisma.categoria.update({
     where: { slug },
-    data: { label: label.trim(), emoji: emoji || EMOJI_PADRAO },
+    data: { label: label.trim(), imagemUrl: validarImagem(imagemUrl) },
   });
-  return { slug: categoria.slug, label: categoria.label, emoji: categoria.emoji };
+  return { slug: categoria.slug, label: categoria.label, imagemUrl: categoria.imagemUrl };
 }
 
 export async function removerCategoria(slug: string) {

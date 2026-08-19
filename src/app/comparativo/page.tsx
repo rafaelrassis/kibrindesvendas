@@ -69,10 +69,19 @@ export default async function ComparativoPage() {
 
           <section id="produto" className="grid md:grid-cols-2 gap-8 items-start scroll-mt-24">
             <div
-              className="aspect-square rounded-lg flex items-center justify-center text-8xl"
+              className="aspect-square rounded-lg flex items-center justify-center text-8xl overflow-hidden"
               style={{ backgroundColor: `${destaque.cor}22` }}
             >
-              {destaque.emoji}
+              {destaque.imagens[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={destaque.imagens[0]}
+                  alt={destaque.nome}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                destaque.emoji
+              )}
             </div>
 
             <div>

@@ -19,6 +19,10 @@ export type Produto = {
   requerPersonalizacao: boolean;
   emoji: string;
   cor: string;
+  // Galeria de mídia: até 4 fotos (nessa ordem) e 1 vídeo. Sem nada aqui, a
+  // vitrine cai no emoji + cor de sempre.
+  imagens: string[];
+  video: string | null;
   variacoes: Variacao[];
   destaque?: boolean;
   // Usados na cotação de frete real (Correios via Melhor Envio).
@@ -60,7 +64,7 @@ export type Cupom = {
 export type Categoria = {
   slug: string;
   label: string;
-  emoji: string;
+  imagemUrl: string | null;
 };
 
 // Slide do carrossel da home, como a loja recebe.

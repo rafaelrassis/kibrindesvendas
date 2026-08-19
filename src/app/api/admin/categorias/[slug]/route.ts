@@ -10,12 +10,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   const { slug } = await params;
 
   try {
-    const { label, emoji } = await corpoJson<{ label?: string; emoji?: string }>(req);
+    const { label, imagemUrl } = await corpoJson<{ label?: string; imagemUrl?: string | null }>(
+      req
+    );
     if (!label?.trim()) {
       return NextResponse.json({ error: "Informe o nome da categoria." }, { status: 400 });
     }
 
-    return NextResponse.json(await atualizarCategoria(slug, label, emoji));
+    return NextResponse.json(await atualizarCategoria(slug, label, imagemUrl));
   } catch (e) {
     return respostaDeErro(e);
   }

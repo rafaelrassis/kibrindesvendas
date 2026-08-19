@@ -148,14 +148,15 @@ export default function ProdutoPage() {
         </div>
 
         <div className="mx-auto max-w-5xl px-5 pt-4 grid md:grid-cols-2 gap-10">
-          {/* Imagem com favorito e compartilhar */}
+          {/* Galeria com favorito e compartilhar */}
           <div className="relative h-fit">
-            <div
-              className="aspect-square rounded-lg flex items-center justify-center text-8xl"
-              style={{ backgroundColor: `${produto.cor}22` }}
-            >
-              {produto.emoji}
-            </div>
+            <ProdutoGaleria
+              imagens={produto.imagens}
+              video={produto.video}
+              emoji={produto.emoji}
+              cor={produto.cor}
+              nome={produto.nome}
+            />
             <FavoritoButton produto={produto} tamanho="lg" className="absolute top-3 right-3" />
           </div>
 
@@ -180,10 +181,19 @@ export default function ProdutoPage() {
                 <p className="text-sm font-medium mb-3">Compare com a Shopee</p>
                 <div className="bg-white border border-line rounded-lg p-4 flex items-center gap-4">
                   <div
-                    className="w-16 h-16 rounded flex items-center justify-center text-3xl shrink-0"
+                    className="w-16 h-16 rounded flex items-center justify-center text-3xl shrink-0 overflow-hidden"
                     style={{ backgroundColor: `${produto.cor}22` }}
                   >
-                    {produto.emoji}
+                    {produto.imagens[0] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={produto.imagens[0]}
+                        alt={produto.nome}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      produto.emoji
+                    )}
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-ink/50 line-through">
@@ -334,6 +344,87 @@ export default function ProdutoPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Galeria da página do produto: fotos + vídeo com miniaturas, quando existem.
+// Sem nenhum arquivo cadastrado, cai no emoji + cor de sempre.
+type ItemGaleria = { tipo: "foto" | "video"; url: string };
+
+function ProdutoGaleria({
+  imagens,
+  video,
+  emoji,
+  cor,
+  nome,
+}: {
+  imagens: string[];
+  video: string | null;
+  emoji: string;
+  cor: string;
+  nome: string;
+}) {
+  const itens: ItemGaleria[] = [
+    ...imagens.map((url): ItemGaleria => ({ tipo: "foto", url })),
+    ...(video ? [{ tipo: "video", url: video } as ItemGaleria] : []),
+  ];
+  const [ativo, setAtivo] = useState(0);
+
+  if (itens.length === 0) {
+    return (
+      <div
+        className="aspect-square rounded-lg flex items-center justify-center text-8xl"
+        style={{ backgroundColor: `${cor}22` }}
+      >
+        {emoji}
+      </div>
+    );
+  }
+
+  const item = itens[Math.min(ativo, itens.length - 1)];
+
+  return (
+    <div>
+      <div
+        className="aspect-square rounded-lg overflow-hidden flex items-center justify-center"
+        style={{ backgroundColor: `${cor}22` }}
+      >
+        {item.tipo === "video" ? (
+          <video src={item.url} className="w-full h-full object-cover" controls playsInline />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.url} alt={nome} className="w-full h-full object-cover" />
+        )}
+      </div>
+
+      {itens.length > 1 && (
+        <div className="flex gap-2 mt-3">
+          {itens.map((it, i) => (
+            <button
+              key={it.url}
+              type="button"
+              onClick={() => setAtivo(i)}
+              className={`w-14 h-14 rounded overflow-hidden border-2 shrink-0 relative ${
+                i === ativo ? "border-pine" : "border-transparent"
+              }`}
+              style={{ backgroundColor: `${cor}22` }}
+            >
+              {it.tipo === "video" ? (
+                <>
+                  <video src={it.url} className="w-full h-full object-cover" muted />
+                  <span className="absolute inset-0 flex items-center justify-center text-white text-lg bg-black/25">
+                    ▶
+                  </span>
+                </>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={it.url} alt="" className="w-full h-full object-cover" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
