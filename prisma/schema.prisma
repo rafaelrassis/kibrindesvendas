@@ -97,6 +97,7 @@ model Usuario {
   id           String        @id @default(cuid())
   nome         String
   email        String        @unique
+  cpf          String?       @unique // nullable p/ não quebrar contas antigas; obrigatório na API de registro
   senhaHash    String
   admin        Boolean       @default(false) // libera /admin e /api/admin (ver npm run db:admin)
   pedidos      Pedido[]

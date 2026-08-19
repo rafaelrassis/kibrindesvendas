@@ -66,15 +66,21 @@ seed do banco (`prisma/seed.ts`, catálogo e banners) e como origem das FAQs do
 ## Contas e sessão
 
 Cadastro (`/cadastro`) e login (`/entrar`) gravam em `Usuario` no banco, com a
-senha em hash `bcrypt` (`src/lib/data/usuarios.ts`). A sessão é um cookie
+senha em hash `bcrypt` (`src/lib/data/usuarios.ts`). O cadastro pede CPF, que é
+validado no client e de novo na API (`src/lib/cpf.ts` — formato, dígitos
+verificadores e sequências repetidas) e gravado só com os dígitos, único por
+conta. A coluna é nullable no banco para não quebrar contas criadas antes
+disso; a obrigatoriedade vale na rota de registro. O CPF não sai no payload
+público de `/api/auth/me`. A sessão é um cookie
 `httpOnly` assinado com HMAC-SHA256 usando `SESSION_SECRET` — sem esse
 segredo as rotas de auth quebram de propósito, para não haver fallback
 inseguro. O ciclo todo fica em `src/lib/session.ts` e nas rotas
 `src/app/api/auth/` (`registro`, `login`, `logout`, `me`, `senha`); no client,
 `useAuth()` (`src/lib/auth-context.tsx`) lê `/api/auth/me` no primeiro render.
 
-O resto do perfil (telefone, CPF, endereços, preferências) continua local em
-`localStorage`, via `conta-context`.
+O resto do perfil (telefone, endereços, preferências) continua local em
+`localStorage`, via `conta-context` — inclusive o campo de CPF de
+`/conta/dados`, que ainda é o do perfil local e não o gravado no registro.
 
 ## Área interna (`/admin`)
 

@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { cpfValido, formatarCpf } from "@/lib/cpf";
 
 export default function CadastroPage() {
   const router = useRouter();
   const { registrar } = useAuth();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -17,8 +19,14 @@ export default function CadastroPage() {
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro("");
+
+    if (!cpfValido(cpf)) {
+      setErro("CPF inválido.");
+      return;
+    }
+
     setEnviando(true);
-    const r = await registrar(nome.trim(), email.trim(), senha);
+    const r = await registrar(nome.trim(), email.trim(), senha, cpf);
     setEnviando(false);
     if (!r.ok) {
       setErro(r.erro ?? "Não foi possível criar a conta.");
@@ -48,6 +56,18 @@ export default function CadastroPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
+            required
+          />
+        </label>
+        <label className="block">
+          <span className="block text-xs text-ink/50 mb-1.5">CPF</span>
+          <input
+            value={cpf}
+            onChange={(e) => setCpf(formatarCpf(e.target.value))}
+            inputMode="numeric"
+            placeholder="000.000.000-00"
+            maxLength={14}
             className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
             required
           />
