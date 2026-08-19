@@ -66,3 +66,22 @@ export async function trocarSenha(id: string, senhaAtual: string, novaSenha: str
   const senhaHash = await bcrypt.hash(novaSenha, 10);
   await prisma.usuario.update({ where: { id }, data: { senhaHash } });
 }
+
+export async function trocarEmail(id: string, senhaAtual: string, novoEmail: string) {
+  const usuario = await prisma.usuario.findUnique({ where: { id } });
+  if (!usuario) throw new Error("Usuário não encontrado.");
+
+  const ok = await bcrypt.compare(senhaAtual, usuario.senhaHash);
+  if (!ok) throw new Error("Senha atual incorreta.");
+
+  if (novoEmail === usuario.email) return paraPublico(usuario);
+
+  const existente = await prisma.usuario.findUnique({ where: { email: novoEmail } });
+  if (existente) throw new Error("Já existe uma conta com este e-mail.");
+
+  const atualizado = await prisma.usuario.update({
+    where: { id },
+    data: { email: novoEmail },
+  });
+  return paraPublico(atualizado);
+}

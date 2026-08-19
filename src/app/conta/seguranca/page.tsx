@@ -7,11 +7,40 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function SegurancaPage() {
   const router = useRouter();
-  const { sair } = useAuth();
+  const { sair, usuario, trocarEmail } = useAuth();
   const [form, setForm] = useState({ atual: "", nova: "", confirmar: "" });
   const [erro, setErro] = useState("");
   const [salvo, setSalvo] = useState(false);
   const [enviando, setEnviando] = useState(false);
+
+  const [emailForm, setEmailForm] = useState({ novoEmail: "", senha: "" });
+  const [erroEmail, setErroEmail] = useState("");
+  const [salvoEmail, setSalvoEmail] = useState(false);
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+
+  async function salvarEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setSalvoEmail(false);
+    setErroEmail("");
+
+    if (emailForm.novoEmail.trim().toLowerCase() === usuario?.email) {
+      setErroEmail("Esse já é o seu e-mail atual.");
+      return;
+    }
+
+    setEnviandoEmail(true);
+    try {
+      const r = await trocarEmail(emailForm.senha, emailForm.novoEmail);
+      if (!r.ok) {
+        setErroEmail(r.erro ?? "Não foi possível trocar o e-mail.");
+        return;
+      }
+      setSalvoEmail(true);
+      setEmailForm({ novoEmail: "", senha: "" });
+    } finally {
+      setEnviandoEmail(false);
+    }
+  }
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +85,44 @@ export default function SegurancaPage() {
         Sua senha atual é validada no servidor antes da troca.
       </p>
 
+      <form onSubmit={salvarEmail} className="space-y-4 mb-8">
+        <h2 className="text-sm font-medium -mb-1">Trocar e-mail</h2>
+        <p className="text-xs text-ink/50 -mt-3 mb-1">
+          E-mail atual: <span className="font-medium">{usuario?.email}</span>
+        </p>
+        <Campo label="Novo e-mail">
+          <input
+            type="email"
+            value={emailForm.novoEmail}
+            onChange={(e) => setEmailForm((f) => ({ ...f, novoEmail: e.target.value }))}
+            className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
+            required
+          />
+        </Campo>
+        <Campo label="Confirme sua senha">
+          <input
+            type="password"
+            value={emailForm.senha}
+            onChange={(e) => setEmailForm((f) => ({ ...f, senha: e.target.value }))}
+            className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
+            required
+          />
+        </Campo>
+
+        {erroEmail && <p className="text-xs text-berry">{erroEmail}</p>}
+        {salvoEmail && <p className="text-xs text-pine">E-mail atualizado ✓</p>}
+
+        <button
+          type="submit"
+          disabled={enviandoEmail}
+          className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2 disabled:opacity-50"
+        >
+          {enviandoEmail ? "Salvando..." : "Atualizar e-mail"}
+        </button>
+      </form>
+
       <form onSubmit={salvar} className="space-y-4 mb-8">
+        <h2 className="text-sm font-medium -mb-1">Trocar senha</h2>
         <Campo label="Senha atual">
           <input
             type="password"

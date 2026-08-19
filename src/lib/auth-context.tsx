@@ -18,6 +18,10 @@ type AuthContextType = {
   usuario: Usuario | null;
   nome: string;
   login: (email: string, senha: string) => Promise<{ ok: boolean; erro?: string }>;
+  trocarEmail: (
+    senhaAtual: string,
+    novoEmail: string
+  ) => Promise<{ ok: boolean; erro?: string }>;
   registrar: (
     nome: string,
     email: string,
@@ -81,6 +85,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const trocarEmail = useCallback(async (senhaAtual: string, novoEmail: string) => {
+    const r = await fetch("/api/auth/email", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ senhaAtual, novoEmail }),
+    });
+    const data = await r.json();
+    if (!r.ok) return { ok: false, erro: data.error as string };
+    setUsuario(data);
+    return { ok: true };
+  }, []);
+
   const sair = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUsuario(null);
@@ -93,10 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       usuario,
       nome: usuario?.nome ?? "Cliente",
       login,
+      trocarEmail,
       registrar,
       sair,
     }),
-    [usuario, carregando, login, registrar, sair]
+    [usuario, carregando, login, trocarEmail, registrar, sair]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
