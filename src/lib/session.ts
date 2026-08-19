@@ -59,3 +59,34 @@ export async function usuarioIdDaSessao(): Promise<string | null> {
   const token = jar.get(COOKIE_NAME)?.value;
   return token ? desempacotar(token) : null;
 }
+
+// --- Token de redefinição de senha -----------------------------------
+// Mesmo esquema HMAC do cookie de sessão, mas com propósito e expiração
+// próprios: o prefixo "reset" impede que um token de sessão vazado (ou
+// vice-versa) seja reaproveitado pro outro fim.
+const RESET_EM_MS = 60 * 60 * 1000; // 1 hora
+
+export function gerarTokenRedefinicao(usuarioId: string): string {
+  const payload = `reset.${usuarioId}.${Date.now() + RESET_EM_MS}`;
+  const assinatura = assinar(payload);
+  return Buffer.from(`${payload}.${assinatura}`).toString("base64url");
+}
+
+export function usuarioIdDoTokenRedefinicao(token: string): string | null {
+  try {
+    const decoded = Buffer.from(token, "base64url").toString("utf8");
+    const [marca, usuarioId, expiraEmStr, assinatura] = decoded.split(".");
+    if (marca !== "reset" || !usuarioId || !expiraEmStr || !assinatura) return null;
+
+    const esperada = assinar(`reset.${usuarioId}.${expiraEmStr}`);
+    const a = Buffer.from(assinatura);
+    const b = Buffer.from(esperada);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+
+    if (Date.now() > Number(expiraEmStr)) return null;
+
+    return usuarioId;
+  } catch {
+    return null;
+  }
+}

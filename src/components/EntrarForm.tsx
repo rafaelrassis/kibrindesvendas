@@ -50,6 +50,12 @@ export default function EntrarForm({ destino }: { destino: string }) {
           />
         </label>
 
+        <div className="text-right -mt-2">
+          <Link href="/esqueci-senha" className="text-xs text-pine hover:underline">
+            Esqueci minha senha
+          </Link>
+        </div>
+
         {erro && <p className="text-xs text-berry">{erro}</p>}
 
         <button

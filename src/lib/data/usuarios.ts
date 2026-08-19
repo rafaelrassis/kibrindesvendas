@@ -67,6 +67,16 @@ export async function trocarSenha(id: string, senhaAtual: string, novaSenha: str
   await prisma.usuario.update({ where: { id }, data: { senhaHash } });
 }
 
+// Usada pelo fluxo "esqueci minha senha": o token já prova identidade (ver
+// session.ts), então não pede a senha atual como trocarSenha() pede.
+export async function redefinirSenhaComToken(usuarioId: string, novaSenha: string) {
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+  if (!usuario) throw new Error("Usuário não encontrado.");
+
+  const senhaHash = await bcrypt.hash(novaSenha, 10);
+  await prisma.usuario.update({ where: { id: usuarioId }, data: { senhaHash } });
+}
+
 export async function trocarEmail(id: string, senhaAtual: string, novoEmail: string) {
   const usuario = await prisma.usuario.findUnique({ where: { id } });
   if (!usuario) throw new Error("Usuário não encontrado.");

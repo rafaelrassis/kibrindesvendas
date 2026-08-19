@@ -13,6 +13,7 @@ import {
 import { consultarCep, resumoDoEndereco } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
+import { enviarEmailStatusPedido } from "@/lib/email";
 import { devolverUsoCupom, normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
 
 // Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
@@ -131,6 +132,16 @@ export async function criarPedido(
   });
 
   if (!pagamentoReal) {
+    // Fora da transação de propósito: e-mail é melhor esforço, uma falha dele
+    // não pode desfazer um pedido que já foi gravado com sucesso.
+    enviarEmailStatusPedido(
+      usuario.email,
+      usuario.nome,
+      "Pedido recebido!",
+      produto.requerPersonalizacao
+        ? `Recebemos seu pedido de ${produto.nome}. Sua arte entrou na fila de validação da nossa equipe.`
+        : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`
+    ).catch(() => {});
     return { pedido, checkoutUrl: `/pedido/confirmado?id=${pedido.id}` };
   }
 
@@ -337,13 +348,13 @@ function validarStatus(valor: unknown): StatusPedido {
 export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
   const status = validarStatus(statusBruto);
 
-  const pedido = await prisma.pedido.findUnique({ where: { id } });
+  const pedido = await prisma.pedido.findUnique({ where: { id }, include: { usuario: true } });
   if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
 
   // Reenviar o mesmo status (dois cliques no select) não gera aviso repetido.
   if (pedido.status === status) return pedido;
 
-  return prisma.$transaction(async (tx) => {
+  const atualizado = await prisma.$transaction(async (tx) => {
     const atualizado = await tx.pedido.update({ where: { id }, data: { status } });
 
     const aviso = AVISO_POR_STATUS[status];
@@ -353,6 +364,18 @@ export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
 
     return atualizado;
   });
+
+  const aviso = AVISO_POR_STATUS[status];
+  if (aviso) {
+    enviarEmailStatusPedido(
+      pedido.usuario.email,
+      pedido.usuario.nome,
+      "Atualização do seu pedido",
+      aviso
+    ).catch(() => {});
+  }
+
+  return atualizado;
 }
 
 const STATUS_POR_PAGAMENTO: Record<string, StatusPedido> = {
@@ -386,7 +409,10 @@ export async function registrarRetornoDoPagamento(pagamentoId: string) {
   const pedidoId = pagamento.external_reference;
   if (!pedidoId) return;
 
-  const pedido = await prisma.pedido.findUnique({ where: { id: pedidoId } });
+  const pedido = await prisma.pedido.findUnique({
+    where: { id: pedidoId },
+    include: { usuario: true },
+  });
   if (!pedido) return;
 
   const status = STATUS_POR_PAGAMENTO[pagamento.status ?? ""] ?? "AGUARDANDO_PAGAMENTO";
@@ -408,4 +434,11 @@ export async function registrarRetornoDoPagamento(pagamentoId: string) {
       await notificar(pedido.usuarioId, aviso.titulo, aviso.mensagem, tx);
     }
   });
+
+  const aviso = AVISO_POR_PAGAMENTO[status];
+  if (aviso) {
+    enviarEmailStatusPedido(pedido.usuario.email, pedido.usuario.nome, aviso.titulo, aviso.mensagem).catch(
+      () => {}
+    );
+  }
 }
