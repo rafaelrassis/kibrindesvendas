@@ -1,7 +1,28 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import { getCategorias } from "@/lib/data/categorias";
 import { getProdutosPorCategoria } from "@/lib/data/produtos";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const categorias = await getCategorias();
+  const categoria = categorias.find((c) => c.slug === slug);
+  if (!categoria) return { title: "Categoria não encontrada — LeoKibrindes" };
+
+  const titulo = `${categoria.label} — LeoKibrindes`;
+  const descricao = `Presentes personalizados de ${categoria.label.toLowerCase()} na LeoKibrindes.`;
+  return {
+    title: titulo,
+    description: descricao,
+    alternates: { canonical: `/categoria/${categoria.slug}` },
+    openGraph: { title: titulo, description: descricao, type: "website" },
+  };
+}
 
 export default async function CategoriaPage({
   params,

@@ -11,10 +11,21 @@ import BottomNav from "@/components/BottomNav";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import { getCategorias } from "@/lib/data/categorias";
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "LeoKibrindes — Presentes personalizados",
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: "LeoKibrindes — Presentes personalizados",
+    template: "%s",
+  },
   description:
-    "Protótipo visual para validação interna do fluxo de compra e personalização da LeoKibrindes.",
+    "Magnetos, canecas, moletons e camisetas personalizadas na LeoKibrindes. Crie seu presente com a gente.",
+  openGraph: {
+    siteName: "LeoKibrindes",
+    type: "website",
+    locale: "pt_BR",
+  },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
