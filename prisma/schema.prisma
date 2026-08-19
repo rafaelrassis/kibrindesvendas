@@ -50,6 +50,7 @@ model Produto {
   materiais            MaterialProduto[]
   itensPedido          ItemPedido[]
   favoritos            Favorito[]
+  avaliacoes           Avaliacao[]
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 }
@@ -103,6 +104,7 @@ model Usuario {
   pedidos      Pedido[]
   favoritos    Favorito[]
   notificacoes Notificacao[]
+  avaliacoes   Avaliacao[]
   createdAt    DateTime      @default(now())
 }
 
@@ -232,6 +234,24 @@ enum TipoPersonalizacao {
 // Linha única (id fixo "singleton") com dados operacionais da loja editáveis
 // pelo admin sem precisar de redeploy: CEP de onde os Correios buscam a
 // encomenda e o token da conta Melhor Envio usada pra cotar o frete real.
+// Avaliação de produto, feita pelo cliente. Nasce pendente (aprovado = false)
+// e só aparece na página do produto depois que o admin aprova — barra spam e
+// review ofensiva sem depender de moderação manual em tempo real.
+model Avaliacao {
+  id         String   @id @default(cuid())
+  produtoId  String
+  produto    Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nota       Int
+  comentario String?
+  aprovado   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  // Um cliente avalia o mesmo produto uma vez só — reenviar edita, não duplica.
+  @@unique([produtoId, usuarioId])
+}
+
 model ConfiguracaoLoja {
   id               String   @id @default("singleton")
   cepOrigem        String   @default("01310100")

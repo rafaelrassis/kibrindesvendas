@@ -9,6 +9,7 @@ import { useCep } from "@/lib/use-cep";
 import { compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 import FavoritoButton from "@/components/FavoritoButton";
+import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
@@ -343,6 +344,10 @@ export default function ProdutoPageClient() {
             </div>
           </div>
         )}
+
+        <div className="mx-auto max-w-5xl px-5">
+          <AvaliacoesProduto produtoId={produto.id} />
+        </div>
       </div>
     </div>
   );
