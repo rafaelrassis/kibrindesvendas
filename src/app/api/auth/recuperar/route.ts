@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const usuario = await prisma.usuario.findUnique({ where: { email: emailNormalizado } });
 
   if (usuario) {
-    const token = gerarTokenRedefinicao(usuario.id);
+    const token = gerarTokenRedefinicao(usuario.id, usuario.senhaHash);
     const link = `${baseUrl()}/redefinir-senha?token=${token}`;
     enviarEmailRedefinirSenha(usuario.email, usuario.nome, link).catch(() => {});
   }
@@ -65,7 +65,15 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const usuarioId = usuarioIdDoTokenRedefinicao(token);
+  // O hash atual entra na conferência da assinatura: link já usado (ou emitido
+  // antes de uma troca de senha por outro caminho) não fecha mais.
+  const usuarioId = await usuarioIdDoTokenRedefinicao(token, async (id) => {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id },
+      select: { senhaHash: true },
+    });
+    return usuario?.senhaHash ?? null;
+  });
   if (!usuarioId) {
     return NextResponse.json(
       { error: "Link inválido ou expirado. Peça uma nova redefinição." },

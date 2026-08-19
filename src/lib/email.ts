@@ -20,6 +20,12 @@ async function enviar(destinatario: string, assunto: string, html: string) {
   const resend = clienteConfigurado();
   if (!resend) {
     console.log(`[email simulado] para ${destinatario}: ${assunto}`);
+    // Os links do corpo também vão pro console: sem chave não há caixa de
+    // entrada pra clicar, e o link de redefinição é justamente o único jeito
+    // de seguir o fluxo — sem isto ele fica impossível de testar local.
+    for (const [, url] of html.matchAll(/href="([^"]+)"/g)) {
+      console.log(`  link: ${url}`);
+    }
     return;
   }
   try {
@@ -27,6 +33,16 @@ async function enviar(destinatario: string, assunto: string, html: string) {
   } catch (e) {
     console.error("Falha ao enviar e-mail", e);
   }
+}
+
+// O nome vem do cadastro, ou seja, do próprio cliente: entra no HTML escapado
+// pra não conseguir fechar a tag e injetar marcação no e-mail.
+function escaparHtml(texto: string) {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function layout(titulo: string, corpo: string) {
@@ -48,7 +64,7 @@ export async function enviarEmailStatusPedido(
   await enviar(
     destinatario,
     titulo,
-    layout(titulo, `<p>Olá, ${nome}!</p><p>${mensagem}</p>`)
+    layout(titulo, `<p>Olá, ${escaparHtml(nome)}!</p><p>${mensagem}</p>`)
   );
 }
 
@@ -58,7 +74,7 @@ export async function enviarEmailRedefinirSenha(destinatario: string, nome: stri
     "Redefinir sua senha — LeoKibrindes",
     layout(
       "Redefinir senha",
-      `<p>Olá, ${nome}!</p>
+      `<p>Olá, ${escaparHtml(nome)}!</p>
        <p>Recebemos um pedido pra redefinir sua senha. Clique no link abaixo — ele vale por 1 hora:</p>
        <p><a href="${link}" style="color: #3F6B4C;">${link}</a></p>
        <p>Se você não pediu isso, pode ignorar este e-mail.</p>`
