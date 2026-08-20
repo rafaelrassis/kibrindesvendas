@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminNav from "@/components/AdminNav";
+import EditorFoto from "@/components/EditorFoto";
 
 type Categoria = { slug: string; label: string; imagemUrl: string | null };
 
@@ -13,6 +14,7 @@ export default function AdminCategoriasPage() {
     imagemUrl: null,
   });
   const [enviandoImagem, setEnviandoImagem] = useState(false);
+  const [arquivoParaEditar, setArquivoParaEditar] = useState<File | null>(null);
 
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -38,11 +40,16 @@ export default function AdminCategoriasPage() {
     setForm({ label: "", imagemUrl: null });
   };
 
-  // A imagem sobe na hora e o formulário guarda só a URL que o servidor
-  // devolveu — igual ao banner da home.
-  const selecionarImagem = async (arquivo: File | undefined) => {
+  // A escolha abre o editor (zoom/arraste/rotação); o upload de verdade só
+  // acontece depois de confirmar, sempre como JPEG — igual ao banner.
+  const selecionarImagemBruta = (arquivo: File | undefined) => {
     if (!arquivo) return;
     setErro("");
+    setArquivoParaEditar(arquivo);
+  };
+
+  const enviarImagemEditada = async (arquivo: File) => {
+    setArquivoParaEditar(null);
     setEnviandoImagem(true);
     const dados = new FormData();
     dados.append("arquivo", arquivo);
@@ -131,7 +138,7 @@ export default function AdminCategoriasPage() {
                       form={form}
                       setForm={setForm}
                       enviandoImagem={enviandoImagem}
-                      selecionarImagem={selecionarImagem}
+                      selecionarImagem={selecionarImagemBruta}
                       salvar={salvar}
                       cancelar={cancelar}
                       salvando={salvando}
@@ -171,7 +178,7 @@ export default function AdminCategoriasPage() {
                     form={form}
                     setForm={setForm}
                     enviandoImagem={enviandoImagem}
-                    selecionarImagem={selecionarImagem}
+                    selecionarImagem={selecionarImagemBruta}
                     salvar={salvar}
                     cancelar={cancelar}
                     salvando={salvando}
@@ -193,6 +200,13 @@ export default function AdminCategoriasPage() {
           + Nova categoria
         </button>
       )}
+
+      <EditorFoto
+        arquivo={arquivoParaEditar}
+        aspecto={1}
+        onCancelar={() => setArquivoParaEditar(null)}
+        onConfirmar={enviarImagemEditada}
+      />
     </div>
   );
 }
@@ -249,10 +263,13 @@ function LinhaEdicao({
       <label className="text-xs text-pine hover:underline cursor-pointer">
         <input
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/*,.heic,.heif"
           className="hidden"
           disabled={enviandoImagem}
-          onChange={(e) => selecionarImagem(e.target.files?.[0])}
+          onChange={(e) => {
+            selecionarImagem(e.target.files?.[0]);
+            e.target.value = "";
+          }}
         />
         {enviandoImagem ? "Enviando..." : form.imagemUrl ? "Trocar" : "Enviar imagem"}
       </label>

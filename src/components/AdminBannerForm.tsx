@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BannerAdmin } from "@/lib/types";
+import EditorFoto from "@/components/EditorFoto";
 
 export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
   const router = useRouter();
@@ -15,14 +16,20 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
   const [corFundo, setCorFundo] = useState(banner?.corFundo ?? "#3F6B4C");
   const [imagemUrl, setImagemUrl] = useState<string | null>(banner?.imagemUrl ?? null);
   const [enviandoImagem, setEnviandoImagem] = useState(false);
+  const [arquivoParaEditar, setArquivoParaEditar] = useState<File | null>(null);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  // A imagem sobe na hora e o formulário guarda só a URL que o servidor
-  // devolveu — é ela, e não um endereço digitado, que a home aceita.
-  async function selecionarImagem(arquivo: File | undefined) {
+  // A escolha abre o editor (zoom/arraste/rotação); o upload de verdade só
+  // acontece depois de confirmar, sempre como JPEG.
+  function selecionarImagemBruta(arquivo: File | undefined) {
     if (!arquivo) return;
     setErro("");
+    setArquivoParaEditar(arquivo);
+  }
+
+  async function enviarImagemEditada(arquivo: File) {
+    setArquivoParaEditar(null);
     setEnviandoImagem(true);
 
     const form = new FormData();
@@ -97,10 +104,13 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
         <label className="block border-2 border-dashed border-line rounded-md p-4 text-center cursor-pointer hover:border-mustard transition-colors">
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/*,.heic,.heif"
             className="hidden"
             disabled={enviandoImagem}
-            onChange={(e) => selecionarImagem(e.target.files?.[0])}
+            onChange={(e) => {
+              selecionarImagemBruta(e.target.files?.[0]);
+              e.target.value = "";
+            }}
           />
           <span className="text-sm text-ink/50">
             {enviandoImagem
@@ -176,6 +186,13 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
       >
         {enviando ? "Salvando..." : editando ? "Salvar alterações" : "Criar banner"}
       </button>
+
+      <EditorFoto
+        arquivo={arquivoParaEditar}
+        aspecto={21 / 9}
+        onCancelar={() => setArquivoParaEditar(null)}
+        onConfirmar={enviarImagemEditada}
+      />
     </form>
   );
 }
