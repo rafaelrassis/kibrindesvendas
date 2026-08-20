@@ -109,6 +109,10 @@ export default function ProdutoPageClient() {
   // no máximo este tipo. Com outros tipos ainda em aberto não dá pra cravar,
   // então o valor aparece normal.
   //
+  // A marca vale também pro valor já escolhido: sem isso o chip selecionado
+  // ficava com a cor de "ok" mesmo levando a uma combinação zerada, e o único
+  // sinal era o aviso mais abaixo.
+  //
   // Marcado não é bloqueado: o botão continua clicável pra dar pra trocar de
   // ideia sem ficar preso (escolher a cor esgotada e depois mudar o tamanho,
   // por exemplo). Quem segura a compra é o aviso da combinação + os CTAs
@@ -336,7 +340,7 @@ export default function ProdutoPageClient() {
                         <div className="flex flex-wrap gap-2.5">
                           {v.valores.map((valor) => {
                             const ativo = selecoes[v.tipo] === valor;
-                            const indisponivel = !ativo && valorIndisponivel(v.tipo, valor);
+                            const indisponivel = valorIndisponivel(v.tipo, valor);
                             const url = v.imagensValores?.[valor];
                             return (
                               <button
@@ -344,10 +348,10 @@ export default function ProdutoPageClient() {
                                 onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
                                 title={indisponivel ? "Sem estoque nessa combinação" : valor}
                                 className={`relative w-16 h-16 rounded-md overflow-hidden border-2 transition-colors ${
-                                  ativo
-                                    ? "border-pine"
-                                    : indisponivel
-                                      ? "border-line"
+                                  ativo && indisponivel
+                                    ? "border-berry"
+                                    : ativo
+                                      ? "border-pine"
                                       : "border-line hover:border-pine/50"
                                 }`}
                               >
@@ -376,7 +380,7 @@ export default function ProdutoPageClient() {
                                       y1="0"
                                       x2="100"
                                       y2="100"
-                                      stroke="#8A818C"
+                                      stroke={ativo ? "#b23a48" : "#8A818C"}
                                       strokeWidth="2"
                                     />
                                   </svg>
@@ -389,18 +393,20 @@ export default function ProdutoPageClient() {
                         <div className="flex flex-wrap gap-2">
                           {v.valores.map((valor) => {
                             const ativo = selecoes[v.tipo] === valor;
-                            const indisponivel = !ativo && valorIndisponivel(v.tipo, valor);
+                            const indisponivel = valorIndisponivel(v.tipo, valor);
                             return (
                               <button
                                 key={valor}
                                 onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
                                 title={indisponivel ? "Sem estoque nessa combinação" : undefined}
                                 className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                                  ativo
-                                    ? "bg-pine text-white border-pine"
-                                    : indisponivel
-                                      ? "border-dashed border-line text-ink/30 line-through"
-                                      : "border-line hover:border-pine/50"
+                                  ativo && indisponivel
+                                    ? "bg-berry/10 text-berry border-berry line-through"
+                                    : ativo
+                                      ? "bg-pine text-white border-pine"
+                                      : indisponivel
+                                        ? "border-dashed border-line text-ink/30 line-through"
+                                        : "border-line hover:border-pine/50"
                                 }`}
                               >
                                 {valor}
