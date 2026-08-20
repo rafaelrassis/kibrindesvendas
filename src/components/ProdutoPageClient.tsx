@@ -104,10 +104,15 @@ export default function ProdutoPageClient() {
   const faltaEscolher =
     faltaSelecionar || combinacaoSemEstoque || (!porVariacao && esgotado);
 
-  // Um valor de variação fica bloqueado só quando dá pra saber que a
-  // combinação resultante está zerada — ou seja, quando faltar escolher no
-  // máximo este tipo. Com outros tipos ainda em aberto não dá pra cravar,
-  // então o valor fica clicável normalmente.
+  // Um valor de variação é marcado como indisponível só quando dá pra saber
+  // que a combinação resultante está zerada — ou seja, quando faltar escolher
+  // no máximo este tipo. Com outros tipos ainda em aberto não dá pra cravar,
+  // então o valor aparece normal.
+  //
+  // Marcado não é bloqueado: o botão continua clicável pra dar pra trocar de
+  // ideia sem ficar preso (escolher a cor esgotada e depois mudar o tamanho,
+  // por exemplo). Quem segura a compra é o aviso da combinação + os CTAs
+  // desabilitados por `faltaEscolher`.
   function valorIndisponivel(tipo: string, valor: string) {
     if (!porVariacao) return false;
     const tentativa = { ...selecoes, [tipo]: valor };
@@ -336,14 +341,13 @@ export default function ProdutoPageClient() {
                             return (
                               <button
                                 key={valor}
-                                disabled={indisponivel}
                                 onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
                                 title={indisponivel ? "Sem estoque nessa combinação" : valor}
                                 className={`relative w-16 h-16 rounded-md overflow-hidden border-2 transition-colors ${
                                   ativo
                                     ? "border-pine"
                                     : indisponivel
-                                      ? "border-line cursor-not-allowed"
+                                      ? "border-line"
                                       : "border-line hover:border-pine/50"
                                 }`}
                               >
@@ -389,14 +393,13 @@ export default function ProdutoPageClient() {
                             return (
                               <button
                                 key={valor}
-                                disabled={indisponivel}
                                 onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
                                 title={indisponivel ? "Sem estoque nessa combinação" : undefined}
                                 className={`px-4 py-2 rounded-full text-sm border transition-colors ${
                                   ativo
                                     ? "bg-pine text-white border-pine"
                                     : indisponivel
-                                      ? "border-dashed border-line text-ink/30 line-through cursor-not-allowed"
+                                      ? "border-dashed border-line text-ink/30 line-through"
                                       : "border-line hover:border-pine/50"
                                 }`}
                               >
