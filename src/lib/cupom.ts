@@ -6,7 +6,7 @@
 
 import { formatarPreco } from "./compare-price";
 
-export type TipoCupom = "PERCENTUAL" | "FIXO";
+export type TipoCupom = "PERCENTUAL" | "FIXO" | "FRETE_GRATIS";
 
 // Normaliza pra maiúsculas sem espaço nas pontas — assim "promo10" e
 // "PROMO10" são o mesmo cupom, tanto pra cadastrar quanto pra aplicar.
@@ -14,7 +14,12 @@ export function normalizarCodigo(codigo: string) {
   return codigo.trim().toUpperCase();
 }
 
+// Frete grátis não desconta do valor dos produtos — zera o frete, que é
+// somado depois, fora daqui (ver total no checkout e em criarPedido). Cupom
+// desse tipo sempre tem `valor: 0` (não usa o campo), então calcularDesconto
+// devolve 0 de propósito: nenhum desconto no subtotal do pedido.
 export function calcularDesconto(tipo: TipoCupom, valor: number, valorPedido: number) {
+  if (tipo === "FRETE_GRATIS") return 0;
   const desconto = tipo === "PERCENTUAL" ? (valorPedido * valor) / 100 : valor;
   // Nunca desconta mais do que o próprio pedido vale.
   return Math.min(Math.round(desconto * 100) / 100, valorPedido);

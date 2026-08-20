@@ -15,7 +15,9 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
   const editando = !!cupom;
 
   const [codigo, setCodigo] = useState(cupom?.codigo ?? "");
-  const [tipo, setTipo] = useState<"PERCENTUAL" | "FIXO">(cupom?.tipo ?? "PERCENTUAL");
+  const [tipo, setTipo] = useState<"PERCENTUAL" | "FIXO" | "FRETE_GRATIS">(
+    cupom?.tipo ?? "PERCENTUAL"
+  );
   const [valor, setValor] = useState(cupom?.valor?.toString() ?? "");
   const [ativo, setAtivo] = useState(cupom?.ativo ?? true);
   const [validoAte, setValidoAte] = useState(paraDataInput(cupom?.validoAte ?? null));
@@ -30,7 +32,7 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
     e.preventDefault();
     setErro("");
 
-    if (!codigo.trim() || !valor) {
+    if (!codigo.trim() || (tipo !== "FRETE_GRATIS" && !valor)) {
       setErro("Preencha o código e o valor do desconto.");
       return;
     }
@@ -38,7 +40,7 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
     const payload = {
       codigo,
       tipo,
-      valor: Number(valor),
+      valor: tipo === "FRETE_GRATIS" ? 0 : Number(valor),
       ativo,
       validoAte: validoAte || null,
       usoMaximo: usoMaximo ? Number(usoMaximo) : null,
@@ -77,26 +79,42 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
         <Campo label="Tipo">
           <select
             value={tipo}
-            onChange={(e) => setTipo(e.target.value as "PERCENTUAL" | "FIXO")}
+            onChange={(e) => setTipo(e.target.value as "PERCENTUAL" | "FIXO" | "FRETE_GRATIS")}
             className="w-full border border-line rounded px-3 py-2 text-sm"
           >
             <option value="PERCENTUAL">Percentual (%)</option>
             <option value="FIXO">Valor fixo (R$)</option>
+            <option value="FRETE_GRATIS">Frete grátis</option>
           </select>
         </Campo>
-        <Campo label={tipo === "PERCENTUAL" ? "Desconto (%)" : "Desconto (R$)"}>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max={tipo === "PERCENTUAL" ? 100 : undefined}
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            className="w-full border border-line rounded px-3 py-2 text-sm"
-            required
-          />
-        </Campo>
+        {tipo === "FRETE_GRATIS" ? (
+          <Campo label="Desconto">
+            <div className="w-full border border-line rounded px-3 py-2 text-sm text-ink/40 bg-paper-2">
+              Frete zerado
+            </div>
+          </Campo>
+        ) : (
+          <Campo label={tipo === "PERCENTUAL" ? "Desconto (%)" : "Desconto (R$)"}>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max={tipo === "PERCENTUAL" ? 100 : undefined}
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+              required
+            />
+          </Campo>
+        )}
       </div>
+      {tipo === "FRETE_GRATIS" && (
+        <p className="text-xs text-ink/50 -mt-2">
+          O cliente paga só o produto — o frete some do total, não importa o valor do pedido.
+          Pra frete grátis automático acima de um valor, sem precisar de código, veja o bloco no
+          topo da lista de cupons.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Campo label="Válido até (opcional)">

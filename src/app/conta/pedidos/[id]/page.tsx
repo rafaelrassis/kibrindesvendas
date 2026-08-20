@@ -144,7 +144,15 @@ export default function DetalhePedidoPage() {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-ink/60">Frete</span>
-            <span className="font-mono">{reais(pedido.frete)}</span>
+            {/* Sem a marca de grátis, um frete zerado no histórico pareceria
+                erro de cálculo em vez de benefício aplicado. */}
+            <span className="font-mono">
+              {pedido.freteGratis ? (
+                <span className="text-pine-2">Grátis</span>
+              ) : (
+                reais(pedido.frete)
+              )}
+            </span>
           </div>
           <div className="flex items-center justify-between font-medium">
             <span>Total</span>

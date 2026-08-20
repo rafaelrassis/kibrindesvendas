@@ -51,6 +51,12 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     produto?.requerPersonalizacao ?? false
   );
   const [destaque, setDestaque] = useState(produto?.destaque ?? false);
+  // Vazio = estoque não controlado (comportamento de sempre). Só quando o
+  // admin preenche um número é que a compra passa a travar nele.
+  const [controlaEstoque, setControlaEstoque] = useState(produto?.estoque != null);
+  const [estoque, setEstoque] = useState(
+    produto?.estoque != null ? String(produto.estoque) : ""
+  );
   const [pesoGramas, setPesoGramas] = useState(String(produto?.pesoGramas ?? 300));
   const [alturaCm, setAlturaCm] = useState(String(produto?.alturaCm ?? 4));
   const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
@@ -166,6 +172,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       setErro("Preencha nome, categoria e preço.");
       return;
     }
+    if (controlaEstoque && !(Number(estoque) >= 0)) {
+      setErro("Informe um estoque válido (0 ou mais) ou desative o controle.");
+      return;
+    }
 
     const payload = {
       nome,
@@ -181,6 +191,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       imagens,
       video,
       destaque,
+      estoque: controlaEstoque ? Math.round(Number(estoque)) : null,
       pesoGramas: Number(pesoGramas) || 300,
       alturaCm: Number(alturaCm) || 4,
       larguraCm: Number(larguraCm) || 11,
@@ -467,6 +478,32 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         />
         Produto em destaque
       </label>
+
+      <div className="border border-line rounded-lg p-4">
+        <label className="flex items-center gap-2 text-sm mb-1">
+          <input
+            type="checkbox"
+            checked={controlaEstoque}
+            onChange={(e) => setControlaEstoque(e.target.checked)}
+          />
+          Controlar estoque
+        </label>
+        <p className="text-xs text-ink/50 mb-3">
+          Desmarcado, o produto vende sem limite de unidades — igual sempre foi.
+        </p>
+        {controlaEstoque && (
+          <Campo label="Unidades disponíveis">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={estoque}
+              onChange={(e) => setEstoque(e.target.value)}
+              className="w-32 border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+        )}
+      </div>
 
       <div>
         <p className="text-sm font-medium mb-2">Variações</p>

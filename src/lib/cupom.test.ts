@@ -49,6 +49,13 @@ describe("calcularDesconto", () => {
   it("incide sobre o total das unidades, não sobre uma só", () => {
     expect(calcularDesconto("PERCENTUAL", 10, 39.9 * 3)).toBe(11.97);
   });
+
+  it("frete grátis não desconta nada do produto — só zera o frete, fora daqui", () => {
+    expect(calcularDesconto("FRETE_GRATIS", 0, 100)).toBe(0);
+    // mesmo que `valor` venha preenchido por engano, o tipo manda: nunca
+    // desconta do subtotal do produto.
+    expect(calcularDesconto("FRETE_GRATIS", 50, 100)).toBe(0);
+  });
 });
 
 describe("paraValidoAte", () => {

@@ -86,7 +86,9 @@ export default function ProdutoPageClient() {
   }
 
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
-  const faltaEscolher = produto.variacoes.some((v) => !selecoes[v.tipo]);
+  const esgotado = produto.estoque === 0;
+  const estoqueBaixo = produto.estoque !== null && produto.estoque > 0 && produto.estoque <= 5;
+  const faltaEscolher = produto.variacoes.some((v) => !selecoes[v.tipo]) || esgotado;
 
   // Personalização não tem como pular pro pagamento sem antes definir a arte
   // — por isso só existe um botão nesse caso, sem a escolha "sacola vs. agora".
@@ -175,6 +177,14 @@ export default function ProdutoPageClient() {
                 {reais(produto.preco)}
               </p>
               <p className="text-sm text-ink/50 mt-2">no Pix ou em até 3x sem juros</p>
+              {esgotado && (
+                <p className="text-sm text-berry font-medium mt-3">Produto esgotado no momento</p>
+              )}
+              {estoqueBaixo && (
+                <p className="text-sm text-mustard font-medium mt-3">
+                  Só {produto.estoque} unidade{produto.estoque === 1 ? "" : "s"} em estoque
+                </p>
+              )}
             </div>
 
             {/* Comparação de preço, estilo "Achamos uma oferta melhor" */}

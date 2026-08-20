@@ -92,7 +92,11 @@ export default async function AdminPedidosPage() {
               <p className="font-mono text-sm font-medium mt-2">
                 R$ {Number(p.total).toFixed(2).replace(".", ",")}{" "}
                 <span className="font-sans text-xs font-normal text-ink/50">
-                  (frete R$ {Number(p.frete).toFixed(2).replace(".", ",")})
+                  {/* Frete zerado por cupom ou pelo valor mínimo da loja — dito
+                      com todas as letras pra não parecer erro de cálculo. */}
+                  {p.freteGratis
+                    ? "(frete grátis)"
+                    : `(frete R$ ${Number(p.frete).toFixed(2).replace(".", ",")})`}
                 </span>
               </p>
             </div>

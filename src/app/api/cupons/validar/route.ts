@@ -8,8 +8,8 @@ import { corpoJson, respostaDeErro } from "@/lib/api";
 export async function POST(req: NextRequest) {
   try {
     const { codigo, valorPedido } = await corpoJson<{ codigo: string; valorPedido: number }>(req);
-    const { desconto } = await validarCupom(codigo, Number(valorPedido) || 0);
-    return NextResponse.json({ valido: true, desconto });
+    const { desconto, freteGratis } = await validarCupom(codigo, Number(valorPedido) || 0);
+    return NextResponse.json({ valido: true, desconto, freteGratis });
   } catch (e) {
     return respostaDeErro(e);
   }

@@ -31,10 +31,17 @@ export default function ProductCard({
             <span>{produto.emoji}</span>
           )}
           {/* top-6: abaixo do corte diagonal do .tag-shape, senão a etiqueta fica cortada */}
-          {comparativo && comparacao.mostrar && (
-            <span className="absolute top-6 left-3 bg-berry text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
-              Mais barato aqui
+          {produto.estoque === 0 ? (
+            <span className="absolute top-6 left-3 bg-ink/70 text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
+              Esgotado
             </span>
+          ) : (
+            comparativo &&
+            comparacao.mostrar && (
+              <span className="absolute top-6 left-3 bg-berry text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
+                Mais barato aqui
+              </span>
+            )
           )}
         </div>
 

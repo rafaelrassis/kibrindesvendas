@@ -25,6 +25,9 @@ export type Produto = {
   video: string | null;
   variacoes: Variacao[];
   destaque?: boolean;
+  // null = estoque não controlado (comportamento de sempre). Com um número,
+  // a compra não passa disso — ver checarEstoque / decrementarEstoque.
+  estoque: number | null;
   // Usados na cotação de frete real (Correios via Melhor Envio).
   pesoGramas: number;
   alturaCm: number;
@@ -51,7 +54,7 @@ export type ProdutoAdmin = Produto & {
 export type Cupom = {
   id: string;
   codigo: string;
-  tipo: "PERCENTUAL" | "FIXO";
+  tipo: "PERCENTUAL" | "FIXO" | "FRETE_GRATIS";
   valor: number;
   ativo: boolean;
   validoAte: string | null;
@@ -100,6 +103,10 @@ export type Pedido = {
   status: string;
   total: number;
   frete: number;
+  // Frete cobrado zerado (cupom de frete grátis ou limiar automático) — sem
+  // isso, um `frete: 0` no histórico pareceria erro de cálculo em vez de
+  // benefício aplicado.
+  freteGratis: boolean;
   desconto: number;
   cupomCodigo: string | null;
   enderecoResumo: string | null;

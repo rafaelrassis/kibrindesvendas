@@ -37,6 +37,12 @@ model Produto {
   imagens              String[]          @default([])
   video                String?
   destaque             Boolean           @default(false)
+  // null = estoque não controlado (comportamento de sempre — produto sob
+  // encomenda ou sem controle de unidades). Com um número, o pedido não
+  // deixa passar da quantidade disponível — ver decrementarEstoque, que usa
+  // UPDATE condicional pra duas compras simultâneas não venderem a mesma
+  // última unidade duas vezes.
+  estoque              Int?
   // Usados no cálculo de frete real (Correios via Melhor Envio). Valores
   // padrão são de uma caixa pequena — produto sem cadastro específico ainda
   // recebe uma cotação plausível em vez de falhar.
@@ -141,6 +147,10 @@ model Pedido {
   // `total` já inclui o frete: é o valor cobrado do cliente.
   total           Decimal      @db.Decimal(10, 2)
   frete           Decimal      @default(0) @db.Decimal(10, 2)
+  // true quando `frete` é 0 por cupom de frete grátis ou pelo limiar
+  // automático (ConfiguracaoLoja.freteGratisAcimaDe) — sem isso, um frete
+  // zerado no histórico pareceria erro de cálculo em vez de benefício aplicado.
+  freteGratis     Boolean      @default(false)
   // Endereço congelado no momento da compra: o cadastro do cliente pode mudar
   // depois, mas o pedido tem que continuar mostrando pra onde foi.
   enderecoCep     String?
@@ -212,6 +222,7 @@ model Cupom {
 enum TipoCupom {
   PERCENTUAL
   FIXO
+  FRETE_GRATIS
 }
 
 enum StatusPedido {
@@ -256,5 +267,10 @@ model ConfiguracaoLoja {
   id               String   @id @default("singleton")
   cepOrigem        String   @default("01310100")
   melhorEnvioToken String?
+  // Frete grátis automático pra pedidos a partir desse valor (produto, sem
+  // frete) — null desliga a regra. Independente de cupom: soma com um cupom
+  // FRETE_GRATIS aplicado (o resultado é o mesmo, frete zerado, mas as duas
+  // origens coexistem sem conflito).
+  freteGratisAcimaDe Decimal? @db.Decimal(10, 2)
   updatedAt        DateTime @updatedAt
 }

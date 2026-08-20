@@ -17,9 +17,11 @@ function reais(valor: number) {
 export default function CheckoutResumo({
   pagamentoReal,
   erroInicial = "",
+  freteGratisAcimaDe = null,
 }: {
   pagamentoReal: boolean;
   erroInicial?: string;
+  freteGratisAcimaDe?: number | null;
 }) {
   const router = useRouter();
   const { item, limpar, definirQuantidade } = useCart();
@@ -54,6 +56,7 @@ export default function CheckoutResumo({
   const [cupomAplicado, setCupomAplicado] = useState<{
     codigo: string;
     desconto: number;
+    freteGratis: boolean;
     valorPedido: number;
   } | null>(null);
   const [validandoCupom, setValidandoCupom] = useState(false);
@@ -101,7 +104,12 @@ export default function CheckoutResumo({
           return;
         }
         setErroCupom("");
-        setCupomAplicado({ codigo, desconto: data.desconto, valorPedido: precoProduto });
+        setCupomAplicado({
+          codigo,
+          desconto: data.desconto,
+          freteGratis: !!data.freteGratis,
+          valorPedido: precoProduto,
+        });
       })
       .catch(() => {
         if (cancelado) return;
@@ -143,10 +151,17 @@ export default function CheckoutResumo({
 
   const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
-  const frete = endereco?.frete ?? null;
+  const freteCalculado = endereco?.frete ?? null;
   const desconto = cupomAplicado?.desconto ?? 0;
   const subtotal = Math.max(0, precoProduto - desconto);
-  const total = subtotal + (frete?.valor ?? 0);
+
+  // Frete grátis por cupom OU por o pedido já bater o valor mínimo
+  // configurado em /admin/cupons — os dois só zeram o frete cobrado, nunca
+  // empilham desconto duplicado.
+  const freteGratisPorValor = freteGratisAcimaDe !== null && precoProduto >= freteGratisAcimaDe;
+  const freteGratis = !!cupomAplicado?.freteGratis || freteGratisPorValor;
+  const frete = freteGratis ? 0 : (freteCalculado?.valor ?? null);
+  const total = subtotal + (frete ?? 0);
 
   function aplicarCupom() {
     if (!codigoCupom.trim()) return;
@@ -173,6 +188,7 @@ export default function CheckoutResumo({
         setCupomAplicado({
           codigo: codigoCupom.trim().toUpperCase(),
           desconto: data.desconto,
+          freteGratis: !!data.freteGratis,
           valorPedido,
         });
       })
@@ -355,8 +371,10 @@ export default function CheckoutResumo({
             <p className="text-sm text-pine-2">
               <span className="font-mono font-medium">{cupomAplicado.codigo}</span> aplicado —{" "}
               {recalculandoCupom
-                ? "recalculando o desconto..."
-                : `${reais(cupomAplicado.desconto)} de desconto`}
+                ? "recalculando..."
+                : cupomAplicado.freteGratis
+                  ? "frete grátis"
+                  : `${reais(cupomAplicado.desconto)} de desconto`}
             </p>
             <button onClick={removerCupom} className="text-xs text-berry hover:underline shrink-0">
               Remover
@@ -403,7 +421,16 @@ export default function CheckoutResumo({
         <div className="flex justify-between text-sm">
           <span className="text-ink/60">Frete</span>
           <span className="font-mono">
-            {frete ? reais(frete.valor) : <span className="text-ink/40">informe o CEP</span>}
+            {!freteCalculado ? (
+              <span className="text-ink/40">informe o CEP</span>
+            ) : freteGratis ? (
+              <span className="text-pine-2">
+                <span className="line-through text-ink/30 mr-1.5">{reais(freteCalculado.valor)}</span>
+                Grátis
+              </span>
+            ) : (
+              reais(freteCalculado.valor)
+            )}
           </span>
         </div>
         <div className="flex justify-between font-medium pt-3 mt-3 border-t border-line">
@@ -427,7 +454,7 @@ export default function CheckoutResumo({
           ainda não mostra — o botão espera a conta fechar. */}
       <button
         onClick={pagar}
-        disabled={precisaArte || processando || !frete || recalculandoCupom}
+        disabled={precisaArte || processando || !freteCalculado || recalculandoCupom}
         className="w-full bg-berry text-paper font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-95 transition"
       >
         {processando

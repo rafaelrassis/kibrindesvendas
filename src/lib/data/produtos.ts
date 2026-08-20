@@ -9,6 +9,7 @@ import type {
   Variacao as VariacaoDb,
   Categoria as CategoriaDb,
   MaterialProduto as MaterialProdutoDb,
+  Prisma,
 } from "@prisma/client";
 import { ErroDeNegocio } from "./erros";
 
@@ -40,6 +41,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     video: p.video,
     destaque: p.destaque,
     variacoes: p.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
+    estoque: p.estoque,
     pesoGramas: p.pesoGramas,
     alturaCm: p.alturaCm,
     larguraCm: p.larguraCm,
@@ -156,6 +158,8 @@ export type DadosProduto = {
   destaque?: boolean;
   variacoes?: { tipo: string; valores: string[] }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
+  // null explícito desliga o controle de estoque; undefined deixa como está.
+  estoque?: number | null;
   pesoGramas?: number;
   alturaCm?: number;
   larguraCm?: number;
@@ -198,6 +202,9 @@ function validar(dados: Partial<DadosProduto>) {
   if (dados.video !== undefined && dados.video && !ehUrlDeVideo(dados.video)) {
     throw new ErroDeNegocio("Vídeo inválido — envie pelo campo de upload.");
   }
+  if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
+    throw new ErroDeNegocio("O estoque precisa ser um número inteiro maior ou igual a zero.");
+  }
 }
 
 export async function criarProduto(dados: DadosProduto): Promise<Produto> {
@@ -228,6 +235,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       imagens: dados.imagens ?? [],
       video: dados.video || null,
       destaque: !!dados.destaque,
+      estoque: dados.estoque ?? null,
       pesoGramas: dados.pesoGramas ?? PESO_PADRAO_G,
       alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
       larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
@@ -289,6 +297,7 @@ export async function atualizarProduto(
         imagens: dados.imagens,
         video: dados.video !== undefined ? dados.video || null : undefined,
         destaque: dados.destaque,
+        estoque: dados.estoque !== undefined ? dados.estoque : undefined,
         pesoGramas: dados.pesoGramas,
         alturaCm: dados.alturaCm,
         larguraCm: dados.larguraCm,
@@ -327,4 +336,42 @@ export async function removerProduto(id: string) {
   }
 
   await prisma.produto.delete({ where: { id } });
+}
+
+// Chamada dentro da transação que cria o pedido, depois de já ter confirmado
+// que há estoque suficiente. A condição é reconferida aqui pelo próprio
+// Postgres, na mesma instrução que desconta — igual ao padrão de
+// `registrarUsoCupom` em cupons.ts: duas compras simultâneas da última
+// unidade não vendem a mesma peça duas vezes, porque a segunda transação
+// espera a primeira commitar e só então vê o estoque já atualizado.
+// Produto sem controle de estoque (`estoque: null`) não entra aqui — quem
+// chama já filtra isso antes.
+export async function decrementarEstoque(
+  produtoId: string,
+  quantidade: number,
+  tx: Prisma.TransactionClient
+) {
+  const linhas = await tx.$executeRaw`
+    UPDATE "Produto"
+    SET estoque = estoque - ${quantidade}, "updatedAt" = NOW()
+    WHERE id = ${produtoId}
+      AND estoque IS NOT NULL
+      AND estoque >= ${quantidade}
+  `;
+  if (linhas === 0) {
+    throw new ErroDeNegocio("Este produto não tem mais estoque suficiente.", 409);
+  }
+}
+
+// Devolve as unidades quando o pedido que as reservou não vinga (falha ao
+// abrir o pagamento, por exemplo) — mesmo raciocínio de `devolverUsoCupom`.
+export async function devolverEstoque(
+  produtoId: string,
+  quantidade: number,
+  tx: Prisma.TransactionClient
+) {
+  await tx.produto.updateMany({
+    where: { id: produtoId, estoque: { not: null } },
+    data: { estoque: { increment: quantidade } },
+  });
 }

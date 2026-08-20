@@ -29,9 +29,12 @@ export function paraCupomPublico(c: CupomDb): Cupom {
 }
 
 // Confere se o cupom pode ser usado nesse pedido e devolve o valor de
-// desconto já calculado. Usado tanto na pré-visualização do checkout quanto,
-// de novo, na hora de gravar o pedido — nunca confiando no valor do cliente.
-// É validação de preview: quem garante o limite de usos sob concorrência é
+// desconto já calculado, mais se ele dá frete grátis — quem soma isso ao
+// total (zerando o frete) é quem chama, não esta função: ela só diz o que o
+// cupom vale, sem saber ainda quanto o frete custaria pro CEP escolhido.
+// Usado tanto na pré-visualização do checkout quanto, de novo, na hora de
+// gravar o pedido — nunca confiando no valor do cliente. É validação de
+// preview: quem garante o limite de usos sob concorrência é
 // `registrarUsoCupom`, dentro da transação que grava o pedido.
 export async function validarCupom(codigoBruto: unknown, valorPedido: number) {
   const codigo = typeof codigoBruto === "string" ? normalizarCodigo(codigoBruto) : "";
@@ -52,7 +55,11 @@ export async function validarCupom(codigoBruto: unknown, valorPedido: number) {
   );
   if (indisponivel) throw new ErroDeNegocio(indisponivel.mensagem, indisponivel.status);
 
-  return { cupom, desconto: calcularDesconto(cupom.tipo, Number(cupom.valor), valorPedido) };
+  return {
+    cupom,
+    desconto: calcularDesconto(cupom.tipo, Number(cupom.valor), valorPedido),
+    freteGratis: cupom.tipo === "FRETE_GRATIS",
+  };
 }
 
 // Chamada dentro da transação que cria o pedido. O limite é reconferido aqui
@@ -100,7 +107,7 @@ export async function getCupom(id: string): Promise<Cupom | undefined> {
 
 export type DadosCupom = {
   codigo: string;
-  tipo: "PERCENTUAL" | "FIXO";
+  tipo: "PERCENTUAL" | "FIXO" | "FRETE_GRATIS";
   valor: number;
   ativo?: boolean;
   validoAte?: string | null;
@@ -109,7 +116,14 @@ export type DadosCupom = {
 };
 
 function validarDados(dados: Partial<DadosCupom>) {
-  if (dados.valor !== undefined && !(dados.valor > 0)) {
+  // Frete grátis não usa o campo `valor` (a constraint do banco também exige
+  // isso — ver migration 20260820000100): ele só zera o frete, não desconta
+  // do produto.
+  if (
+    dados.tipo !== "FRETE_GRATIS" &&
+    dados.valor !== undefined &&
+    !(dados.valor > 0)
+  ) {
     throw new ErroDeNegocio("Informe um valor de desconto maior que zero.");
   }
   if (dados.tipo === "PERCENTUAL" && dados.valor !== undefined && dados.valor > 100) {
@@ -148,7 +162,7 @@ export async function criarCupom(dados: DadosCupom): Promise<Cupom> {
     data: {
       codigo,
       tipo: dados.tipo,
-      valor: dados.valor,
+      valor: dados.tipo === "FRETE_GRATIS" ? 0 : dados.valor,
       ativo: dados.ativo ?? true,
       validoAte: paraValidoAte(dados.validoAte),
       usoMaximo: dados.usoMaximo ?? null,
@@ -166,12 +180,16 @@ export async function atualizarCupom(id: string, dados: Partial<DadosCupom>): Pr
   const codigo = dados.codigo ? normalizarCodigo(dados.codigo) : undefined;
   if (codigo) await garantirCodigoLivre(codigo, id);
 
+  // Tipo final é o que vem no PATCH, ou o que já estava, se não mudou —
+  // precisa dos dois pra saber se `valor` tem que ser zerado.
+  const tipoFinal = dados.tipo ?? atual.tipo;
+
   const cupom = await prisma.cupom.update({
     where: { id },
     data: {
       codigo,
       tipo: dados.tipo,
-      valor: dados.valor,
+      valor: tipoFinal === "FRETE_GRATIS" ? 0 : dados.valor,
       ativo: dados.ativo,
       validoAte: dados.validoAte !== undefined ? paraValidoAte(dados.validoAte) : undefined,
       usoMaximo: dados.usoMaximo !== undefined ? dados.usoMaximo : undefined,

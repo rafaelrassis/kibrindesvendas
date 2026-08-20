@@ -15,6 +15,8 @@ import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
 import { enviarEmailStatusPedido } from "@/lib/email";
 import { devolverUsoCupom, normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
+import { getConfiguracaoLoja } from "./configuracao";
+import { decrementarEstoque, devolverEstoque } from "./produtos";
 
 // Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
 // 56.800000000000004); a coluna é Decimal(10,2), então arredonda antes.
@@ -55,18 +57,40 @@ export async function criarPedido(
     throw new ErroDeNegocio("Falta confirmar a personalização antes de pagar.");
   }
 
+  // Estoque também é conferido aqui antes de qualquer coisa: produto sem
+  // controle (`estoque: null`) passa direto, do jeito que sempre funcionou.
+  // A trava de verdade (contra duas compras simultâneas da última unidade)
+  // é o UPDATE condicional dentro da transação, mais abaixo — esta checagem
+  // aqui só evita abrir preferência de pagamento pra um pedido que a
+  // transação ia recusar de qualquer jeito.
+  if (produto.estoque !== null && produto.estoque < quantidade) {
+    throw new ErroDeNegocio(
+      produto.estoque === 0
+        ? "Este produto está sem estoque no momento."
+        : `Só restam ${produto.estoque} unidade(s) deste produto.`
+    );
+  }
+
   // O desconto também é recalculado no servidor, pelo mesmo motivo do frete:
   // o que o navegador mostrou é preview, quem decide é a validação aqui.
   // `valorPedido` já considera a quantidade — cupom percentual incide sobre
   // o total das unidades, não só sobre uma.
   const precoTotalProduto = Number(produto.preco) * quantidade;
   const temCupom = typeof cupomCodigo === "string" && cupomCodigo.trim();
-  const { cupom, desconto } = temCupom
+  const { cupom, desconto, freteGratis: freteGratisPorCupom } = temCupom
     ? await validarCupom(cupomCodigo, precoTotalProduto)
-    : { cupom: null, desconto: 0 };
+    : { cupom: null, desconto: 0, freteGratis: false };
+
+  // Frete grátis automático por valor mínimo (ConfiguracaoLoja, editável em
+  // /admin/cupons) soma sem conflito com o cupom: os dois só zeram o frete,
+  // não empilham desconto nenhum um sobre o outro.
+  const config = await getConfiguracaoLoja();
+  const freteGratisPorValor =
+    config.freteGratisAcimaDe !== null && precoTotalProduto >= config.freteGratisAcimaDe;
+  const freteGratis = freteGratisPorCupom || freteGratisPorValor;
 
   const pagamentoReal = pagamentoRealConfigurado();
-  const frete = endereco.frete.valor;
+  const frete = freteGratis ? 0 : endereco.frete.valor;
   const subtotal = emReais(precoTotalProduto - desconto);
   const total = emReais(subtotal + frete);
 
@@ -78,6 +102,7 @@ export async function criarPedido(
         status: pagamentoReal ? "AGUARDANDO_PAGAMENTO" : "PAGO",
         total,
         frete,
+        freteGratis,
         desconto,
         cupomCodigo: cupom ? normalizarCodigo(cupom.codigo) : null,
         enderecoCep: endereco.cep,
@@ -113,6 +138,14 @@ export async function criarPedido(
     // pedido gravado com um desconto que o cupom não podia mais dar.
     if (cupom) {
       await registrarUsoCupom(cupom.id, tx);
+    }
+
+    // Mesmo raciocínio pro estoque: produto sem controle passa direto, com
+    // controle o desconto é condicional no próprio UPDATE (ver
+    // decrementarEstoque) — duas compras simultâneas da última unidade não
+    // vendem a mesma peça duas vezes.
+    if (produto.estoque !== null) {
+      await decrementarEstoque(produto.id, quantidade, tx);
     }
 
     // No modo simulado o pedido já nasce pago, então o aviso sai junto. Com
@@ -173,14 +206,21 @@ export async function criarPedido(
             currency_id: "BRL",
           },
           // Frete como item separado: a soma da preferência tem que bater com
-          // o total do pedido, e o cliente vê o valor discriminado na tela do MP.
-          {
-            id: "frete",
-            title: `Frete — ${endereco.cidade}/${endereco.uf}`,
-            quantity: 1,
-            unit_price: frete,
-            currency_id: "BRL",
-          },
+          // o total do pedido, e o cliente vê o valor discriminado na tela do
+          // MP. Frete grátis não entra como item de R$ 0 — some da lista,
+          // porque o motivo (cupom ou valor mínimo) já aparece no título do
+          // produto ou no resumo do pedido.
+          ...(frete > 0
+            ? [
+                {
+                  id: "frete",
+                  title: `Frete — ${endereco.cidade}/${endereco.uf}`,
+                  quantity: 1,
+                  unit_price: frete,
+                  currency_id: "BRL",
+                },
+              ]
+            : []),
         ],
         payer: { name: usuario.nome, email: usuario.email },
         back_urls: {
@@ -208,6 +248,9 @@ export async function criarPedido(
         if (pedido.cupomCodigo) {
           await devolverUsoCupom(pedido.cupomCodigo, tx);
         }
+        if (produto.estoque !== null) {
+          await devolverEstoque(produto.id, quantidade, tx);
+        }
       });
     } catch (erroDaLimpeza) {
       console.error("Falha ao desfazer o pedido sem preferência", erroDaLimpeza);
@@ -233,6 +276,7 @@ export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
     status: pedido.status,
     total: Number(pedido.total),
     frete: Number(pedido.frete),
+    freteGratis: pedido.freteGratis,
     desconto: Number(pedido.desconto),
     cupomCodigo: pedido.cupomCodigo,
     enderecoResumo: pedido.enderecoResumo,
