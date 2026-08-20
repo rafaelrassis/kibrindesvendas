@@ -10,6 +10,7 @@ import { compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 import FavoritoButton from "@/components/FavoritoButton";
 import AvaliacoesProduto from "@/components/AvaliacoesProduto";
+import Lightbox from "@/components/Lightbox";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
@@ -375,6 +376,7 @@ function ProdutoGaleria({
     ...(video ? [{ tipo: "video", url: video } as ItemGaleria] : []),
   ];
   const [ativo, setAtivo] = useState(0);
+  const [lightboxAberto, setLightboxAberto] = useState(false);
 
   if (itens.length === 0) {
     return (
@@ -391,17 +393,28 @@ function ProdutoGaleria({
 
   return (
     <div>
-      <div
-        className="aspect-square rounded-lg overflow-hidden flex items-center justify-center"
-        style={{ backgroundColor: `${cor}22` }}
-      >
-        {item.tipo === "video" ? (
+      {item.tipo === "video" ? (
+        <div
+          className="w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center"
+          style={{ backgroundColor: `${cor}22` }}
+        >
           <video src={item.url} className="w-full h-full object-cover" controls playsInline />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setLightboxAberto(true)}
+          className="w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center relative group"
+          style={{ backgroundColor: `${cor}22` }}
+          aria-label="Ver foto em tela cheia"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={item.url} alt={nome} className="w-full h-full object-cover" />
-        )}
-      </div>
+          <span className="absolute bottom-2 right-2 bg-black/50 text-white text-[11px] px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            🔍 Ampliar
+          </span>
+        </button>
+      )}
 
       {itens.length > 1 && (
         <div className="flex gap-2 mt-3">
@@ -429,6 +442,15 @@ function ProdutoGaleria({
             </button>
           ))}
         </div>
+      )}
+
+      {lightboxAberto && (
+        <Lightbox
+          itens={itens}
+          indiceInicial={Math.min(ativo, itens.length - 1)}
+          nome={nome}
+          onFechar={() => setLightboxAberto(false)}
+        />
       )}
     </div>
   );

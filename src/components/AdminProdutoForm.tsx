@@ -114,6 +114,13 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     setImagens((prev) => prev.filter((u) => u !== url));
   }
 
+  // A primeira foto do array é a capa em toda a loja (cartão da home, busca,
+  // comparativo) — isso já é automático em quem lê `imagens[0]`. O que essa
+  // função dá é o controle de qual foto ocupa essa posição.
+  function tornarCapa(url: string) {
+    setImagens((prev) => [url, ...prev.filter((u) => u !== url)]);
+  }
+
   async function selecionarVideo(arquivo: File | undefined) {
     if (!arquivo) return;
     setErroVideo("");
@@ -298,14 +305,28 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       <div>
         <p className="text-sm font-medium mb-1">Fotos e vídeo</p>
         <p className="text-xs text-ink/50 mb-3">
-          Até 4 fotos e 1 vídeo. Sem nenhum arquivo aqui, o produto usa o emoji + cor abaixo.
+          Até 4 fotos e 1 vídeo. A primeira é a capa mostrada na home e na busca — toque em
+          &quot;Tornar capa&quot; pra trocar. Sem nenhum arquivo aqui, o produto usa o emoji + cor abaixo.
         </p>
 
         <div className="flex flex-wrap gap-3 mb-3">
-          {imagens.map((url) => (
+          {imagens.map((url, i) => (
             <div key={url} className="relative w-20 h-20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={url} alt="" className="w-20 h-20 rounded object-cover border border-line" />
+              {i === 0 ? (
+                <span className="absolute bottom-0 inset-x-0 bg-pine/90 text-white text-[9px] text-center py-0.5 rounded-b">
+                  Capa
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => tornarCapa(url)}
+                  className="absolute bottom-0 inset-x-0 bg-ink/60 text-white text-[9px] text-center py-0.5 rounded-b hover:bg-pine/90"
+                >
+                  Tornar capa
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => removerFoto(url)}
