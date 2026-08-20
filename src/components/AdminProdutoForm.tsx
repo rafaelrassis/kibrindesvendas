@@ -4,12 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Categoria, ProdutoAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
+import { buildCombinacaoKey, gerarCombinacoes } from "@/lib/estoque-variacao";
 
-type VariacaoForm = { tipo: string; valores: string };
+type VariacaoForm = { tipo: string; valores: string; imagensValores: Record<string, string> };
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
 
 function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
-  return v.map((x) => ({ tipo: x.tipo, valores: x.valores.join(", ") }));
+  return v.map((x) => ({
+    tipo: x.tipo,
+    valores: x.valores.join(", "),
+    imagensValores: x.imagensValores ?? {},
+  }));
 }
 
 function paraMaterialForm(m: ProdutoAdmin["materiais"] | undefined): MaterialForm[] {
@@ -51,22 +56,54 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     produto?.requerPersonalizacao ?? false
   );
   const [destaque, setDestaque] = useState(produto?.destaque ?? false);
-  // Vazio = estoque não controlado (comportamento de sempre). Só quando o
-  // admin preenche um número é que a compra passa a travar nele.
-  const [controlaEstoque, setControlaEstoque] = useState(produto?.estoque != null);
+  const [variacoes, setVariacoes] = useState<VariacaoForm[]>(
+    produto ? paraVariacaoForm(produto.variacoes) : []
+  );
+  // Vazio = estoque não controlado (comportamento de sempre). Sem variação,
+  // um número trava a compra nele (como sempre foi); com variação, o
+  // controle é por combinação — ver gradeEstoque — e este número não é
+  // usado (fica null).
+  const [controlaEstoque, setControlaEstoque] = useState(
+    produto && produto.variacoes.length > 0
+      ? produto.estoqueVariacoes.length > 0
+      : produto?.estoque != null
+  );
   const [estoque, setEstoque] = useState(
     produto?.estoque != null ? String(produto.estoque) : ""
   );
+  // Uma entrada por combinação (chave = buildCombinacaoKey). Recalculada a
+  // cada combinação atual das variações — combinação nova aparece com "0",
+  // combinação removida (o admin apagou um valor) some do payload sozinha.
+  const [gradeEstoque, setGradeEstoque] = useState<Record<string, string>>(() => {
+    const inicial: Record<string, string> = {};
+    for (const e of produto?.estoqueVariacoes ?? []) inicial[e.combinacao] = String(e.estoque);
+    return inicial;
+  });
+  const [enviandoImagemCor, setEnviandoImagemCor] = useState<string | null>(null);
+  const [erroImagemCor, setErroImagemCor] = useState("");
   const [pesoGramas, setPesoGramas] = useState(String(produto?.pesoGramas ?? 300));
   const [alturaCm, setAlturaCm] = useState(String(produto?.alturaCm ?? 4));
   const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
   const [comprimentoCm, setComprimentoCm] = useState(String(produto?.comprimentoCm ?? 16));
-  const [variacoes, setVariacoes] = useState<VariacaoForm[]>(
-    produto ? paraVariacaoForm(produto.variacoes) : []
-  );
   const [materiais, setMateriais] = useState<MaterialForm[]>(paraMaterialForm(produto?.materiais));
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+
+  // Variações válidas (tipo preenchido, valores já separados) e a grade de
+  // combinações que elas geram — recalculadas a cada digitação, então a
+  // grade de estoque sempre reflete o que está nos campos agora, mesmo
+  // antes de salvar.
+  const variacoesValidas = variacoes
+    .filter((v) => v.tipo.trim())
+    .map((v) => ({
+      tipo: v.tipo.trim(),
+      valores: v.valores
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    }));
+  const temVariacoes = variacoesValidas.length > 0;
+  const combinacoes = temVariacoes ? gerarCombinacoes(variacoesValidas) : [];
 
   useEffect(() => {
     fetch("/api/categorias")
@@ -84,6 +121,49 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
   function removerVariacao(i: number) {
     setVariacoes((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function atualizarGradeEstoque(combinacao: string, valor: string) {
+    setGradeEstoque((prev) => ({ ...prev, [combinacao]: valor }));
+  }
+
+  // Swatch de cor: upload direto, sem passar pelo editor de recorte das
+  // fotos do produto — é só uma miniatura pequena, não precisa de zoom nem
+  // rotação.
+  async function enviarImagemCor(i: number, valorCor: string, arquivo: File | undefined) {
+    if (!arquivo) return;
+    setErroImagemCor("");
+    setEnviandoImagemCor(`${i}:${valorCor}`);
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+    try {
+      const r = await fetch("/api/admin/imagens", { method: "POST", body: form });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar a foto.");
+      setVariacoes((prev) =>
+        prev.map((v, idx) =>
+          idx === i
+            ? { ...v, imagensValores: { ...v.imagensValores, [valorCor]: data.url } }
+            : v
+        )
+      );
+    } catch (e) {
+      setErroImagemCor(e instanceof Error ? e.message : "Não foi possível enviar a foto.");
+    } finally {
+      setEnviandoImagemCor(null);
+    }
+  }
+
+  function removerImagemCor(i: number, valorCor: string) {
+    setVariacoes((prev) =>
+      prev.map((v, idx) => {
+        if (idx !== i) return v;
+        const resto = Object.fromEntries(
+          Object.entries(v.imagensValores).filter(([valor]) => valor !== valorCor)
+        );
+        return { ...v, imagensValores: resto };
+      })
+    );
   }
 
   // A escolha do arquivo abre o editor (zoom/arraste/rotação); só depois de
@@ -172,9 +252,19 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       setErro("Preencha nome, categoria e preço.");
       return;
     }
-    if (controlaEstoque && !(Number(estoque) >= 0)) {
+    if (controlaEstoque && !temVariacoes && !(Number(estoque) >= 0)) {
       setErro("Informe um estoque válido (0 ou mais) ou desative o controle.");
       return;
+    }
+    if (controlaEstoque && temVariacoes) {
+      const algumInvalido = combinacoes.some((c) => {
+        const v = gradeEstoque[buildCombinacaoKey(c)];
+        return !(Number(v ?? 0) >= 0);
+      });
+      if (algumInvalido) {
+        setErro("Informe um estoque válido (0 ou mais) pra cada combinação.");
+        return;
+      }
     }
 
     const payload = {
@@ -191,7 +281,20 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       imagens,
       video,
       destaque,
-      estoque: controlaEstoque ? Math.round(Number(estoque)) : null,
+      // Sem variação, o controle é o número único de sempre. Com variação,
+      // o controle é por combinação (estoqueVariacoes) — este campo fica
+      // sempre null nesse caso.
+      estoque: temVariacoes ? null : controlaEstoque ? Math.round(Number(estoque)) : null,
+      // null desliga o controle por combinação (apaga a grade inteira);
+      // array substitui a grade inteira pela atual — sempre um dos dois,
+      // igual ao padrão de `variacoes` logo abaixo.
+      estoqueVariacoes:
+        temVariacoes && controlaEstoque
+          ? combinacoes.map((c) => {
+              const chave = buildCombinacaoKey(c);
+              return { combinacao: chave, estoque: Math.round(Number(gradeEstoque[chave] ?? 0)) };
+            })
+          : null,
       pesoGramas: Number(pesoGramas) || 300,
       alturaCm: Number(alturaCm) || 4,
       larguraCm: Number(larguraCm) || 11,
@@ -201,6 +304,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         .map((v) => ({
           tipo: v.tipo.trim(),
           valores: v.valores.split(",").map((x) => x.trim()).filter(Boolean),
+          imagensValores: Object.keys(v.imagensValores).length > 0 ? v.imagensValores : undefined,
         })),
       materiais: materiais
         .filter((m) => m.nome.trim())
@@ -479,6 +583,105 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         Produto em destaque
       </label>
 
+      <div>
+        <p className="text-sm font-medium mb-2">Variações</p>
+        <div className="space-y-3">
+          {variacoes.map((v, i) => {
+            const ehCor = v.tipo.trim().toLowerCase() === "cor";
+            const valoresLista = v.valores
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean);
+            return (
+              <div key={i} className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    value={v.tipo}
+                    onChange={(e) => atualizarVariacao(i, "tipo", e.target.value)}
+                    placeholder="Tipo (ex: Tamanho)"
+                    className="w-1/3 border border-line rounded px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={v.valores}
+                    onChange={(e) => atualizarVariacao(i, "valores", e.target.value)}
+                    placeholder="Valores separados por vírgula"
+                    className="flex-1 border border-line rounded px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removerVariacao(i)}
+                    className="text-berry text-xs px-2"
+                  >
+                    Remover
+                  </button>
+                </div>
+
+                {/* Foto por cor — só pra variação "Cor". Sem foto, o valor
+                    continua aparecendo como chip de texto na página do
+                    produto (ver ProdutoPageClient). */}
+                {ehCor && valoresLista.length > 0 && (
+                  <div className="flex flex-wrap gap-3 pl-1">
+                    {valoresLista.map((valorCor) => {
+                      const url = v.imagensValores[valorCor];
+                      const enviando = enviandoImagemCor === `${i}:${valorCor}`;
+                      return (
+                        <div key={valorCor} className="text-center">
+                          <label
+                            className={`relative block w-14 h-14 rounded border border-line overflow-hidden cursor-pointer bg-paper-2 ${
+                              enviando ? "opacity-50" : ""
+                            }`}
+                          >
+                            {url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={url} alt={valorCor} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="w-full h-full flex items-center justify-center text-ink/30 text-lg">
+                                +
+                              </span>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={enviando}
+                              onChange={(e) =>
+                                enviarImagemCor(i, valorCor, e.target.files?.[0])
+                              }
+                            />
+                          </label>
+                          <p className="text-[11px] text-ink/50 mt-1 max-w-14 truncate">
+                            {valorCor}
+                          </p>
+                          {url && (
+                            <button
+                              type="button"
+                              onClick={() => removerImagemCor(i, valorCor)}
+                              className="text-berry text-[11px] hover:underline"
+                            >
+                              remover
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {erroImagemCor && <p className="text-xs text-berry mt-2">{erroImagemCor}</p>}
+        <button
+          type="button"
+          onClick={() =>
+            setVariacoes((prev) => [...prev, { tipo: "", valores: "", imagensValores: {} }])
+          }
+          className="text-pine text-xs mt-2 hover:underline"
+        >
+          + Adicionar variação
+        </button>
+      </div>
+
       <div className="border border-line rounded-lg p-4">
         <label className="flex items-center gap-2 text-sm mb-1">
           <input
@@ -491,7 +694,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         <p className="text-xs text-ink/50 mb-3">
           Desmarcado, o produto vende sem limite de unidades — igual sempre foi.
         </p>
-        {controlaEstoque && (
+        {controlaEstoque && !temVariacoes && (
           <Campo label="Unidades disponíveis">
             <input
               type="number"
@@ -503,42 +706,48 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             />
           </Campo>
         )}
-      </div>
-
-      <div>
-        <p className="text-sm font-medium mb-2">Variações</p>
-        <div className="space-y-2">
-          {variacoes.map((v, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                value={v.tipo}
-                onChange={(e) => atualizarVariacao(i, "tipo", e.target.value)}
-                placeholder="Tipo (ex: Tamanho)"
-                className="w-1/3 border border-line rounded px-3 py-2 text-sm"
-              />
-              <input
-                value={v.valores}
-                onChange={(e) => atualizarVariacao(i, "valores", e.target.value)}
-                placeholder="Valores separados por vírgula"
-                className="flex-1 border border-line rounded px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => removerVariacao(i)}
-                className="text-berry text-xs px-2"
-              >
-                Remover
-              </button>
+        {controlaEstoque && temVariacoes && (
+          <div>
+            <p className="text-xs text-ink/50 mb-3">
+              Este produto tem variações — defina o estoque de cada combinação em vez de um
+              total único.
+            </p>
+            <div className="space-y-1.5">
+              {combinacoes.map((c) => {
+                const chave = buildCombinacaoKey(c);
+                const rotulo = Object.values(c).join(" · ");
+                const valorAtual = gradeEstoque[chave] ?? "";
+                const zerado = Number(valorAtual) === 0;
+                return (
+                  <div key={chave} className="flex items-center gap-2">
+                    <span className="flex-1 text-sm">{rotulo}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={valorAtual}
+                      placeholder="0"
+                      onChange={(e) => atualizarGradeEstoque(chave, e.target.value)}
+                      className={`w-24 border rounded px-3 py-1.5 text-sm ${
+                        zerado ? "border-berry text-berry" : "border-line"
+                      }`}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setVariacoes((prev) => [...prev, { tipo: "", valores: "" }])}
-          className="text-pine text-xs mt-2 hover:underline"
-        >
-          + Adicionar variação
-        </button>
+            <div className="flex justify-between mt-3 pt-3 border-t border-line text-sm">
+              <span className="text-ink/60">Total em estoque</span>
+              <span className="font-mono font-medium">
+                {combinacoes.reduce(
+                  (soma, c) => soma + (Number(gradeEstoque[buildCombinacaoKey(c)]) || 0),
+                  0
+                )}{" "}
+                un.
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-line pt-4">

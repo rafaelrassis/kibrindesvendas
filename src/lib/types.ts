@@ -1,6 +1,17 @@
 export type Variacao = {
   tipo: string;
   valores: string[];
+  // Foto por valor — só usado quando tipo é "Cor" (case-insensitive).
+  // Valor sem entrada aqui cai no chip de texto de sempre.
+  imagensValores?: Record<string, string> | null;
+};
+
+// Estoque de uma combinação específica (ex: Cor=Preta + Tamanho=G).
+// `combinacao` é a chave gerada por buildCombinacaoKey — ver
+// lib/estoque-variacao.ts.
+export type EstoqueVariacaoItem = {
+  combinacao: string;
+  estoque: number;
 };
 
 export type Produto = {
@@ -27,7 +38,13 @@ export type Produto = {
   destaque?: boolean;
   // null = estoque não controlado (comportamento de sempre). Com um número,
   // a compra não passa disso — ver checarEstoque / decrementarEstoque.
+  // Só vale pra produto SEM variações — com variações, o controle é por
+  // combinação (ver estoqueVariacoes) e este campo fica sempre null.
   estoque: number | null;
+  // Uma linha por combinação de variação com controle ligado. Vazio = sem
+  // controle por variação (produto sem variações, ou variações sem
+  // controle de estoque ligado) — ver estoque-variacao.ts.
+  estoqueVariacoes: EstoqueVariacaoItem[];
   // Usados na cotação de frete real (Correios via Melhor Envio).
   pesoGramas: number;
   alturaCm: number;

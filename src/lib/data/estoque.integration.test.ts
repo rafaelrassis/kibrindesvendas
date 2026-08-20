@@ -264,3 +264,127 @@ describe("CHECK constraints (rede de segurança do banco)", () => {
     expect(Number(cupom.valor)).toBe(0);
   });
 });
+
+// --- Estoque por combinação de variação -------------------------------
+
+const PRODUTO_VARIACAO_ID = "teste-estoque-variacao-produto";
+const COR_PRETA_G = "Cor:Preta|Tamanho:G";
+const COR_BRANCA_G = "Cor:Branca|Tamanho:G";
+
+function itemVariacao(escolhas: Record<string, string>, quantidade = 1): ItemCarrinho {
+  return { produtoId: PRODUTO_VARIACAO_ID, variacoesEscolhidas: escolhas, quantidade };
+}
+
+async function definirGrade(linhas: { combinacao: string; estoque: number }[]) {
+  await prisma.estoqueVariacao.deleteMany({ where: { produtoId: PRODUTO_VARIACAO_ID } });
+  if (linhas.length > 0) {
+    await prisma.estoqueVariacao.createMany({
+      data: linhas.map((l) => ({ ...l, produtoId: PRODUTO_VARIACAO_ID })),
+    });
+  }
+}
+
+async function estoqueDaGrade(combinacao: string) {
+  const linha = await prisma.estoqueVariacao.findUnique({
+    where: { produtoId_combinacao: { produtoId: PRODUTO_VARIACAO_ID, combinacao } },
+  });
+  return linha?.estoque ?? null;
+}
+
+async function limparVariacao() {
+  await prisma.pedido.deleteMany({ where: { usuarioId: USUARIO_ID } });
+  await prisma.notificacao.deleteMany({ where: { usuarioId: USUARIO_ID } });
+}
+
+describe("estoque por combinação de variação", () => {
+  beforeAll(async () => {
+    await prisma.produto.deleteMany({ where: { id: PRODUTO_VARIACAO_ID } });
+    await prisma.produto.create({
+      data: {
+        id: PRODUTO_VARIACAO_ID,
+        nome: "Produto de teste com variação",
+        descricao: "Produto criado pela suíte de integração.",
+        categoriaId: CATEGORIA_ID,
+        preco: PRECO,
+        precoShopee: PRECO + 20,
+        emoji: "🧪",
+        cor: "#3F6B4C",
+        variacoes: {
+          create: [
+            { tipo: "Cor", valores: ["Preta", "Branca"] },
+            { tipo: "Tamanho", valores: ["P", "G"] },
+          ],
+        },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await limparVariacao();
+    await definirGrade([]);
+  });
+
+  afterAll(async () => {
+    await prisma.produto.deleteMany({ where: { id: PRODUTO_VARIACAO_ID } });
+  });
+
+  it("duas compras simultâneas da última unidade de uma combinação: uma passa, a outra ouve que acabou", async () => {
+    await definirGrade([{ combinacao: COR_PRETA_G, estoque: 1 }]);
+    const item = itemVariacao({ Cor: "Preta", Tamanho: "G" });
+
+    const resultados = await Promise.allSettled([
+      criarPedido(USUARIO_ID, item, "01310100"),
+      criarPedido(USUARIO_ID, item, "01310100"),
+    ]);
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const recusado = resultados.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(recusado.reason).toMatchObject({
+      message: expect.stringMatching(/estoque/i),
+    });
+    expect(await estoqueDaGrade(COR_PRETA_G)).toBe(0);
+  });
+
+  it("uma combinação zerada não afeta as outras combinações do mesmo produto", async () => {
+    await definirGrade([
+      { combinacao: COR_PRETA_G, estoque: 0 },
+      { combinacao: COR_BRANCA_G, estoque: 5 },
+    ]);
+
+    await expect(
+      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "01310100")
+    ).rejects.toMatchObject({ message: expect.stringMatching(/sem estoque/i) });
+
+    await criarPedido(USUARIO_ID, itemVariacao({ Cor: "Branca", Tamanho: "G" }), "01310100");
+    expect(await estoqueDaGrade(COR_BRANCA_G)).toBe(4);
+  });
+
+  it("combinação sem linha na grade é tratada como esgotada", async () => {
+    await definirGrade([{ combinacao: COR_PRETA_G, estoque: 5 }]);
+
+    await expect(
+      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Branca", Tamanho: "P" }), "01310100")
+    ).rejects.toMatchObject({ message: expect.stringMatching(/sem estoque/i) });
+  });
+
+  it("produto com variações mas sem nenhuma linha de grade vende sem controle (controle desligado)", async () => {
+    await definirGrade([]);
+
+    await criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "01310100");
+    // Sem erro nenhum — nenhuma linha existe pra decrementar, o produto
+    // passa direto, igual a `estoque: null` no caminho sem variação.
+  });
+
+  it("falha ao abrir o pagamento devolve a unidade pra combinação certa", async () => {
+    gateway.pagamentoReal = true;
+    gateway.criarPreferencia.mockRejectedValue(new Error("Mercado Pago fora do ar"));
+    await definirGrade([{ combinacao: COR_PRETA_G, estoque: 1 }]);
+
+    await expect(
+      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "01310100")
+    ).rejects.toMatchObject({ status: 502 });
+
+    expect(await estoqueDaGrade(COR_PRETA_G)).toBe(1);
+    gateway.pagamentoReal = false;
+  });
+});

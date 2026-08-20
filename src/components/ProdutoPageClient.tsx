@@ -8,6 +8,7 @@ import { useConta } from "@/lib/conta-context";
 import { useCep } from "@/lib/use-cep";
 import { compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
+import { controladoPorVariacao, estoqueDaCombinacao, produtoEsgotado } from "@/lib/estoque-variacao";
 import FavoritoButton from "@/components/FavoritoButton";
 import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 import Lightbox from "@/components/Lightbox";
@@ -86,9 +87,34 @@ export default function ProdutoPageClient() {
   }
 
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
-  const esgotado = produto.estoque === 0;
-  const estoqueBaixo = produto.estoque !== null && produto.estoque > 0 && produto.estoque <= 5;
-  const faltaEscolher = produto.variacoes.some((v) => !selecoes[v.tipo]) || esgotado;
+
+  // Com variações e controle ligado, o estoque é por combinação — o aviso
+  // de "esgotado" no bloco de preço vira só um resumo geral (soma de tudo);
+  // o aviso específico da combinação escolhida aparece junto das variações,
+  // mais abaixo.
+  const porVariacao = controladoPorVariacao(produto);
+  const esgotado = produtoEsgotado(produto);
+  const estoqueBaixo =
+    !porVariacao && produto.estoque !== null && produto.estoque > 0 && produto.estoque <= 5;
+
+  const faltaSelecionar = produto.variacoes.some((v) => !selecoes[v.tipo]);
+  const estoqueCombinacaoEscolhida =
+    porVariacao && !faltaSelecionar ? estoqueDaCombinacao(produto, selecoes) : null;
+  const combinacaoSemEstoque = estoqueCombinacaoEscolhida === 0;
+  const faltaEscolher =
+    faltaSelecionar || combinacaoSemEstoque || (!porVariacao && esgotado);
+
+  // Um valor de variação fica bloqueado só quando dá pra saber que a
+  // combinação resultante está zerada — ou seja, quando faltar escolher no
+  // máximo este tipo. Com outros tipos ainda em aberto não dá pra cravar,
+  // então o valor fica clicável normalmente.
+  function valorIndisponivel(tipo: string, valor: string) {
+    if (!porVariacao) return false;
+    const tentativa = { ...selecoes, [tipo]: valor };
+    const completa = produto!.variacoes.every((v) => tentativa[v.tipo]);
+    if (!completa) return false;
+    return estoqueDaCombinacao(produto!, tentativa) === 0;
+  }
 
   // Personalização não tem como pular pro pagamento sem antes definir a arte
   // — por isso só existe um botão nesse caso, sem a escolha "sacola vs. agora".
@@ -282,30 +308,126 @@ export default function ProdutoPageClient() {
             )}
 
             {produto.variacoes.length > 0 && (
-              <div className="space-y-6 mb-8">
-                {produto.variacoes.map((v) => (
-                  <div key={v.tipo}>
-                    <p className="text-sm font-medium mb-2">{v.tipo}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {v.valores.map((valor) => {
-                        const ativo = selecoes[v.tipo] === valor;
-                        return (
-                          <button
-                            key={valor}
-                            onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
-                            className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                              ativo
-                                ? "bg-pine text-white border-pine"
-                                : "border-line hover:border-pine/50"
-                            }`}
-                          >
-                            {valor}
-                          </button>
-                        );
-                      })}
+              <div className="space-y-6 mb-6">
+                {produto.variacoes.map((v) => {
+                  // Cor com pelo menos uma foto cadastrada vira swatch de
+                  // imagem (com risco diagonal pra indisponível); sem foto
+                  // nenhuma, ou outro tipo qualquer, continua chip de texto.
+                  const ehCorComFoto =
+                    v.tipo.trim().toLowerCase() === "cor" &&
+                    v.imagensValores &&
+                    Object.keys(v.imagensValores).length > 0;
+
+                  return (
+                    <div key={v.tipo}>
+                      <p className="text-sm font-medium mb-2">
+                        {v.tipo}
+                        {ehCorComFoto && selecoes[v.tipo] && (
+                          <span className="text-ink/50 font-normal">: {selecoes[v.tipo]}</span>
+                        )}
+                      </p>
+
+                      {ehCorComFoto ? (
+                        <div className="flex flex-wrap gap-2.5">
+                          {v.valores.map((valor) => {
+                            const ativo = selecoes[v.tipo] === valor;
+                            const indisponivel = !ativo && valorIndisponivel(v.tipo, valor);
+                            const url = v.imagensValores?.[valor];
+                            return (
+                              <button
+                                key={valor}
+                                disabled={indisponivel}
+                                onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
+                                title={indisponivel ? "Sem estoque nessa combinação" : valor}
+                                className={`relative w-16 h-16 rounded-md overflow-hidden border-2 transition-colors ${
+                                  ativo
+                                    ? "border-pine"
+                                    : indisponivel
+                                      ? "border-line cursor-not-allowed"
+                                      : "border-line hover:border-pine/50"
+                                }`}
+                              >
+                                {url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={url}
+                                    alt={valor}
+                                    className={`w-full h-full object-cover ${
+                                      indisponivel ? "opacity-50" : ""
+                                    }`}
+                                  />
+                                ) : (
+                                  <span className="w-full h-full flex items-center justify-center text-[11px] bg-paper-2">
+                                    {valor}
+                                  </span>
+                                )}
+                                {indisponivel && (
+                                  <svg
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                    className="absolute inset-0 w-full h-full"
+                                  >
+                                    <line
+                                      x1="0"
+                                      y1="0"
+                                      x2="100"
+                                      y2="100"
+                                      stroke="#8A818C"
+                                      strokeWidth="2"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {v.valores.map((valor) => {
+                            const ativo = selecoes[v.tipo] === valor;
+                            const indisponivel = !ativo && valorIndisponivel(v.tipo, valor);
+                            return (
+                              <button
+                                key={valor}
+                                disabled={indisponivel}
+                                onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
+                                title={indisponivel ? "Sem estoque nessa combinação" : undefined}
+                                className={`px-4 py-2 rounded-full text-sm border transition-colors ${
+                                  ativo
+                                    ? "bg-pine text-white border-pine"
+                                    : indisponivel
+                                      ? "border-dashed border-line text-ink/30 line-through cursor-not-allowed"
+                                      : "border-line hover:border-pine/50"
+                                }`}
+                              >
+                                {valor}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+
+                {/* Aviso da combinação escolhida — só aparece com todas as
+                    variações definidas e controle de estoque por variação
+                    ligado. */}
+                {porVariacao && !faltaSelecionar && (
+                  <p
+                    className={`text-sm font-medium ${
+                      combinacaoSemEstoque ? "text-berry" : "text-ink/60"
+                    }`}
+                  >
+                    {combinacaoSemEstoque
+                      ? "Sem estoque para essa combinação no momento."
+                      : estoqueCombinacaoEscolhida !== null && estoqueCombinacaoEscolhida <= 5
+                        ? `Só ${estoqueCombinacaoEscolhida} unidade${
+                            estoqueCombinacaoEscolhida === 1 ? "" : "s"
+                          } dessa combinação`
+                        : null}
+                  </p>
+                )}
               </div>
             )}
 
@@ -338,7 +460,7 @@ export default function ProdutoPageClient() {
                 </button>
               </div>
             )}
-            {faltaEscolher && (
+            {faltaEscolher && !combinacaoSemEstoque && faltaSelecionar && (
               <p className="text-xs text-ink/40 mt-2">Escolha todas as variações pra continuar.</p>
             )}
           </div>

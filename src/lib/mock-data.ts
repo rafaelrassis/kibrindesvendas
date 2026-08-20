@@ -41,6 +41,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
   {
     id: "ima-casal-02",
@@ -64,6 +65,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
   {
     id: "ima-familia-03",
@@ -86,6 +88,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
   {
     id: "caneca-pet-01",
@@ -109,6 +112,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
   {
     id: "camiseta-basica-01",
@@ -134,6 +138,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
   {
     id: "camiseta-custom-02",
@@ -160,6 +165,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
   {
     id: "moletom-custom-01",
@@ -185,6 +191,7 @@ export const produtos: Produto[] = [
     larguraCm: 11,
     comprimentoCm: 16,
     estoque: null,
+    estoqueVariacoes: [],
   },
 ];
 

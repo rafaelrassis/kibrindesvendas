@@ -16,7 +16,13 @@ import { notificar } from "./notificacoes";
 import { enviarEmailStatusPedido } from "@/lib/email";
 import { devolverUsoCupom, normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
 import { getConfiguracaoLoja } from "./configuracao";
-import { decrementarEstoque, devolverEstoque } from "./produtos";
+import {
+  decrementarEstoque,
+  decrementarEstoqueVariacao,
+  devolverEstoque,
+  devolverEstoqueVariacao,
+} from "./produtos";
+import { buildCombinacaoKey } from "@/lib/estoque-variacao";
 
 // Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
 // 56.800000000000004); a coluna é Decimal(10,2), então arredonda antes.
@@ -47,7 +53,10 @@ export async function criarPedido(
   // é só pra visualização, quem define o que vai ser cobrado é o servidor.
   const [usuario, produto, endereco] = await Promise.all([
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
-    prisma.produto.findUnique({ where: { id: item.produtoId } }),
+    prisma.produto.findUnique({
+      where: { id: item.produtoId },
+      include: { estoqueVariacoes: true },
+    }),
     consultarCep(cep, item.produtoId, quantidade),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
@@ -57,13 +66,32 @@ export async function criarPedido(
     throw new ErroDeNegocio("Falta confirmar a personalização antes de pagar.");
   }
 
+  // Produto com variações e controle ligado (tem linha em estoqueVariacoes)
+  // é controlado por combinação; senão cai no campo único de sempre.
+  // Combinação sem linha cadastrada conta como esgotada — mesmo critério de
+  // estoqueDaCombinacao.
+  const combinacaoEscolhida = buildCombinacaoKey(item.variacoesEscolhidas ?? {});
+  const controladoPorVariacao = produto.estoqueVariacoes.length > 0;
+  const linhaVariacao = controladoPorVariacao
+    ? produto.estoqueVariacoes.find((e) => e.combinacao === combinacaoEscolhida)
+    : undefined;
+
   // Estoque também é conferido aqui antes de qualquer coisa: produto sem
-  // controle (`estoque: null`) passa direto, do jeito que sempre funcionou.
-  // A trava de verdade (contra duas compras simultâneas da última unidade)
-  // é o UPDATE condicional dentro da transação, mais abaixo — esta checagem
-  // aqui só evita abrir preferência de pagamento pra um pedido que a
-  // transação ia recusar de qualquer jeito.
-  if (produto.estoque !== null && produto.estoque < quantidade) {
+  // controle passa direto, do jeito que sempre funcionou. A trava de
+  // verdade (contra duas compras simultâneas da última unidade) é o UPDATE
+  // condicional dentro da transação, mais abaixo — esta checagem aqui só
+  // evita abrir preferência de pagamento pra um pedido que a transação ia
+  // recusar de qualquer jeito.
+  if (controladoPorVariacao) {
+    const disponivel = linhaVariacao?.estoque ?? 0;
+    if (disponivel < quantidade) {
+      throw new ErroDeNegocio(
+        disponivel === 0
+          ? "Esta combinação está sem estoque no momento."
+          : `Só restam ${disponivel} unidade(s) desta combinação.`
+      );
+    }
+  } else if (produto.estoque !== null && produto.estoque < quantidade) {
     throw new ErroDeNegocio(
       produto.estoque === 0
         ? "Este produto está sem estoque no momento."
@@ -142,9 +170,11 @@ export async function criarPedido(
 
     // Mesmo raciocínio pro estoque: produto sem controle passa direto, com
     // controle o desconto é condicional no próprio UPDATE (ver
-    // decrementarEstoque) — duas compras simultâneas da última unidade não
-    // vendem a mesma peça duas vezes.
-    if (produto.estoque !== null) {
+    // decrementarEstoque / decrementarEstoqueVariacao) — duas compras
+    // simultâneas da última unidade não vendem a mesma peça duas vezes.
+    if (controladoPorVariacao) {
+      await decrementarEstoqueVariacao(produto.id, combinacaoEscolhida, quantidade, tx);
+    } else if (produto.estoque !== null) {
       await decrementarEstoque(produto.id, quantidade, tx);
     }
 
@@ -248,7 +278,9 @@ export async function criarPedido(
         if (pedido.cupomCodigo) {
           await devolverUsoCupom(pedido.cupomCodigo, tx);
         }
-        if (produto.estoque !== null) {
+        if (controladoPorVariacao) {
+          await devolverEstoqueVariacao(produto.id, combinacaoEscolhida, quantidade, tx);
+        } else if (produto.estoque !== null) {
           await devolverEstoque(produto.id, quantidade, tx);
         }
       });

@@ -54,6 +54,12 @@ model Produto {
   // Custo de material é dado interno (usado pra calcular lucro no admin) —
   // nunca sai pela API pública, só pela rota /api/admin.
   materiais            MaterialProduto[]
+  // Estoque por combinação de variação (ex: Cor:Preta|Tamanho:G). Produto
+  // sem variações não usa isto — continua no campo `estoque` acima. Produto
+  // com variações e controle ligado tem uma linha aqui por combinação; sem
+  // nenhuma linha, o controle está desligado e o produto vende sem limite
+  // (mesmo com variações cadastradas) — ver estoque-variacao.ts.
+  estoqueVariacoes     EstoqueVariacao[]
   itensPedido          ItemPedido[]
   favoritos            Favorito[]
   avaliacoes           Avaliacao[]
@@ -73,12 +79,37 @@ model MaterialProduto {
   custoUnitario Decimal @db.Decimal(10, 2)
 }
 
+// Estoque de uma combinação específica de variações (ex: Cor=Preta +
+// Tamanho=G). `combinacao` é a chave canônica gerada por
+// buildCombinacaoKey — tipos ordenados alfabeticamente, "tipo:valor"
+// juntados por "|". Combinação pedida no checkout que não tem linha aqui
+// (produto com controle ligado, mas grade desatualizada) é tratada como
+// sem estoque — ver criarPedido.
+model EstoqueVariacao {
+  id         String   @id @default(cuid())
+  produtoId  String
+  produto    Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  combinacao String
+  estoque    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([produtoId, combinacao])
+  @@index([produtoId])
+}
+
 model Variacao {
   id        String   @id @default(cuid())
   produtoId String
   produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
   tipo      String
   valores   String[]
+  // Foto por valor — só usado quando tipo = "Cor" (case-insensitive); outros
+  // tipos continuam mostrados como chip de texto. Chave = valor exatamente
+  // como está em `valores`; sem entrada pro valor, cai no chip de texto de
+  // sempre. Json em vez de tabela à parte porque é um mapa pequeno e nunca
+  // é consultado por fora do próprio produto.
+  imagensValores Json?
 }
 
 // Slide do carrossel da home, editável em /admin/banners. `ordem` é a posição

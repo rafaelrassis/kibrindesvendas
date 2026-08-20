@@ -9,6 +9,7 @@ import type {
   Variacao as VariacaoDb,
   Categoria as CategoriaDb,
   MaterialProduto as MaterialProdutoDb,
+  EstoqueVariacao as EstoqueVariacaoDb,
   Prisma,
 } from "@prisma/client";
 import { ErroDeNegocio } from "./erros";
@@ -16,6 +17,7 @@ import { ErroDeNegocio } from "./erros";
 type ProdutoComRelacoes = ProdutoDb & {
   categoria: CategoriaDb;
   variacoes: VariacaoDb[];
+  estoqueVariacoes: EstoqueVariacaoDb[];
 };
 
 type ProdutoComMateriais = ProdutoComRelacoes & { materiais: MaterialProdutoDb[] };
@@ -40,8 +42,16 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     imagens: p.imagens,
     video: p.video,
     destaque: p.destaque,
-    variacoes: p.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
+    variacoes: p.variacoes.map((v) => ({
+      tipo: v.tipo,
+      valores: v.valores,
+      imagensValores: (v.imagensValores as Record<string, string> | null) ?? null,
+    })),
     estoque: p.estoque,
+    estoqueVariacoes: p.estoqueVariacoes.map((e) => ({
+      combinacao: e.combinacao,
+      estoque: e.estoque,
+    })),
     pesoGramas: p.pesoGramas,
     alturaCm: p.alturaCm,
     larguraCm: p.larguraCm,
@@ -70,10 +80,15 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
   };
 }
 
-export const relacoesProduto = { categoria: true, variacoes: true } as const;
+export const relacoesProduto = {
+  categoria: true,
+  variacoes: true,
+  estoqueVariacoes: true,
+} as const;
 export const relacoesProdutoAdmin = {
   categoria: true,
   variacoes: true,
+  estoqueVariacoes: true,
   materiais: true,
 } as const;
 
@@ -156,10 +171,16 @@ export type DadosProduto = {
   imagens?: string[];
   video?: string | null;
   destaque?: boolean;
-  variacoes?: { tipo: string; valores: string[] }[];
+  variacoes?: { tipo: string; valores: string[]; imagensValores?: Record<string, string> | null }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
+  // Só se aplica a produto sem variações — com variações o controle é por
+  // combinação, ver estoqueVariacoes abaixo.
   estoque?: number | null;
+  // Uma linha por combinação (grade inteira, o form manda sempre tudo).
+  // null explícito desliga o controle por variação (apaga todas as linhas);
+  // undefined deixa como está; array substitui a grade inteira.
+  estoqueVariacoes?: { combinacao: string; estoque: number }[] | null;
   pesoGramas?: number;
   alturaCm?: number;
   larguraCm?: number;
@@ -205,6 +226,18 @@ function validar(dados: Partial<DadosProduto>) {
   if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
     throw new ErroDeNegocio("O estoque precisa ser um número inteiro maior ou igual a zero.");
   }
+  if (dados.estoqueVariacoes) {
+    for (const linha of dados.estoqueVariacoes) {
+      if (!linha.combinacao.trim()) {
+        throw new ErroDeNegocio("Combinação de estoque inválida.");
+      }
+      if (!Number.isInteger(linha.estoque) || linha.estoque < 0) {
+        throw new ErroDeNegocio(
+          `O estoque de "${linha.combinacao}" precisa ser um número inteiro maior ou igual a zero.`
+        );
+      }
+    }
+  }
 }
 
 export async function criarProduto(dados: DadosProduto): Promise<Produto> {
@@ -241,7 +274,17 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
       comprimentoCm: dados.comprimentoCm ?? COMPRIMENTO_PADRAO_CM,
       variacoes: {
-        create: (dados.variacoes ?? []).map((v) => ({ tipo: v.tipo, valores: v.valores })),
+        create: (dados.variacoes ?? []).map((v) => ({
+          tipo: v.tipo,
+          valores: v.valores,
+          imagensValores: v.imagensValores ?? undefined,
+        })),
+      },
+      estoqueVariacoes: {
+        create: (dados.estoqueVariacoes ?? []).map((e) => ({
+          combinacao: e.combinacao,
+          estoque: e.estoque,
+        })),
       },
       materiais: {
         create: (dados.materiais ?? []).map((m) => ({
@@ -277,6 +320,11 @@ export async function atualizarProduto(
     if (dados.materiais) {
       await tx.materialProduto.deleteMany({ where: { produtoId: id } });
     }
+    // A grade é sempre substituída em bloco, igual às variações: o form
+    // manda a lista inteira (ou `null` pra desligar o controle).
+    if (dados.estoqueVariacoes !== undefined) {
+      await tx.estoqueVariacao.deleteMany({ where: { produtoId: id } });
+    }
 
     return tx.produto.update({
       where: { id },
@@ -304,7 +352,19 @@ export async function atualizarProduto(
         comprimentoCm: dados.comprimentoCm,
         ...(dados.variacoes && {
           variacoes: {
-            create: dados.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores })),
+            create: dados.variacoes.map((v) => ({
+              tipo: v.tipo,
+              valores: v.valores,
+              imagensValores: v.imagensValores ?? undefined,
+            })),
+          },
+        }),
+        ...(dados.estoqueVariacoes && {
+          estoqueVariacoes: {
+            create: dados.estoqueVariacoes.map((e) => ({
+              combinacao: e.combinacao,
+              estoque: e.estoque,
+            })),
           },
         }),
         ...(dados.materiais && {
@@ -372,6 +432,43 @@ export async function devolverEstoque(
 ) {
   await tx.produto.updateMany({
     where: { id: produtoId, estoque: { not: null } },
+    data: { estoque: { increment: quantidade } },
+  });
+}
+
+// Mesmo padrão de decrementarEstoque, só que por combinação: o UPDATE
+// condicional (estoque >= quantidade) é o que garante que duas compras
+// simultâneas da última unidade daquela combinação específica não vendem a
+// mesma peça duas vezes. Combinação sem linha (0 linhas afetadas) cai no
+// mesmo erro — é o mesmo resultado de "sem estoque suficiente".
+export async function decrementarEstoqueVariacao(
+  produtoId: string,
+  combinacao: string,
+  quantidade: number,
+  tx: Prisma.TransactionClient
+) {
+  const linhas = await tx.$executeRaw`
+    UPDATE "EstoqueVariacao"
+    SET estoque = estoque - ${quantidade}, "updatedAt" = NOW()
+    WHERE "produtoId" = ${produtoId}
+      AND combinacao = ${combinacao}
+      AND estoque >= ${quantidade}
+  `;
+  if (linhas === 0) {
+    throw new ErroDeNegocio("Esta combinação não tem mais estoque suficiente.", 409);
+  }
+}
+
+// Devolve as unidades de uma combinação quando o pedido não vinga — mesmo
+// raciocínio de devolverEstoque, por combinação.
+export async function devolverEstoqueVariacao(
+  produtoId: string,
+  combinacao: string,
+  quantidade: number,
+  tx: Prisma.TransactionClient
+) {
+  await tx.estoqueVariacao.updateMany({
+    where: { produtoId, combinacao },
     data: { estoque: { increment: quantidade } },
   });
 }

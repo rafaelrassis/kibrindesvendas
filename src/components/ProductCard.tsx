@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Produto } from "@/lib/types";
 import { compararPreco, formatarPreco } from "@/lib/compare-price";
+import { produtoEsgotado } from "@/lib/estoque-variacao";
 import FavoritoButton from "./FavoritoButton";
 
 export default function ProductCard({
@@ -11,6 +12,7 @@ export default function ProductCard({
   comparativo?: boolean;
 }) {
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
+  const esgotado = produtoEsgotado(produto);
 
   return (
     // O favorito fica fora do <Link>: <button> dentro de <a> é HTML inválido e
@@ -31,7 +33,7 @@ export default function ProductCard({
             <span>{produto.emoji}</span>
           )}
           {/* top-6: abaixo do corte diagonal do .tag-shape, senão a etiqueta fica cortada */}
-          {produto.estoque === 0 ? (
+          {esgotado ? (
             <span className="absolute top-6 left-3 bg-ink/70 text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
               Esgotado
             </span>
