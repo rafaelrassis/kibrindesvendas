@@ -37,6 +37,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { url } = await salvarArte(bytes, formato.extensao);
-  return NextResponse.json({ url, nome: arquivo.name });
+  try {
+    const { url } = await salvarArte(bytes, formato.extensao);
+    return NextResponse.json({ url, nome: arquivo.name });
+  } catch (e) {
+    // Sem isso, uma falha de gravação (ex: BLOB_READ_WRITE_TOKEN ausente ou
+    // inválido em produção) vira página de erro HTML — o cliente tenta
+    // interpretar como JSON e quebra sem mensagem nenhuma pra pessoa.
+    console.error("Falha ao salvar arte:", e);
+    return NextResponse.json(
+      { error: "Não foi possível salvar o arquivo no servidor." },
+      { status: 500 }
+    );
+  }
 }

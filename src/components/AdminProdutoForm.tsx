@@ -42,7 +42,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [imagens, setImagens] = useState<string[]>(produto?.imagens ?? []);
   const [video, setVideo] = useState<string | null>(produto?.video ?? null);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [erroFoto, setErroFoto] = useState("");
   const [enviandoVideo, setEnviandoVideo] = useState(false);
+  const [erroVideo, setErroVideo] = useState("");
   const [requerPersonalizacao, setRequerPersonalizacao] = useState(
     produto?.requerPersonalizacao ?? false
   );
@@ -81,10 +83,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   async function selecionarFoto(arquivo: File | undefined) {
     if (!arquivo) return;
     if (imagens.length >= 4) {
-      setErro("No máximo 4 fotos por produto.");
+      setErroFoto("No máximo 4 fotos por produto.");
       return;
     }
-    setErro("");
+    setErroFoto("");
     setEnviandoFoto(true);
     const form = new FormData();
     form.append("arquivo", arquivo);
@@ -94,7 +96,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar a foto.");
       setImagens((prev) => [...prev, data.url]);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível enviar a foto.");
+      setErroFoto(e instanceof Error ? e.message : "Não foi possível enviar a foto.");
     } finally {
       setEnviandoFoto(false);
     }
@@ -106,7 +108,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
   async function selecionarVideo(arquivo: File | undefined) {
     if (!arquivo) return;
-    setErro("");
+    setErroVideo("");
     setEnviandoVideo(true);
     const form = new FormData();
     form.append("arquivo", arquivo);
@@ -116,7 +118,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar o vídeo.");
       setVideo(data.url);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível enviar o vídeo.");
+      setErroVideo(e instanceof Error ? e.message : "Não foi possível enviar o vídeo.");
     } finally {
       setEnviandoVideo(false);
     }
@@ -321,6 +323,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             </label>
           )}
         </div>
+        {erroFoto && <p className="text-xs text-berry mb-3">{erroFoto}</p>}
 
         {video ? (
           <div className="flex items-center gap-3">
@@ -347,6 +350,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             </span>
           </label>
         )}
+        {erroVideo && <p className="text-xs text-berry mt-2">{erroVideo}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

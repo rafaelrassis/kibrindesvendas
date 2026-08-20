@@ -23,11 +23,15 @@ const FORMATOS = [
   },
   // MP4 não tem assinatura fixa no início (os 4 primeiros bytes são o
   // tamanho da box, que varia) — o marcador "ftyp" sempre cai no offset 4.
+  // HEIC/HEIF (foto "normal" de iPhone) usa o mesmo contêiner e também cai
+  // em "ftyp" no offset 4 — sem checar a marca logo depois, toda foto HEIC
+  // seria aceita como se fosse vídeo. A marca (offset 8) é o que diferencia.
   {
     extensao: "mp4",
     tipo: "video/mp4",
     assinatura: [] as number[],
     assinatura2: { offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] },
+    marcaExcluida: { offset: 8, prefixos: ["heic", "heix", "hevc", "heim", "heis", "mif1", "msf1"] },
   },
 ] as const;
 
@@ -71,12 +75,21 @@ function combina(bytes: Buffer, assinatura: readonly number[], offset = 0) {
 // O `type` do FormData é o que o cliente diz que enviou. Conferimos o conteúdo
 // pra um arquivo não entrar como imagem sendo outra coisa.
 export function formatoDoConteudo(bytes: Buffer, aceitos?: readonly Extensao[]) {
-  return FORMATOS.find(
-    (f) =>
-      (!aceitos || aceitos.includes(f.extensao)) &&
-      combina(bytes, f.assinatura) &&
-      (!("assinatura2" in f) || combina(bytes, f.assinatura2.bytes, f.assinatura2.offset))
-  );
+  return FORMATOS.find((f) => {
+    if (aceitos && !aceitos.includes(f.extensao)) return false;
+    if (!combina(bytes, f.assinatura)) return false;
+    if ("assinatura2" in f && !combina(bytes, f.assinatura2.bytes, f.assinatura2.offset)) {
+      return false;
+    }
+    if ("marcaExcluida" in f) {
+      const marca = bytes
+        .subarray(f.marcaExcluida.offset, f.marcaExcluida.offset + 4)
+        .toString("ascii")
+        .toLowerCase();
+      if (f.marcaExcluida.prefixos.some((p) => marca.startsWith(p))) return false;
+    }
+    return true;
+  });
 }
 
 // Só nomes que nós mesmos geramos passam — nada de subir diretório.
