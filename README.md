@@ -195,9 +195,14 @@ A ordem é gravada de uma vez (`PUT /api/admin/banners` com a lista de ids na
 ordem nova), então nenhuma gravação pela metade deixa dois slides na mesma
 posição. Sem nenhum banner ativo a home simplesmente não mostra o carrossel.
 
-A home é prerenderizada, e por isso declara `revalidate = 60`: o que a loja
-muda em `/admin` aparece no próximo minuto. Sem isso, o HTML gerado no build
-ficaria valendo até o próximo deploy.
+A home é prerenderizada, e por isso declara `revalidate = 60`: sem isso, o HTML
+gerado no build ficaria valendo até o próximo deploy. Mas esperar o minuto
+vencer é ruim pra quem acabou de salvar algo no `/admin` e volta na loja pra
+conferir — por isso as rotas de escrita de banner, produto e categoria chamam
+`revalidatePath("/")` depois de gravar, junto das outras páginas afetadas
+(`/categorias`, `/categoria/[slug]`, `/produto/[id]`, que não têm janela de
+revalidação nenhuma e ficariam paradas até o próximo deploy). O `revalidate =
+60` continua valendo como rede de segurança pro que muda fora do admin.
 
 O seed cria três banners iniciais (`src/lib/mock-data.ts`) e não mexe mais
 neles depois — rodar `npm run db:seed` de novo não desfaz o que a loja editou.

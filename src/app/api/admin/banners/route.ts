@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { criarBanner, getBanners, reordenarBanners } from "@/lib/data/banners";
 import { bloqueioAdmin } from "@/lib/admin";
 import { corpoJson, respostaDeErro } from "@/lib/api";
@@ -15,7 +16,9 @@ export async function POST(req: NextRequest) {
   if (bloqueio) return bloqueio;
 
   try {
-    return NextResponse.json(await criarBanner(await corpoJson(req)));
+    const banner = await criarBanner(await corpoJson(req));
+    revalidatePath("/");
+    return NextResponse.json(banner);
   } catch (e) {
     return respostaDeErro(e);
   }
@@ -34,6 +37,7 @@ export async function PUT(req: NextRequest) {
     }
 
     await reordenarBanners(ids as string[]);
+    revalidatePath("/");
     return NextResponse.json({ ok: true });
   } catch (e) {
     return respostaDeErro(e);

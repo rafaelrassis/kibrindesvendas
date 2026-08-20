@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { criarProduto, getProdutosAdmin } from "@/lib/data/produtos";
 import { bloqueioAdmin } from "@/lib/admin";
 import { corpoJson, respostaDeErro } from "@/lib/api";
@@ -15,7 +16,12 @@ export async function POST(req: NextRequest) {
   if (bloqueio) return bloqueio;
 
   try {
-    return NextResponse.json(await criarProduto(await corpoJson(req)));
+    const produto = await criarProduto(await corpoJson(req));
+    // A home fica até 60s em cache (`revalidate = 60`) — sem isso, produto
+    // novo/editado só aparece lá quando o cache vencer sozinho.
+    revalidatePath("/");
+    revalidatePath(`/categoria/${produto.categoria}`);
+    return NextResponse.json(produto);
   } catch (e) {
     return respostaDeErro(e);
   }
