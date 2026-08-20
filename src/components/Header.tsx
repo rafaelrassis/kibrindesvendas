@@ -43,9 +43,9 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
 
         <nav className="flex items-center gap-6 text-sm tracking-wide uppercase">
           <div className="relative group">
-            <button className="py-2 uppercase hover:text-mustard transition-colors cursor-pointer">
+            <Link href="/categorias" className="py-2 uppercase hover:text-mustard transition-colors block">
               Categorias
-            </button>
+            </Link>
             <div className="absolute left-0 top-full hidden group-hover:block pt-1 min-w-[200px]">
               <div className="bg-white text-ink rounded-md shadow-lg border border-line overflow-hidden">
                 {categorias.map((c) => (
@@ -137,7 +137,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
             ←
           </button>
         )}
-        <div className="relative flex-1">
+        <div className="relative flex-1 md:max-w-md">
           <Search
             size={18}
             className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/40"
