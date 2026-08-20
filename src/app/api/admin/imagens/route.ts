@@ -33,6 +33,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { url } = await salvarImagem(bytes, formato.extensao);
-  return NextResponse.json({ url, nome: arquivo.name });
+  try {
+    const { url } = await salvarImagem(bytes, formato.extensao);
+    return NextResponse.json({ url, nome: arquivo.name });
+  } catch (e) {
+    console.error("Falha ao salvar imagem:", e);
+    return NextResponse.json(
+      { error: "Não foi possível salvar o arquivo no servidor." },
+      { status: 500 }
+    );
+  }
 }
