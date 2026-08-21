@@ -1,6 +1,6 @@
 import type { Produto } from "@/lib/types";
 import Link from "next/link";
-import { compararPreco } from "@/lib/compare-price";
+import { calcularDesconto, compararPreco, formatarPreco } from "@/lib/compare-price";
 
 export default function ProductShelf({
   titulo,
@@ -21,6 +21,7 @@ export default function ProductShelf({
       <div className="pl-5 flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide">
         {produtos.map((p) => {
           const comparacao = compararPreco(p.precoShopee, p.preco, p.vendidoNaShopee);
+          const desconto = calcularDesconto(p.preco, p.precoOriginal);
           return (
             <Link
               key={p.id}
@@ -39,13 +40,24 @@ export default function ProductShelf({
                 )}
               </div>
               <p className="text-xs leading-snug line-clamp-2 mb-1 h-8">{p.nome}</p>
-              <p className="font-mono text-sm font-medium">
-                R$ {p.preco.toFixed(2).replace(".", ",")}
-              </p>
-              {comparacao.mostrar && (
-                <p className="text-[11px] text-berry">
-                  -{comparacao.percentual}% vs Shopee
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <p className="font-mono text-sm font-medium">
+                  R$ {p.preco.toFixed(2).replace(".", ",")}
                 </p>
+                {desconto.ativo && (
+                  <p className="font-mono text-[11px] text-ink/40 line-through">
+                    {formatarPreco(p.precoOriginal!)}
+                  </p>
+                )}
+              </div>
+              {desconto.ativo ? (
+                <p className="text-[11px] text-berry font-medium">-{desconto.percentual}%</p>
+              ) : (
+                comparacao.mostrar && (
+                  <p className="text-[11px] text-berry">
+                    -{comparacao.percentual}% vs Shopee
+                  </p>
+                )
               )}
             </Link>
           );

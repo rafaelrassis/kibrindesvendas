@@ -23,6 +23,22 @@ export function compararPreco(
   return { mostrar: true, tipo: "economia", percentual, economia };
 }
 
+export type Desconto = { ativo: false } | { ativo: true; percentual: number };
+
+// Desconto próprio da loja (precoOriginal riscado), independente da
+// comparação com a Shopee acima. precoOriginal null/undefined ou <= preco
+// não mostra nada — evita badge de desconto negativo por cadastro errado.
+export function calcularDesconto(
+  preco: number,
+  precoOriginal: number | null | undefined
+): Desconto {
+  if (!precoOriginal || precoOriginal <= preco) {
+    return { ativo: false };
+  }
+  const percentual = Math.round(((precoOriginal - preco) / precoOriginal) * 100);
+  return { ativo: true, percentual };
+}
+
 export function formatarPreco(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
 }

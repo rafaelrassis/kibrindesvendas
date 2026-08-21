@@ -24,6 +24,7 @@ export type Produto = {
   categoria: string;
   categoriaLabel: string;
   preco: number;
+  precoOriginal: number | null;
   precoShopee: number;
   // Desligado, o site nunca mostra o comparativo de preço deste produto.
   vendidoNaShopee: boolean;

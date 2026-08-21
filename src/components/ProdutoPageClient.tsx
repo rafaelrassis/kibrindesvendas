@@ -6,7 +6,7 @@ import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
 import { useConta } from "@/lib/conta-context";
 import { useCep } from "@/lib/use-cep";
-import { compararPreco } from "@/lib/compare-price";
+import { calcularDesconto, compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 import { controladoPorVariacao, estoqueDaCombinacao, produtoEsgotado } from "@/lib/estoque-variacao";
 import FavoritoButton from "@/components/FavoritoButton";
@@ -87,6 +87,7 @@ export default function ProdutoPageClient() {
   }
 
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
+  const desconto = calcularDesconto(produto.preco, produto.precoOriginal);
 
   // Com variações e controle ligado, o estoque é por combinação — o aviso
   // de "esgotado" no bloco de preço vira só um resumo geral (soma de tudo);
@@ -164,9 +165,16 @@ export default function ProdutoPageClient() {
         style={{ top: offsetHeader }}
       >
         <div className="min-w-0">
-          <p className="font-mono text-lg font-semibold leading-none truncate">
-            {reais(produto.preco)}
-          </p>
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <p className="font-mono text-lg font-semibold leading-none truncate">
+              {reais(produto.preco)}
+            </p>
+            {desconto.ativo && (
+              <p className="font-mono text-xs text-ink/40 line-through">
+                {reais(produto.precoOriginal!)}
+              </p>
+            )}
+          </div>
           <p className="text-[11px] text-ink/50 mt-0.5">no Pix</p>
         </div>
         <button
@@ -208,9 +216,21 @@ export default function ProdutoPageClient() {
             {/* Preço — bloco de referência: quando sai de tela, a barra fixa
                 do topo assume o lugar dele */}
             <div ref={precoRef} className="pb-5 mb-5 border-b border-line">
-              <p className="font-mono text-4xl font-semibold leading-none">
-                {reais(produto.preco)}
-              </p>
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <p className="font-mono text-4xl font-semibold leading-none">
+                  {reais(produto.preco)}
+                </p>
+                {desconto.ativo && (
+                  <>
+                    <p className="font-mono text-lg text-ink/40 line-through">
+                      {reais(produto.precoOriginal!)}
+                    </p>
+                    <span className="bg-berry text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                      -{desconto.percentual}%
+                    </span>
+                  </>
+                )}
+              </div>
               <p className="text-sm text-ink/50 mt-2">no Pix ou em até 3x sem juros</p>
               {esgotado && (
                 <p className="text-sm text-berry font-medium mt-3">Produto esgotado no momento</p>

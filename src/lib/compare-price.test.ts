@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compararPreco, formatarPreco } from "./compare-price";
+import { calcularDesconto, compararPreco, formatarPreco } from "./compare-price";
 
 describe("compararPreco", () => {
   it("mostra economia quando o preço do site é menor", () => {
@@ -34,5 +34,35 @@ describe("formatarPreco", () => {
   it("formata em reais com vírgula decimal", () => {
     expect(formatarPreco(24.9)).toBe("R$ 24,90");
     expect(formatarPreco(1000)).toBe("R$ 1000,00");
+  });
+});
+
+describe("calcularDesconto", () => {
+  it("mostra desconto quando precoOriginal é maior que preco", () => {
+    const r = calcularDesconto(5, 10);
+    expect(r.ativo).toBe(true);
+    if (r.ativo) expect(r.percentual).toBe(50);
+  });
+
+  it("não mostra quando precoOriginal é null", () => {
+    expect(calcularDesconto(5, null).ativo).toBe(false);
+  });
+
+  it("não mostra quando precoOriginal é undefined", () => {
+    expect(calcularDesconto(5, undefined).ativo).toBe(false);
+  });
+
+  it("não mostra quando precoOriginal é igual ao preco", () => {
+    expect(calcularDesconto(10, 10).ativo).toBe(false);
+  });
+
+  it("não mostra quando precoOriginal é menor que o preco (cadastro errado)", () => {
+    expect(calcularDesconto(10, 8).ativo).toBe(false);
+  });
+
+  it("arredonda o percentual pra inteiro mais próximo", () => {
+    const r = calcularDesconto(20, 30);
+    expect(r.ativo).toBe(true);
+    if (r.ativo) expect(r.percentual).toBe(33);
   });
 });

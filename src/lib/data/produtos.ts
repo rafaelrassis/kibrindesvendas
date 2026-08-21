@@ -34,6 +34,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     categoria: p.categoria.slug,
     categoriaLabel: p.categoria.label,
     preco: Number(p.preco),
+    precoOriginal: p.precoOriginal ? Number(p.precoOriginal) : null,
     precoShopee: Number(p.precoShopee),
     vendidoNaShopee: p.vendidoNaShopee,
     requerPersonalizacao: p.requerPersonalizacao,
@@ -162,6 +163,9 @@ export type DadosProduto = {
   descricaoDetalhada?: string | null;
   categoriaSlug: string;
   preco: number;
+  // Preço "de", riscado na vitrine. null explícito desliga o desconto;
+  // undefined deixa como está. Precisa ser maior que `preco` — ver validar().
+  precoOriginal?: number | null;
   precoShopee?: number;
   vendidoNaShopee?: boolean;
   requerPersonalizacao?: boolean;
@@ -212,6 +216,12 @@ function validar(dados: Partial<DadosProduto>) {
   if (dados.precoShopee !== undefined && dados.precoShopee < 0) {
     throw new ErroDeNegocio("O preço da Shopee não pode ser negativo.");
   }
+  if (dados.precoOriginal != null) {
+    const precoAtual = dados.preco ?? 0;
+    if (dados.precoOriginal <= precoAtual) {
+      throw new ErroDeNegocio("O preço original precisa ser maior que o preço atual.");
+    }
+  }
   if (dados.imagens !== undefined) {
     if (dados.imagens.length > 4) {
       throw new ErroDeNegocio("No máximo 4 fotos por produto.");
@@ -260,6 +270,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       descricaoDetalhada: dados.descricaoDetalhada?.trim() || null,
       categoriaId,
       preco: dados.preco,
+      precoOriginal: dados.precoOriginal ?? null,
       precoShopee: dados.precoShopee ?? dados.preco,
       vendidoNaShopee: dados.vendidoNaShopee ?? true,
       requerPersonalizacao: !!dados.requerPersonalizacao,
@@ -337,6 +348,7 @@ export async function atualizarProduto(
             : undefined,
         categoriaId,
         preco: dados.preco,
+        precoOriginal: dados.precoOriginal !== undefined ? dados.precoOriginal : undefined,
         precoShopee: dados.precoShopee,
         vendidoNaShopee: dados.vendidoNaShopee,
         requerPersonalizacao: dados.requerPersonalizacao,

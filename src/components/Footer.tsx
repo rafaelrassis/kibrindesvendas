@@ -76,7 +76,6 @@ export default function Footer() {
       <div className="border-t border-white/10">
         <div className="mx-auto max-w-6xl px-5 py-5 text-xs text-paper/50 space-y-1">
           <p>LeoKibrindes Personalizados — CNPJ: 53.686.886/0001-35</p>
-          <p>Endereço: [Rua, número, bairro, cidade — UF, CEP]</p>
           <p>
             E-mail de contato:{" "}
             <a href="mailto:contato@leokibrindes.com.br" className="hover:text-mustard transition-colors">

@@ -41,6 +41,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   );
   const [categoriaSlug, setCategoriaSlug] = useState(produto?.categoria ?? "");
   const [preco, setPreco] = useState(produto?.preco?.toString() ?? "");
+  const [precoOriginal, setPrecoOriginal] = useState(produto?.precoOriginal?.toString() ?? "");
   const [precoShopee, setPrecoShopee] = useState(produto?.precoShopee?.toString() ?? "");
   const [vendidoNaShopee, setVendidoNaShopee] = useState(produto?.vendidoNaShopee ?? true);
   const [emoji, setEmoji] = useState(produto?.emoji ?? "🎁");
@@ -273,6 +274,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       descricaoDetalhada: descricaoDetalhada.trim() || null,
       categoriaSlug,
       preco: Number(preco),
+      precoOriginal: precoOriginal ? Number(precoOriginal) : null,
       precoShopee: precoShopee ? Number(precoShopee) : Number(preco),
       vendidoNaShopee,
       requerPersonalizacao,
@@ -379,7 +381,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         </select>
       </Campo>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Campo label="Preço (site)">
           <input
             type="number"
@@ -388,6 +390,16 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             onChange={(e) => setPreco(e.target.value)}
             className="w-full border border-line rounded px-3 py-2 text-sm"
             required
+          />
+        </Campo>
+        <Campo label="Preço original (riscado)">
+          <input
+            type="number"
+            step="0.01"
+            value={precoOriginal}
+            onChange={(e) => setPrecoOriginal(e.target.value)}
+            className="w-full border border-line rounded px-3 py-2 text-sm"
+            placeholder="opcional — maior que o preço"
           />
         </Campo>
         <Campo label="Preço (Shopee)">
@@ -401,6 +413,11 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           />
         </Campo>
       </div>
+      {precoOriginal && Number(precoOriginal) <= Number(preco || 0) && (
+        <p className="text-xs text-berry -mt-2">
+          O preço original precisa ser maior que o preço do site.
+        </p>
+      )}
 
       <div>
         <label className="flex items-center gap-2 text-sm">
@@ -641,7 +658,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                             )}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.heic,.heif"
                               className="hidden"
                               disabled={enviando}
                               onChange={(e) =>

@@ -27,6 +27,10 @@ model Produto {
   categoriaId          String
   categoria            Categoria         @relation(fields: [categoriaId], references: [id])
   preco                Decimal           @db.Decimal(10, 2)
+  // Preço "de", riscado na vitrine e na página do produto. null = sem
+  // desconto ativo. Quando preenchido, deve ser > preco (validado na UI e
+  // na API admin); a diferença vira o badge de desconto percentual.
+  precoOriginal        Decimal?          @db.Decimal(10, 2)
   precoShopee          Decimal           @db.Decimal(10, 2)
   vendidoNaShopee      Boolean           @default(true)
   requerPersonalizacao Boolean           @default(false)

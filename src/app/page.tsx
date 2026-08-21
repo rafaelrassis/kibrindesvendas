@@ -30,7 +30,6 @@ export default async function Home() {
 
       <ProductShelf
         titulo="Pode te interessar"
-        subtitulo="Preço menor que na Shopee"
         produtos={destaques}
       />
 

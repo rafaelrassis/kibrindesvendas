@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Produto } from "@/lib/types";
-import { compararPreco, formatarPreco } from "@/lib/compare-price";
+import { calcularDesconto, compararPreco, formatarPreco } from "@/lib/compare-price";
 import { produtoEsgotado } from "@/lib/estoque-variacao";
 import FavoritoButton from "./FavoritoButton";
 
@@ -12,6 +12,7 @@ export default function ProductCard({
   comparativo?: boolean;
 }) {
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
+  const desconto = calcularDesconto(produto.preco, produto.precoOriginal);
   const esgotado = produtoEsgotado(produto);
 
   return (
@@ -45,6 +46,11 @@ export default function ProductCard({
               </span>
             )
           )}
+          {!esgotado && desconto.ativo && (
+            <span className="absolute top-6 right-3 bg-berry text-white text-[11px] font-semibold px-2 py-0.5 rounded-full">
+              -{desconto.percentual}%
+            </span>
+          )}
         </div>
 
         <p className="text-xs uppercase tracking-wide text-ink/50 mb-1">
@@ -64,15 +70,21 @@ export default function ProductCard({
           <span className="text-base font-medium whitespace-nowrap">
             {formatarPreco(produto.preco)}
           </span>
-          {comparacao.mostrar && (
-            <>
-              <span className="text-xs text-ink/40 line-through whitespace-nowrap">
-                {formatarPreco(produto.precoShopee)}
-              </span>
-              {!comparativo && (
-                <span className="text-xs text-berry">-{comparacao.percentual}%</span>
-              )}
-            </>
+          {desconto.ativo ? (
+            <span className="text-xs text-ink/40 line-through whitespace-nowrap">
+              {formatarPreco(produto.precoOriginal!)}
+            </span>
+          ) : (
+            comparacao.mostrar && (
+              <>
+                <span className="text-xs text-ink/40 line-through whitespace-nowrap">
+                  {formatarPreco(produto.precoShopee)}
+                </span>
+                {!comparativo && (
+                  <span className="text-xs text-berry">-{comparacao.percentual}%</span>
+                )}
+              </>
+            )
           )}
         </div>
 
