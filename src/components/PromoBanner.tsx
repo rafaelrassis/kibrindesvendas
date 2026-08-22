@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Banner } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -23,17 +23,9 @@ export default function PromoBanner({ banners }: { banners: Banner[] }) {
     setAtivo(i);
   }
 
-  useEffect(() => {
-    if (banners.length < 2) return;
-    const t = setInterval(() => {
-      setAtivo((v) => {
-        const proximo = (v + 1) % banners.length;
-        irPara(proximo);
-        return proximo;
-      });
-    }, 5000);
-    return () => clearInterval(t);
-  }, [banners.length]);
+  // Auto-advance removido: causava scroll vertical indesejado na home no
+  // mobile (scrollIntoView disparado sozinho a cada 5s). Navegação agora é
+  // só manual — setas e dots.
 
   if (banners.length === 0) return null;
 
