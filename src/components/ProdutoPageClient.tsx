@@ -511,7 +511,13 @@ export default function ProdutoPageClient() {
               {endereco && (
                 <div className="flex items-center justify-between gap-4 mt-3">
                   <p className="text-sm text-ink/70">
-                    🚚 Receba em até {endereco.frete.prazoDias} dias úteis
+                    🚚 Receba em até{" "}
+                    {endereco.frete.prazoDias +
+                      (produto.requerPersonalizacao ? produto.diasProducaoExtra : 0)}{" "}
+                    dias úteis
+                    {produto.requerPersonalizacao && produto.diasProducaoExtra > 0 && (
+                      <span className="text-ink/40"> (inclui produção)</span>
+                    )}
                   </p>
                   <p className="text-sm font-mono font-medium shrink-0">
                     {reais(endereco.frete.valor)}

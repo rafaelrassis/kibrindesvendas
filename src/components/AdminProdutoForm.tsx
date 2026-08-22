@@ -59,6 +59,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [requerPersonalizacao, setRequerPersonalizacao] = useState(
     produto?.requerPersonalizacao ?? false
   );
+  const [diasProducaoExtra, setDiasProducaoExtra] = useState(
+    String(produto?.diasProducaoExtra ?? 0)
+  );
   const [destaque, setDestaque] = useState(produto?.destaque ?? false);
   const [variacoes, setVariacoes] = useState<VariacaoForm[]>(
     produto ? paraVariacaoForm(produto.variacoes) : []
@@ -333,6 +336,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       precoShopee: precoShopee ? Number(precoShopee) : Number(preco),
       vendidoNaShopee,
       requerPersonalizacao,
+      diasProducaoExtra: Number(diasProducaoExtra) || 0,
       emoji,
       cor,
       imagens,
@@ -666,6 +670,18 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         />
         Requer personalização
       </label>
+
+      {requerPersonalizacao && (
+        <Campo label="Dias extras de produção (somados ao prazo de frete)">
+          <input
+            type="number"
+            min={0}
+            value={diasProducaoExtra}
+            onChange={(e) => setDiasProducaoExtra(e.target.value)}
+            className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
+          />
+        </Campo>
+      )}
 
       <label className="flex items-center gap-2 text-sm">
         <input

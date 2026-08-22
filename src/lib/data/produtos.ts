@@ -53,6 +53,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     precoShopee: Number(p.precoShopee),
     vendidoNaShopee: p.vendidoNaShopee,
     requerPersonalizacao: p.requerPersonalizacao,
+    diasProducaoExtra: p.diasProducaoExtra,
     emoji: p.emoji,
     cor: p.cor,
     imagens: p.imagens,
@@ -184,6 +185,9 @@ export type DadosProduto = {
   precoShopee?: number;
   vendidoNaShopee?: boolean;
   requerPersonalizacao?: boolean;
+  // Dias extras de produção somados ao prazo de frete. Só relevante com
+  // requerPersonalizacao ligado, mas o campo aceita valor independente disso.
+  diasProducaoExtra?: number;
   emoji?: string;
   cor?: string;
   // Até 4 fotos (ordem = ordem de exibição) e 1 vídeo — ver validarMidia.
@@ -312,6 +316,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       precoShopee: dados.precoShopee ?? dados.preco,
       vendidoNaShopee: dados.vendidoNaShopee ?? true,
       requerPersonalizacao: !!dados.requerPersonalizacao,
+      diasProducaoExtra: dados.diasProducaoExtra ?? 0,
       emoji: dados.emoji || EMOJI_PADRAO,
       cor: dados.cor || COR_PADRAO,
       imagens: dados.imagens ?? [],
@@ -390,6 +395,7 @@ export async function atualizarProduto(
         precoShopee: dados.precoShopee,
         vendidoNaShopee: dados.vendidoNaShopee,
         requerPersonalizacao: dados.requerPersonalizacao,
+        diasProducaoExtra: dados.diasProducaoExtra,
         emoji: dados.emoji,
         cor: dados.cor,
         imagens: dados.imagens,

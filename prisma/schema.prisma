@@ -34,6 +34,9 @@ model Produto {
   precoShopee          Decimal           @db.Decimal(10, 2)
   vendidoNaShopee      Boolean           @default(true)
   requerPersonalizacao Boolean           @default(false)
+  // Dias extras de produção somados ao prazo de frete retornado pelo Melhor
+  // Envio, quando o produto exige personalização. 0 = não soma nada.
+  diasProducaoExtra    Int               @default(0)
   emoji                String
   cor                  String
   // Galeria do produto: até 4 fotos (ordem = ordem de exibição) e 1 vídeo,

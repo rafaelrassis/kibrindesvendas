@@ -1,0 +1,1 @@
+ALTER TABLE "Produto" ADD COLUMN "diasProducaoExtra" INTEGER NOT NULL DEFAULT 0;

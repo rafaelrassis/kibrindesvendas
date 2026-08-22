@@ -31,6 +31,9 @@ export type Produto = {
   // Desligado, o site nunca mostra o comparativo de preço deste produto.
   vendidoNaShopee: boolean;
   requerPersonalizacao: boolean;
+  // Dias extras de produção somados ao prazo de frete quando o produto exige
+  // personalização. 0 = não soma nada.
+  diasProducaoExtra: number;
   emoji: string;
   cor: string;
   // Galeria de mídia: até 4 fotos (nessa ordem) e 1 vídeo. Sem nada aqui, a
