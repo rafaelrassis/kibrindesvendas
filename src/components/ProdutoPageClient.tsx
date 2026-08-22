@@ -303,57 +303,6 @@ export default function ProdutoPageClient() {
               </div>
             )}
 
-            {/* Frete — resumo com "alterar", estilo Magalu; abre pra digitar
-                de novo o CEP quando não há um endereço resolvido ainda */}
-            <div className="border-b border-line pb-5 mb-5">
-              {!mostrarInputCep && endereco ? (
-                <div className="bg-paper-2 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
-                  <p className="text-sm">
-                    📍 Enviar para <span className="font-medium">{resumoEndereco}</span>
-                  </p>
-                  <button
-                    onClick={() => setAlterandoCep(true)}
-                    className="text-pine text-sm font-medium shrink-0 hover:underline"
-                  >
-                    alterar
-                  </button>
-                </div>
-              ) : (
-                <label className="block">
-                  <span className="block text-sm font-medium mb-1.5">
-                    Calcular frete e prazo
-                  </span>
-                  <input
-                    value={cep}
-                    inputMode="numeric"
-                    maxLength={9}
-                    placeholder="00000-000"
-                    onChange={(e) => setCepDigitado(formatarCep(e.target.value))}
-                    className="w-full max-w-[160px] bg-white border border-line rounded-lg px-4 py-2.5 text-sm outline-none focus:border-pine"
-                  />
-                </label>
-              )}
-
-              {consultandoCep && <p className="text-xs text-ink/50 mt-2">Calculando...</p>}
-              {erroCep && <p className="text-xs text-berry mt-2">{erroCep}</p>}
-              {mostrarInputCep && !cep && !consultandoCep && !erroCep && (
-                <p className="text-xs text-ink/40 mt-2">
-                  Informe seu CEP pra ver o valor do frete antes de continuar.
-                </p>
-              )}
-
-              {endereco && (
-                <div className="flex items-center justify-between gap-4 mt-3">
-                  <p className="text-sm text-ink/70">
-                    🚚 Receba em até {endereco.frete.prazoDias} dias úteis
-                  </p>
-                  <p className="text-sm font-mono font-medium shrink-0">
-                    {reais(endereco.frete.valor)}
-                  </p>
-                </div>
-              )}
-            </div>
-
             {produto.requerPersonalizacao && (
               <div className="bg-mustard/15 border border-mustard/40 text-pine-2 text-sm rounded-md px-4 py-3 mb-6">
                 Este produto passa por um fluxo de personalização depois de escolhidas as
@@ -517,6 +466,57 @@ export default function ProdutoPageClient() {
               </div>
               {estoqueMaximo != null && estoqueMaximo > 0 && quantidadeEfetiva >= estoqueMaximo && (
                 <p className="text-xs text-ink/40 mt-1">Máximo disponível em estoque.</p>
+              )}
+            </div>
+
+            {/* Frete — resumo com "alterar", estilo Magalu; abre pra digitar
+                de novo o CEP quando não há um endereço resolvido ainda */}
+            <div className="border-b border-line pb-5 mb-5">
+              {!mostrarInputCep && endereco ? (
+                <div className="bg-paper-2 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
+                  <p className="text-sm">
+                    📍 Enviar para <span className="font-medium">{resumoEndereco}</span>
+                  </p>
+                  <button
+                    onClick={() => setAlterandoCep(true)}
+                    className="text-pine text-sm font-medium shrink-0 hover:underline"
+                  >
+                    alterar
+                  </button>
+                </div>
+              ) : (
+                <label className="block">
+                  <span className="block text-sm font-medium mb-1.5">
+                    Calcular frete e prazo
+                  </span>
+                  <input
+                    value={cep}
+                    inputMode="numeric"
+                    maxLength={9}
+                    placeholder="00000-000"
+                    onChange={(e) => setCepDigitado(formatarCep(e.target.value))}
+                    className="w-full max-w-[160px] bg-white border border-line rounded-lg px-4 py-2.5 text-sm outline-none focus:border-pine"
+                  />
+                </label>
+              )}
+
+              {consultandoCep && <p className="text-xs text-ink/50 mt-2">Calculando...</p>}
+              {erroCep && <p className="text-xs text-berry mt-2">{erroCep}</p>}
+              {mostrarInputCep && !cep && !consultandoCep && !erroCep && (
+                <p className="text-xs text-ink/40 mt-2">
+                  Informe seu CEP pra ver o valor do frete antes de continuar.
+                </p>
+              )}
+
+              {endereco && (
+                <div className="flex items-center justify-between gap-4 mt-3">
+                  <p className="text-sm text-ink/70">
+                    🚚 Receba em até {endereco.frete.prazoDias} dias úteis
+                  </p>
+                  <p className="text-sm font-mono font-medium shrink-0">
+                    {reais(endereco.frete.valor)}
+                  </p>
+                </div>
               )}
             </div>
 
