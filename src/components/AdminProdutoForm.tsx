@@ -6,7 +6,7 @@ import type { Categoria, ProdutoAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
 import { buildCombinacaoKey, gerarCombinacoes } from "@/lib/estoque-variacao";
 
-type VariacaoForm = { tipo: string; valores: string; imagensValores: Record<string, string> };
+type VariacaoForm = { tipo: string; valores: string; imagensValores: Record<string, string[]> };
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
 
 function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
@@ -128,11 +128,17 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     setGradeEstoque((prev) => ({ ...prev, [combinacao]: valor }));
   }
 
-  // Swatch de cor: upload direto, sem passar pelo editor de recorte das
-  // fotos do produto — é só uma miniatura pequena, não precisa de zoom nem
-  // rotação.
+  // Fotos por cor: upload direto, sem passar pelo editor de recorte das
+  // fotos do produto — são miniaturas pequenas, não precisa de zoom nem
+  // rotação. Até 4 fotos por valor de cor, mesmo limite da galeria principal;
+  // a foto nova entra no fim da lista, sem substituir as que já tem.
   async function enviarImagemCor(i: number, valorCor: string, arquivo: File | undefined) {
     if (!arquivo) return;
+    const atuais = variacoes[i]?.imagensValores[valorCor] ?? [];
+    if (atuais.length >= 4) {
+      setErroImagemCor(`No máximo 4 fotos por cor — "${valorCor}" já tem 4.`);
+      return;
+    }
     setErroImagemCor("");
     setEnviandoImagemCor(`${i}:${valorCor}`);
     const form = new FormData();
@@ -144,7 +150,13 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       setVariacoes((prev) =>
         prev.map((v, idx) =>
           idx === i
-            ? { ...v, imagensValores: { ...v.imagensValores, [valorCor]: data.url } }
+            ? {
+                ...v,
+                imagensValores: {
+                  ...v.imagensValores,
+                  [valorCor]: [...(v.imagensValores[valorCor] ?? []), data.url],
+                },
+              }
             : v
         )
       );
@@ -155,14 +167,20 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     }
   }
 
-  function removerImagemCor(i: number, valorCor: string) {
+  // Remove uma foto específica da cor (por índice); esvaziando a lista, o
+  // valor deixa de contar como "cor com foto" e volta a ser chip de texto.
+  function removerImagemCor(i: number, valorCor: string, indiceFoto: number) {
     setVariacoes((prev) =>
       prev.map((v, idx) => {
         if (idx !== i) return v;
-        const resto = Object.fromEntries(
-          Object.entries(v.imagensValores).filter(([valor]) => valor !== valorCor)
-        );
-        return { ...v, imagensValores: resto };
+        const restantes = (v.imagensValores[valorCor] ?? []).filter((_, fi) => fi !== indiceFoto);
+        const imagensValores =
+          restantes.length > 0
+            ? { ...v.imagensValores, [valorCor]: restantes }
+            : Object.fromEntries(
+                Object.entries(v.imagensValores).filter(([valor]) => valor !== valorCor)
+              );
+        return { ...v, imagensValores };
       })
     );
   }
@@ -633,51 +651,60 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                   </button>
                 </div>
 
-                {/* Foto por cor — só pra variação "Cor". Sem foto, o valor
-                    continua aparecendo como chip de texto na página do
-                    produto (ver ProdutoPageClient). */}
+                {/* Fotos por cor (até 4) — só pra variação "Cor". Sem foto, o
+                    valor continua aparecendo como chip de texto na página do
+                    produto (ver ProdutoPageClient). Selecionar essa cor lá
+                    troca a galeria grande pra estas fotos. */}
                 {ehCor && valoresLista.length > 0 && (
-                  <div className="flex flex-wrap gap-3 pl-1">
+                  <div className="flex flex-wrap gap-4 pl-1">
                     {valoresLista.map((valorCor) => {
-                      const url = v.imagensValores[valorCor];
+                      const urls = v.imagensValores[valorCor] ?? [];
                       const enviando = enviandoImagemCor === `${i}:${valorCor}`;
+                      const cheio = urls.length >= 4;
                       return (
                         <div key={valorCor} className="text-center">
-                          <label
-                            className={`relative block w-14 h-14 rounded border border-line overflow-hidden cursor-pointer bg-paper-2 ${
-                              enviando ? "opacity-50" : ""
-                            }`}
-                          >
-                            {url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={url} alt={valorCor} className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="w-full h-full flex items-center justify-center text-ink/30 text-lg">
-                                +
-                              </span>
-                            )}
-                            <input
-                              type="file"
-                              accept="image/*,.heic,.heif"
-                              className="hidden"
-                              disabled={enviando}
-                              onChange={(e) =>
-                                enviarImagemCor(i, valorCor, e.target.files?.[0])
-                              }
-                            />
-                          </label>
-                          <p className="text-[11px] text-ink/50 mt-1 max-w-14 truncate">
-                            {valorCor}
+                          <p className="text-[11px] text-ink/50 mb-1 max-w-[9rem] truncate">
+                            {valorCor} ({urls.length}/4)
                           </p>
-                          {url && (
-                            <button
-                              type="button"
-                              onClick={() => removerImagemCor(i, valorCor)}
-                              className="text-berry text-[11px] hover:underline"
-                            >
-                              remover
-                            </button>
-                          )}
+                          <div className="grid grid-cols-2 gap-1 w-[6.25rem]">
+                            {urls.map((url, fi) => (
+                              <div key={url} className="relative w-11 h-11">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={url}
+                                  alt={`${valorCor} ${fi + 1}`}
+                                  className="w-full h-full object-cover rounded border border-line"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removerImagemCor(i, valorCor, fi)}
+                                  aria-label="Remover foto"
+                                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-berry text-white text-[10px] leading-none flex items-center justify-center"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                            {!cheio && (
+                              <label
+                                className={`relative flex items-center justify-center w-11 h-11 rounded border border-dashed border-line cursor-pointer bg-paper-2 ${
+                                  enviando ? "opacity-50" : ""
+                                }`}
+                              >
+                                <span className="text-ink/30 text-lg">+</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,.heic,.heif"
+                                  className="hidden"
+                                  disabled={enviando}
+                                  onChange={(e) => {
+                                    enviarImagemCor(i, valorCor, e.target.files?.[0]);
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

@@ -89,6 +89,15 @@ export default function ProdutoPageClient() {
   const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
   const desconto = calcularDesconto(produto.preco, produto.precoOriginal);
 
+  // Variação de cor com fotos próprias: ao selecionar um valor, a galeria
+  // grande passa a mostrar essas fotos em vez das fotos gerais do produto.
+  // Sem cor selecionada (ou cor sem fotos cadastradas), cai nas fotos gerais.
+  const variacaoCor = produto.variacoes.find((v) => v.tipo.trim().toLowerCase() === "cor");
+  const corSelecionada = variacaoCor ? selecoes[variacaoCor.tipo] : undefined;
+  const imagensDaCor = corSelecionada ? variacaoCor?.imagensValores?.[corSelecionada] : undefined;
+  const imagensGaleria =
+    imagensDaCor && imagensDaCor.length > 0 ? imagensDaCor : produto.imagens;
+
   // Com variações e controle ligado, o estoque é por combinação — o aviso
   // de "esgotado" no bloco de preço vira só um resumo geral (soma de tudo);
   // o aviso específico da combinação escolhida aparece junto das variações,
@@ -198,7 +207,8 @@ export default function ProdutoPageClient() {
           {/* Galeria com favorito e compartilhar */}
           <div className="relative h-fit">
             <ProdutoGaleria
-              imagens={produto.imagens}
+              key={corSelecionada ?? "padrao"}
+              imagens={imagensGaleria}
               video={produto.video}
               emoji={produto.emoji}
               cor={produto.cor}
@@ -361,7 +371,7 @@ export default function ProdutoPageClient() {
                           {v.valores.map((valor) => {
                             const ativo = selecoes[v.tipo] === valor;
                             const indisponivel = valorIndisponivel(v.tipo, valor);
-                            const url = v.imagensValores?.[valor];
+                            const url = v.imagensValores?.[valor]?.[0];
                             return (
                               <button
                                 key={valor}

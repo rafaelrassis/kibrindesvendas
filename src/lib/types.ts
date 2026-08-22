@@ -1,9 +1,11 @@
 export type Variacao = {
   tipo: string;
   valores: string[];
-  // Foto por valor — só usado quando tipo é "Cor" (case-insensitive).
+  // Fotos por valor — só usado quando tipo é "Cor" (case-insensitive). Até 4
+  // fotos por valor de cor (mesmo limite da galeria principal do produto);
+  // ao selecionar a cor, a galeria grande passa a mostrar essas fotos.
   // Valor sem entrada aqui cai no chip de texto de sempre.
-  imagensValores?: Record<string, string> | null;
+  imagensValores?: Record<string, string[]> | null;
 };
 
 // Estoque de uma combinação específica (ex: Cor=Preta + Tamanho=G).

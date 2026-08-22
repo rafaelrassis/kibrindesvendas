@@ -22,6 +22,21 @@ type ProdutoComRelacoes = ProdutoDb & {
 
 type ProdutoComMateriais = ProdutoComRelacoes & { materiais: MaterialProdutoDb[] };
 
+// Dado antigo (antes do suporte a múltiplas fotos por cor) guarda uma string
+// solta por valor; dado novo guarda um array de até 4. Normaliza os dois
+// formatos pra array na leitura, assim produto cadastrado antes da migração
+// continua mostrando a foto que já tinha.
+function normalizarImagensValores(
+  bruto: unknown
+): Record<string, string[]> | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const entradas = Object.entries(bruto as Record<string, unknown>).map(([valor, urls]) => [
+    valor,
+    Array.isArray(urls) ? urls.filter((u): u is string => typeof u === "string") : typeof urls === "string" ? [urls] : [],
+  ]);
+  return Object.fromEntries(entradas);
+}
+
 // Exportado porque outras consultas (favoritos, por exemplo) chegam no produto
 // por outro caminho e precisam do mesmo formato de saída. Nunca inclui custo
 // de material — isso só existe na versão admin, mais abaixo.
@@ -46,7 +61,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     variacoes: p.variacoes.map((v) => ({
       tipo: v.tipo,
       valores: v.valores,
-      imagensValores: (v.imagensValores as Record<string, string> | null) ?? null,
+      imagensValores: normalizarImagensValores(v.imagensValores),
     })),
     estoque: p.estoque,
     estoqueVariacoes: p.estoqueVariacoes.map((e) => ({
@@ -175,7 +190,7 @@ export type DadosProduto = {
   imagens?: string[];
   video?: string | null;
   destaque?: boolean;
-  variacoes?: { tipo: string; valores: string[]; imagensValores?: Record<string, string> | null }[];
+  variacoes?: { tipo: string; valores: string[]; imagensValores?: Record<string, string[]> | null }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
   // Só se aplica a produto sem variações — com variações o controle é por
@@ -232,6 +247,18 @@ function validar(dados: Partial<DadosProduto>) {
   }
   if (dados.video !== undefined && dados.video && !ehUrlDeVideo(dados.video)) {
     throw new ErroDeNegocio("Vídeo inválido — envie pelo campo de upload.");
+  }
+  if (dados.variacoes) {
+    for (const v of dados.variacoes) {
+      for (const [valor, urls] of Object.entries(v.imagensValores ?? {})) {
+        if (urls.length > 4) {
+          throw new ErroDeNegocio(`No máximo 4 fotos por cor — "${valor}" tem ${urls.length}.`);
+        }
+        if (urls.some((url) => !ehUrlDeImagem(url))) {
+          throw new ErroDeNegocio(`Foto inválida em "${valor}" — envie pelo campo de upload.`);
+        }
+      }
+    }
   }
   if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
     throw new ErroDeNegocio("O estoque precisa ser um número inteiro maior ou igual a zero.");
