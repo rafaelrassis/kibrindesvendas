@@ -26,22 +26,40 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
 
   return (
     <header className="sticky top-0 z-30 bg-pine text-white border-b border-black/10">
-      {/* Logo — no mobile aparece só na home; no desktop sempre, junto da nav */}
+      {/* Logo — no mobile aparece só na home; no desktop sempre, junto da nav.
+          h-[92px]: ocupa do topo até o fim da barra inicial, como pedido. */}
       {home && (
-        <div className="md:hidden mx-auto max-w-6xl px-5 pt-4">
-          <Link href="/" className="inline-flex items-center">
-            <Image src="/logo.png" alt="LeoKibrindes" width={168} height={54} priority className="h-11 w-auto" />
+        <div className="md:hidden mx-auto max-w-6xl px-5 flex items-center h-[92px]">
+          <Link href="/" className="inline-flex items-center h-full">
+            <Image
+              src="/logo.png"
+              alt="LeoKibrindes"
+              width={220}
+              height={92}
+              priority
+              className="h-full w-auto"
+            />
           </Link>
         </div>
       )}
 
-      {/* Linha de navegação — só no desktop, onde a BottomNav não existe */}
-      <div className="hidden md:flex mx-auto max-w-6xl px-5 pt-4 items-center justify-between gap-6">
-        <Link href="/" className="inline-flex items-center shrink-0">
-          <Image src="/logo.png" alt="LeoKibrindes" width={168} height={54} priority className="h-12 w-auto" />
+      {/* Desktop: uma única linha — logo | categorias/links | busca | ícones.
+          A busca fica ao lado dos links de navegação, não numa linha à parte
+          embaixo — o menu de categorias não fica mais "escondido" abaixo da
+          busca. */}
+      <div className="hidden md:flex mx-auto max-w-6xl px-5 items-center gap-7 h-[92px]">
+        <Link href="/" className="inline-flex items-center h-full shrink-0">
+          <Image
+            src="/logo.png"
+            alt="LeoKibrindes"
+            width={220}
+            height={92}
+            priority
+            className="h-full w-auto"
+          />
         </Link>
 
-        <nav className="flex items-center gap-6 text-sm tracking-wide uppercase">
+        <nav className="flex items-center gap-6 text-sm tracking-wide uppercase shrink-0">
           <div className="relative group">
             <Link href="/categorias" className="py-2 uppercase hover:text-mustard transition-colors block">
               Categorias
@@ -74,8 +92,22 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
           </Link>
         </nav>
 
-        <div className="flex items-center gap-4 shrink-0">
-          {/* No mobile o sininho fica na linha da busca, aqui ele acompanha a sacola */}
+        <form onSubmit={buscar} className="relative flex-1 max-w-md">
+          <Search
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/40"
+            aria-hidden="true"
+          />
+          <input
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            placeholder="Busca na LeoKibrindes"
+            aria-label="Buscar produtos"
+            className="w-full bg-white text-ink rounded-full pl-11 pr-5 py-2.5 text-sm outline-none shadow-sm"
+          />
+        </form>
+
+        <div className="flex items-center gap-4 shrink-0 ml-auto">
           <Link
             href="/notificacoes"
             aria-label="Notificações"
@@ -122,19 +154,19 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
         </div>
       </div>
 
-      {/* Busca — sempre visível, linha própria em todos os tamanhos */}
-      <form onSubmit={buscar} className="mx-auto max-w-6xl px-5 pt-4 pb-4 flex items-center gap-3">
+      {/* Busca — mobile, linha própria (no desktop já entrou na linha acima) */}
+      <form onSubmit={buscar} className="md:hidden mx-auto max-w-6xl px-5 pt-4 pb-4 flex items-center gap-3">
         {!home && (
           <button
             type="button"
             onClick={() => router.back()}
             aria-label="Voltar"
-            className="md:hidden shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
+            className="shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
           >
             ←
           </button>
         )}
-        <div className="relative flex-1 md:mx-auto md:max-w-md">
+        <div className="relative flex-1">
           <Search
             size={18}
             className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/40"
@@ -151,7 +183,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
         <Link
           href="/notificacoes"
           aria-label="Notificações"
-          className="md:hidden relative shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
+          className="relative shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
         >
           🔔
           {naoLidas > 0 && (

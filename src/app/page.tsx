@@ -1,6 +1,5 @@
 import Link from "next/link";
 import PromoBanner from "@/components/PromoBanner";
-import QuickLinks from "@/components/QuickLinks";
 import ProductShelf from "@/components/ProductShelf";
 import { getBannersAtivos } from "@/lib/data/banners";
 import { getCategorias } from "@/lib/data/categorias";
@@ -25,8 +24,6 @@ export default async function Home() {
       <div className="-mt-4">
         <PromoBanner banners={banners} />
       </div>
-
-      <QuickLinks />
 
       <ProductShelf
         titulo="Pode te interessar"
