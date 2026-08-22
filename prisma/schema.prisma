@@ -135,6 +135,22 @@ model Banner {
   @@index([ativo, ordem])
 }
 
+// Pergunta/resposta da página /suporte, editável em /admin/faqs. Antes vinha
+// fixo de src/lib/mock-data.ts — mudar uma resposta pedia redeploy; agora é
+// dado de loja como banner e cupom. Inativa não sai da área interna, mas some
+// da página pública.
+model Faq {
+  id        String   @id @default(cuid())
+  pergunta  String
+  resposta  String
+  ordem     Int      @default(0)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ativo, ordem])
+}
+
 model Usuario {
   id           String        @id @default(cuid())
   nome         String

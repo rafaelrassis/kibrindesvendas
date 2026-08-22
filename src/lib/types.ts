@@ -107,6 +107,19 @@ export type BannerAdmin = Banner & {
   ativo: boolean;
 };
 
+// Pergunta/resposta da página /suporte, como a loja recebe.
+export type Faq = {
+  id: string;
+  pergunta: string;
+  resposta: string;
+};
+
+// A mesma FAQ na área interna, onde posição e visibilidade também aparecem.
+export type FaqAdmin = Faq & {
+  ordem: number;
+  ativo: boolean;
+};
+
 export type ItemPedido = {
   id: string;
   quantidade: number;

@@ -236,26 +236,36 @@ export const banners = [
 
 export const faqs = [
   {
+    id: "faq-prazo-producao",
+    ordem: 0,
     pergunta: "Quanto tempo leva pra produzir meu pedido?",
     resposta:
       "Produtos prontos enviamos em até 2 dias úteis. Produtos personalizados entram em produção assim que a arte é validada, com prazo médio de 5 dias úteis.",
   },
   {
+    id: "faq-enviar-arte",
+    ordem: 1,
     pergunta: "Posso enviar minha própria arte?",
     resposta:
       "Sim! Na etapa de personalização você escolhe 'Enviar arte pronta', faz o upload e confirma o aceite. A arte é impressa exatamente como enviada.",
   },
   {
+    id: "faq-arte-com-problema",
+    ordem: 2,
     pergunta: "E se a minha arte estiver com problema?",
     resposta:
       "Nossa equipe confere resolução, enquadramento e legibilidade antes de imprimir. Se algo estiver fora do padrão, entramos em contato pelo WhatsApp antes de seguir.",
   },
   {
+    id: "faq-previa-ia",
+    ordem: 3,
     pergunta: "A prévia gerada por IA é igual ao produto final?",
     resposta:
       "É uma simulação e pode variar um pouco do resultado impresso, principalmente em produtos têxteis como camisetas e moletons.",
   },
   {
+    id: "faq-preco-shopee",
+    ordem: 4,
     pergunta: "Por que o preço aqui é menor que na Shopee?",
     resposta:
       "Vendemos os mesmos produtos por um preço menor no site porque não pagamos a taxa da plataforma. A Shopee continua sendo uma opção com toda a proteção de compra de lá.",

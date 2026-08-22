@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { banners, categorias, produtos } from "../src/lib/mock-data";
+import { banners, categorias, faqs, produtos } from "../src/lib/mock-data";
 
 const prisma = new PrismaClient();
 
@@ -19,6 +19,16 @@ async function main() {
       where: { id: b.id },
       update: {},
       create: b,
+    });
+  }
+
+  // Mesmo raciocínio do banner: seed só cria a FAQ na primeira vez, edição
+  // feita em /admin/faqs não é sobrescrita se o seed rodar de novo.
+  for (const f of faqs) {
+    await prisma.faq.upsert({
+      where: { id: f.id },
+      update: {},
+      create: f,
     });
   }
 

@@ -8,6 +8,7 @@ const links = [
   { href: "/admin/avaliacoes", label: "Avaliações" },
   { href: "/admin/pedidos", label: "Pedidos" },
   { href: "/admin/banners", label: "Banners" },
+  { href: "/admin/faqs", label: "Suporte / FAQ" },
   { href: "/admin/configuracoes", label: "Configurações" },
 ];
 
