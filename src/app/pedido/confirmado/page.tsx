@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PedidoStatusLive from "@/components/PedidoStatusLive";
+import LimparCarrinhoAoConfirmar from "@/components/LimparCarrinhoAoConfirmar";
 import { getPedidoDoUsuario } from "@/lib/data/pedidos";
 import { usuarioIdDaSessao } from "@/lib/session";
 
@@ -20,7 +21,7 @@ const conteudoPorStatus: Record<string, { emoji: string; titulo: string; texto: 
     emoji: "⚠️",
     titulo: "Pagamento não confirmado",
     texto:
-      "Não foi possível confirmar o pagamento deste pedido. Você pode montar a sacola de novo e tentar outra forma de pagamento.",
+      "Não foi possível confirmar o pagamento deste pedido. O item continua na sua sacola — é só voltar lá e tentar outra forma de pagamento.",
   },
 };
 
@@ -70,6 +71,7 @@ export default async function PedidoConfirmadoPage({
       {pedido && status === "AGUARDANDO_PAGAMENTO" && (
         <PedidoStatusLive pedidoId={pedido.id} status={status} />
       )}
+      {pedido && <LimparCarrinhoAoConfirmar status={status} />}
 
       <Link
         href="/"

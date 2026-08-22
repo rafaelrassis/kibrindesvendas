@@ -24,7 +24,7 @@ export default function CheckoutResumo({
   freteGratisAcimaDe?: number | null;
 }) {
   const router = useRouter();
-  const { item, limpar, definirQuantidade } = useCart();
+  const { item, definirQuantidade } = useCart();
   const { logado, carregando: carregandoAuth } = useAuth();
   const { enderecos } = useConta();
   const [processando, setProcessando] = useState(false);
@@ -227,7 +227,9 @@ export default function CheckoutResumo({
           setProcessando(false);
           return;
         }
-        limpar();
+        // A sacola só é limpa quando o pagamento é confirmado (ver
+        // /pedido/confirmado): se o cliente voltar de um pagamento recusado,
+        // o item continua aqui em vez de ter que ser montado de novo.
         // Pagamento real devolve a URL da página do Mercado Pago; o modo
         // simulado devolve a rota interna da confirmação. Nos dois casos é uma
         // navegação de verdade, então window.location dá conta dos dois.

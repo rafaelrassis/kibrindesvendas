@@ -11,8 +11,10 @@ favoritos e notificações no perfil, área interna (`/admin`) com painel de
 vendas, que edita catálogo de verdade (inclusive ligando e desligando o
 comparativo de preço da Shopee por produto), move o pedido de status e monta o
 carrossel da home, pagamento real pelo Mercado Pago (Pix, cartão e boleto) e
-entrega com frete cotado nos Correios pelo CEP e devolução pedida pelo cliente.
-O carrinho ainda é mock, em `localStorage`.
+entrega com frete cotado nos Correios pelo CEP, rastreio do envio e devolução
+pedida pelo cliente. O carrinho persiste no banco pra quem está logado (e
+continua em `localStorage` pra visitante) e só é esvaziado quando o pagamento
+é confirmado.
 
 ## Como começar
 
@@ -311,6 +313,16 @@ Em dev o Mercado Pago não alcança `localhost`: pra testar o webhook de ponta a
 ponta é preciso um túnel (ex: ngrok) e `NEXT_PUBLIC_BASE_URL` apontando pra
 URL pública dele.
 
+### A sacola só é esvaziada quando o pagamento é confirmado
+
+Criar o pedido não limpa a sacola — só um pagamento confirmado limpa
+(`LimparCarrinhoAoConfirmar`, em `/pedido/confirmado`, dispara quando o status
+chega em `PAGO`). Assim, quem volta de um pagamento recusado ou de um boleto
+ainda não pago encontra o item de novo em vez de ter que montar o pedido do
+zero. `registrarRetornoDoPagamento` (o webhook) também esvazia a sacola
+gravada no banco quando confirma o pagamento — cobre o caso de o cliente ter
+fechado a aba antes da confirmação chegar (boleto, que pode levar dias).
+
 ## Entrega e devolução
 
 O checkout pede o CEP antes de deixar pagar. `GET /api/cep/[cep]` consulta o
@@ -354,6 +366,17 @@ receber o produto de volta; o motivo informado aparece lá no card.
 
 Os rótulos e cores de status vivem em `src/lib/status-pedido.ts`, um lugar só
 pro select do admin, a lista do cliente e o detalhe do pedido.
+
+### Rastreio do envio
+
+`Pedido.codigoRastreio` é preenchido pelo admin em `/admin/pedidos` (normalmente
+junto de marcar `ENVIADO`, mas a tela deixa editar depois também) e não valida
+um formato fixo — a cotação passa por mais de uma transportadora, e recusar um
+código legítimo custa mais do que aceitar um errado, que o admin corrige na
+mesma tela. Cadastrar um código novo notifica o cliente (`definirCodigoRastreio`
+em `src/lib/data/pedidos.ts`); reeditar o mesmo texto não repete o aviso. O
+cliente vê o código e um link de rastreamento dos Correios no detalhe do
+pedido (`/conta/pedidos/[id]`).
 
 ## Favoritos e notificações
 
@@ -424,6 +447,7 @@ src/
     ├── use-pedidos.ts            # pedidos do usuário logado
     ├── favoritos-context.tsx     # favoritos do usuário (via /api/favoritos)
     ├── notificacoes-context.tsx  # avisos + contador do sininho
+    ├── cart-context.tsx          # sacola: localStorage p/ visitante, banco p/ logado
     ├── mock-data.ts              # seed do banco + FAQs
     └── *.test.ts                 # testes unitários das funções puras (Vitest)
 ```
@@ -505,27 +529,40 @@ forja um pedido pago, mas a rota fica aberta pra quem souber a URL.
 ## Testes
 
 ```bash
-npm test          # roda uma vez
+npm test          # unitários, roda uma vez
 npm run test:watch
+npm run test:db   # integração, exige DATABASE_URL migrado (Postgres descartável)
+npm run test:e2e  # e2e, sobe o próprio `next dev` (exige Postgres seedado)
 ```
 
 `npm test` roda os testes unitários (Vitest) das funções puras de negócio em
 `src/lib`: slug de categoria, comparativo de preço com a Shopee, frete (tabela
 por UF, normalização do CEP e a cotação do Melhor Envio, com `fetch` trocado por
 um stub) e as regras do status do pedido — incluindo quando a devolução pode ser
-pedida.
+pedida. Ficam ao lado do módulo, em `src/lib/*.test.ts`, e o ambiente é `node`:
+nada de banco, servidor ou DOM.
 
-Os testes ficam ao lado do módulo, em `src/lib/*.test.ts`, e o ambiente é `node`:
-nada de banco, servidor ou DOM. Módulos `server-only`, rotas de API e componentes
-ficam **de fora** — só a lógica pura extraída deles. Ainda **não há testes de
-integração/e2e**, que exigiriam Postgres e o app no ar.
+`npm run test:db` (`src/lib/data/*.integration.test.ts`, Vitest contra Postgres
+de verdade) cobre o que só o banco garante: limite de uso de cupom e estoque
+sob concorrência, reversão quando o pagamento falha, CHECK constraints e a
+sacola gravada (`carrinho.ts`) sendo esvaziada só quando o pagamento é
+confirmado — e mantida quando é recusado.
+
+`npm run test:e2e` (Playwright, `e2e/`) sobe `next dev` e exercita o fluxo
+inteiro pelo navegador: cadastro, escolha de variação, CEP/frete real (ViaCEP),
+checkout, pagamento simulado (sem `MERCADOPAGO_ACCESS_TOKEN` no ambiente de
+teste, então não depende do Mercado Pago nem de um webhook) e confirmação —
+inclusive que a sacola aparece vazia depois e o pedido aparece em
+`/conta/pedidos`. Só essa suíte depende de rede de verdade (ViaCEP).
 
 ## CI
 
 `.github/workflows/ci.yml` roda em push e pull request pra `main`: sobe um
 Postgres descartável (service container), aplica migrations, popula o seed e
-então roda lint, checagem de tipos, testes unitários e build. O banco não é opcional aqui — as
-páginas prerenderizadas consultam o catálogo durante o `next build`.
+então roda lint, checagem de tipos, testes unitários, testes de integração,
+build e o e2e do fluxo de compra (Playwright, com o Chromium instalado no
+próprio job). O banco não é opcional aqui — as páginas prerenderizadas
+consultam o catálogo durante o `next build`.
 
 `npm run typecheck` roda `next typegen` antes do `tsc --noEmit`, porque os
 tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
@@ -533,7 +570,8 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 ## Próximos passos
 
 - [x] Mock visual do fluxo completo (produto → personalização → checkout)
-- [ ] Validar telas com o time da loja
+- [ ] Validar telas com o time da loja — revisão de UX/conteúdo com quem toca
+      o negócio, não uma tarefa de código
 - [x] Modelar o schema Prisma + seed a partir do mock-data
 - [x] Trocar mock-data por Prisma + PostgreSQL nas telas (Fase 1 da spec)
 - [x] Autenticação real (cadastro, login, sessão em cookie, troca de senha)
@@ -551,15 +589,20 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Painel de vendas em `/admin` (faturamento, ticket médio, devoluções e
       gráficos dos últimos 30 dias)
 - [x] Comparativo de preço ligado/desligado por produto (`vendidoNaShopee`)
-- [ ] Persistir o carrinho no banco
+- [x] Persistir o carrinho no banco (visitante continua em `localStorage`,
+      quem loga sincroniza com o banco — `CarrinhoItem`, `src/app/api/carrinho`)
 - [x] Cotação real de frete (Correios via Melhor Envio) com a tabela por região
       como fallback, peso/dimensões por produto e token no `/admin/configuracoes`
-- [ ] Rastreio do envio no detalhe do pedido
-- [ ] Guardar a sacola até o pagamento confirmar (hoje ela é limpa na ida pro
-      Mercado Pago, então voltar de um pagamento recusado exige montar de novo)
-- [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store)
+- [x] Rastreio do envio no detalhe do pedido (`Pedido.codigoRastreio`, editável
+      em `/admin/pedidos`, com link de rastreamento pro cliente)
+- [x] Guardar a sacola até o pagamento confirmar (só esvazia quando o pedido
+      vira `PAGO` — pagamento recusado ou ainda aguardando deixa o item intacto)
+- [ ] Subir a primeira versão em produção (Vercel + Postgres + Blob Store) —
+      depende de credenciais e contas reais (Vercel, banco, Mercado Pago) que
+      só quem administra a loja tem acesso pra provisionar
 - [x] Testes automatizados das funções puras de negócio (Vitest, rodando no CI)
-- [ ] Testes de integração das rotas de API e e2e do fluxo de compra
+- [x] Testes de integração das rotas de dados (Vitest + Postgres) e e2e do
+      fluxo de compra (Playwright), os dois rodando no CI
 
 ## Convenções
 

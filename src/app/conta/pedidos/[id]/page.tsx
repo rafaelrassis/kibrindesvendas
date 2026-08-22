@@ -103,6 +103,21 @@ export default function DetalhePedidoPage() {
       <div className="bg-white border border-line rounded-lg p-5 mb-5">
         <p className="text-xs uppercase tracking-wide text-ink/40 mb-2">Status</p>
         <p className="text-sm font-medium">{labelStatus(pedido.status)}</p>
+        {pedido.codigoRastreio && (
+          <p className="text-xs text-ink/60 mt-2">
+            Código de rastreio:{" "}
+            <span className="font-mono">{pedido.codigoRastreio}</span>
+            {" · "}
+            <a
+              href={`https://rastreamento.correios.com.br/app/index.php?objetos=${pedido.codigoRastreio}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-pine underline"
+            >
+              rastrear
+            </a>
+          </p>
+        )}
         {pedido.motivoDevolucao && (
           <p className="text-xs text-ink/50 mt-2">
             Motivo da devolução: {pedido.motivoDevolucao}

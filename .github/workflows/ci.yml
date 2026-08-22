@@ -79,3 +79,21 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Instalar Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+
+      # Fluxo completo de compra (produto → checkout → pagamento →
+      # confirmação) contra `next dev` e o catálogo seedado. Sem
+      # MERCADOPAGO_ACCESS_TOKEN no ambiente, o pagamento é simulado — não
+      # depende do Mercado Pago nem de um webhook de verdade.
+      - name: E2E do fluxo de compra
+        run: npm run test:e2e
+
+      - name: Relatório do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

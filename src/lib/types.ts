@@ -147,6 +147,9 @@ export type Pedido = {
   cupomCodigo: string | null;
   enderecoResumo: string | null;
   motivoDevolucao: string | null;
+  // Código dos Correios (ou da transportadora cotada), preenchido pelo admin
+  // depois que o pedido é despachado. null até lá.
+  codigoRastreio: string | null;
   pagamentoMock: boolean;
   createdAt: string;
   itens: ItemPedido[];

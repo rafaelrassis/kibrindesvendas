@@ -165,7 +165,28 @@ model Usuario {
   favoritos    Favorito[]
   notificacoes Notificacao[]
   avaliacoes   Avaliacao[]
+  carrinho     CarrinhoItem?
   createdAt    DateTime      @default(now())
+}
+
+// A sacola do usuário logado, espelhando o `ItemCarrinho` do client (um item
+// só, com variações, quantidade e personalização). Visitante sem sessão
+// continua só no localStorage — ver cart-context.tsx.
+//
+// `produtoId` não é uma relação de verdade pro `Produto`: uma FK aqui
+// travaria a remoção de um produto só porque alguém tem ele numa sacola nunca
+// comprada. A tela já lida com produto que sumiu do catálogo (useProduto
+// devolve undefined) do mesmo jeito que lida hoje com o item do localStorage.
+model CarrinhoItem {
+  id                  String   @id @default(cuid())
+  usuarioId           String   @unique
+  usuario             Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  produtoId           String
+  variacoesEscolhidas Json     @default("{}")
+  quantidade          Int      @default(1)
+  cepInformado        String?
+  personalizacao      Json?
+  updatedAt           DateTime @updatedAt
 }
 
 model Favorito {
@@ -215,6 +236,9 @@ model Pedido {
   // mesmo que o cupom seja editado ou apagado depois.
   cupomCodigo     String?
   desconto        Decimal      @default(0) @db.Decimal(10, 2)
+  // Código de rastreio dos Correios, preenchido pelo admin ao marcar o pedido
+  // como ENVIADO. Sem ele o cliente só vê o status, sem link de rastreamento.
+  codigoRastreio  String?
   itens           ItemPedido[]
   // Sem credencial do Mercado Pago configurada o checkout roda simulado; o
   // campo marca quais pedidos nasceram assim pra não confundir com venda real.

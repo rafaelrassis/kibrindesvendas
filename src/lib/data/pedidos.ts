@@ -313,6 +313,7 @@ export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
     cupomCodigo: pedido.cupomCodigo,
     enderecoResumo: pedido.enderecoResumo,
     motivoDevolucao: pedido.motivoDevolucao,
+    codigoRastreio: pedido.codigoRastreio,
     pagamentoMock: pedido.pagamentoMock,
     createdAt: pedido.createdAt.toISOString(),
     itens: pedido.itens.map((item) => ({
@@ -454,6 +455,53 @@ export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
   return atualizado;
 }
 
+// Código dos Correios (ou da transportadora que a cotação escolheu), gravado
+// pelo admin depois que o pedido é despachado — normalmente junto de marcar
+// ENVIADO, mas a tela deixa editar mais tarde também. Não valida um formato
+// fixo: a cotação (Melhor Envio) não é só Correios, e recusar um código
+// legítimo de outra transportadora custa mais do que aceitar um cadastrado
+// errado, que o admin corrige na mesma tela.
+export async function definirCodigoRastreio(id: string, codigoBruto: unknown) {
+  const codigo = typeof codigoBruto === "string" ? codigoBruto.trim().toUpperCase() : "";
+  if (codigo.length > 40) {
+    throw new ErroDeNegocio("Código de rastreio muito longo.");
+  }
+
+  const pedido = await prisma.pedido.findUnique({ where: { id }, include: { usuario: true } });
+  if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
+
+  const atualizado = await prisma.$transaction(async (tx) => {
+    const atualizado = await tx.pedido.update({
+      where: { id },
+      data: { codigoRastreio: codigo || null },
+    });
+
+    // Só avisa ao cadastrar um código novo — apagar ou reeditar o mesmo texto
+    // não é novidade nenhuma pro cliente.
+    if (codigo && codigo !== pedido.codigoRastreio) {
+      await notificar(
+        pedido.usuarioId,
+        "Código de rastreio disponível",
+        `Seu pedido já tem código de rastreio: ${codigo}.`,
+        tx
+      );
+    }
+
+    return atualizado;
+  });
+
+  if (codigo && codigo !== pedido.codigoRastreio) {
+    enviarEmailStatusPedido(
+      pedido.usuario.email,
+      pedido.usuario.nome,
+      "Código de rastreio disponível",
+      `Seu pedido já tem código de rastreio: ${codigo}.`
+    ).catch(() => {});
+  }
+
+  return atualizado;
+}
+
 const STATUS_POR_PAGAMENTO: Record<string, StatusPedido> = {
   approved: "PAGO",
   authorized: "PAGO",
@@ -504,6 +552,15 @@ export async function registrarRetornoDoPagamento(pagamentoId: string) {
       where: { id: pedido.id },
       data: { status, pagamentoId: String(pagamento.id ?? pagamentoId) },
     });
+
+    // Pagamento confirmado esvazia a sacola gravada no banco: cobre o caso
+    // do cliente ter fechado a aba antes da confirmação (boleto, que pode
+    // levar dias) — sem isso só a limpeza no client, feita em
+    // LimparCarrinhoAoConfirmar, aconteceria, e ela depende de reabrir a
+    // página do pedido.
+    if (status === "PAGO") {
+      await tx.carrinhoItem.deleteMany({ where: { usuarioId: pedido.usuarioId } });
+    }
 
     const aviso = AVISO_POR_PAGAMENTO[status];
     if (aviso) {

@@ -16,7 +16,8 @@
     "db:admin": "tsx prisma/promover-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db": "vitest run --config vitest.config.integration.ts"
+    "test:db": "vitest run --config vitest.config.integration.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@prisma/client": "^6",
@@ -32,6 +33,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

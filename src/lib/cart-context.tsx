@@ -4,12 +4,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useProduto } from "./use-produto";
 import { criarStoreLocal } from "./store-local";
+import { useAuth } from "./auth-context";
 
 export type ViaPersonalizacao = "IA" | "UPLOAD" | "MANUAL";
 
@@ -68,29 +71,78 @@ export function CartProvider({ children }: { children: ReactNode }) {
     store.lerNoServidor
   );
 
+  const { usuario } = useAuth();
+  const usuarioId = usuario?.id ?? null;
+
   const persist = useCallback((next: ItemCarrinho | null) => {
     store.escrever(next ? JSON.stringify(next) : null);
   }, []);
 
+  // Espelha a mutação no banco pra quem está logado — best effort, sem
+  // travar a UI: se a requisição falhar, a próxima mutação tenta de novo com
+  // o estado mais atual. Visitante sem conta continua só no localStorage.
+  const sincronizarServidor = useCallback(
+    (next: ItemCarrinho | null) => {
+      if (!usuarioId) return;
+      if (next) {
+        fetch("/api/carrinho", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item: next }),
+        }).catch(() => {});
+      } else {
+        fetch("/api/carrinho", { method: "DELETE" }).catch(() => {});
+      }
+    },
+    [usuarioId]
+  );
+
+  // Sincroniza com o servidor uma vez por login (primeiro carregamento já
+  // logado, ou troca de conta): sacola do banco tem prioridade — é ela que
+  // sobrevive a troca de aparelho e a boleto que demora dias pra confirmar.
+  // Sem nada salvo no banco ainda, a sacola montada como visitante (se
+  // houver) sobe em vez de se perder no login.
+  const sincronizadoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!usuarioId || sincronizadoRef.current === usuarioId) return;
+    sincronizadoRef.current = usuarioId;
+
+    fetch("/api/carrinho")
+      .then((r) => (r.ok ? (r.json() as Promise<ItemCarrinho | null>) : null))
+      .then((doServidor) => {
+        if (doServidor) {
+          persist(doServidor);
+          return;
+        }
+        const local = store.ler();
+        if (local) sincronizarServidor(local);
+      })
+      .catch(() => {});
+  }, [usuarioId, persist, sincronizarServidor]);
+
   const iniciarItem = useCallback(
     (produtoId: string, variacoesEscolhidas: Record<string, string>, cepInformado?: string) => {
-      persist({
+      const next: ItemCarrinho = {
         produtoId,
         variacoesEscolhidas,
         quantidade: 1,
         ...(cepInformado && { cepInformado }),
-      });
+      };
+      persist(next);
+      sincronizarServidor(next);
     },
-    [persist]
+    [persist, sincronizarServidor]
   );
 
   const definirPersonalizacao = useCallback(
     (p: ItemCarrinho["personalizacao"]) => {
       const atual = store.ler();
       if (!atual) return;
-      persist({ ...atual, personalizacao: p });
+      const next = { ...atual, personalizacao: p };
+      persist(next);
+      sincronizarServidor(next);
     },
-    [persist]
+    [persist, sincronizarServidor]
   );
 
   const definirQuantidade = useCallback(
@@ -98,12 +150,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const atual = store.ler();
       if (!atual) return;
       const inteira = Math.max(1, Math.round(quantidade) || 1);
-      persist({ ...atual, quantidade: inteira });
+      const next = { ...atual, quantidade: inteira };
+      persist(next);
+      sincronizarServidor(next);
     },
-    [persist]
+    [persist, sincronizarServidor]
   );
 
-  const limpar = useCallback(() => persist(null), [persist]);
+  const limpar = useCallback(() => {
+    persist(null);
+    sincronizarServidor(null);
+  }, [persist, sincronizarServidor]);
 
   const value = useMemo(
     () => ({ item, iniciarItem, definirPersonalizacao, definirQuantidade, limpar }),
