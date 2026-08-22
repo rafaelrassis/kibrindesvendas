@@ -42,6 +42,8 @@ export type Produto = {
   video: string | null;
   variacoes: Variacao[];
   destaque?: boolean;
+  // false = pausado, some da loja mas continua no admin.
+  ativo: boolean;
   // null = estoque não controlado (comportamento de sempre). Com um número,
   // a compra não passa disso — ver checarEstoque / decrementarEstoque.
   // Só vale pra produto SEM variações — com variações, o controle é por

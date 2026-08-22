@@ -1,6 +1,7 @@
 import AdminNav from "@/components/AdminNav";
 import AdminPedidoStatus from "@/components/AdminPedidoStatus";
 import AdminPedidoRastreio from "@/components/AdminPedidoRastreio";
+import AdminPedidoRemover from "@/components/AdminPedidoRemover";
 import { getPedidosRecentes } from "@/lib/data/pedidos";
 import { exigirAdmin } from "@/lib/admin";
 import { CLASSE_STATUS, labelStatus } from "@/lib/status-pedido";
@@ -46,6 +47,7 @@ export default async function AdminPedidosPage() {
               {/* Mudar o status aqui avisa o cliente na tela de notificações */}
               <AdminPedidoStatus pedidoId={p.id} statusAtual={p.status} />
               <AdminPedidoRastreio pedidoId={p.id} codigoAtual={p.codigoRastreio} />
+              <AdminPedidoRemover pedidoId={p.id} />
 
               {p.itens.map((item) => (
                 <div key={item.id} className="text-sm py-1 border-t border-line/60 mt-1">

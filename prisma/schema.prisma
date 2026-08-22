@@ -44,6 +44,11 @@ model Produto {
   imagens              String[]          @default([])
   video                String?
   destaque             Boolean           @default(false)
+  // false = produto pausado: some da loja (vitrine, categoria, busca,
+  // destaque e página de detalhe), mas continua no admin e nos pedidos já
+  // feitos. Usado pra tirar de venda sem apagar (o que exigiria zerar os
+  // pedidos que o referenciam primeiro).
+  ativo                Boolean           @default(true)
   // null = estoque não controlado (comportamento de sempre — produto sob
   // encomenda ou sem controle de unidades). Com um número, o pedido não
   // deixa passar da quantidade disponível — ver decrementarEstoque, que usa

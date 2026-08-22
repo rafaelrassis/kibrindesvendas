@@ -59,6 +59,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     imagens: p.imagens,
     video: p.video,
     destaque: p.destaque,
+    ativo: p.ativo,
     variacoes: p.variacoes.map((v) => ({
       tipo: v.tipo,
       valores: v.valores,
@@ -110,22 +111,28 @@ export const relacoesProdutoAdmin = {
 } as const;
 
 export async function getProdutos(): Promise<Produto[]> {
-  const produtos = await prisma.produto.findMany({ include: relacoesProduto, orderBy: { nome: "asc" } });
-  return produtos.map(toProduto);
-}
-
-export async function getDestaques(): Promise<Produto[]> {
   const produtos = await prisma.produto.findMany({
-    where: { destaque: true },
+    where: { ativo: true },
     include: relacoesProduto,
     orderBy: { nome: "asc" },
   });
   return produtos.map(toProduto);
 }
 
+export async function getDestaques(): Promise<Produto[]> {
+  const produtos = await prisma.produto.findMany({
+    where: { destaque: true, ativo: true },
+    include: relacoesProduto,
+    orderBy: { nome: "asc" },
+  });
+  return produtos.map(toProduto);
+}
+
+// Usado só pela loja (página pública e /api/produtos): produto pausado some
+// daqui, mas continua acessível pelas rotas /api/admin.
 export async function getProduto(id: string): Promise<Produto | undefined> {
   const produto = await prisma.produto.findUnique({ where: { id }, include: relacoesProduto });
-  return produto ? toProduto(produto) : undefined;
+  return produto && produto.ativo ? toProduto(produto) : undefined;
 }
 
 // --- Leitura (admin) — inclui custo de material e margem ------------------
@@ -148,7 +155,7 @@ export async function getProdutoAdmin(id: string): Promise<ProdutoAdmin | undefi
 
 export async function getProdutosPorCategoria(slug: string): Promise<Produto[]> {
   const produtos = await prisma.produto.findMany({
-    where: { categoria: { slug } },
+    where: { categoria: { slug }, ativo: true },
     include: relacoesProduto,
     orderBy: { nome: "asc" },
   });
@@ -160,6 +167,7 @@ export async function buscarProdutos(termo: string): Promise<Produto[]> {
   if (!q) return [];
   const produtos = await prisma.produto.findMany({
     where: {
+      ativo: true,
       OR: [
         { nome: { contains: q, mode: "insensitive" } },
         { descricao: { contains: q, mode: "insensitive" } },
@@ -194,6 +202,8 @@ export type DadosProduto = {
   imagens?: string[];
   video?: string | null;
   destaque?: boolean;
+  // false pausa o produto (some da loja); undefined deixa como está.
+  ativo?: boolean;
   variacoes?: { tipo: string; valores: string[]; imagensValores?: Record<string, string[]> | null }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
@@ -401,6 +411,7 @@ export async function atualizarProduto(
         imagens: dados.imagens,
         video: dados.video !== undefined ? dados.video || null : undefined,
         destaque: dados.destaque,
+        ativo: dados.ativo,
         estoque: dados.estoque !== undefined ? dados.estoque : undefined,
         pesoGramas: dados.pesoGramas,
         alturaCm: dados.alturaCm,

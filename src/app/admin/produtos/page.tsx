@@ -65,6 +65,30 @@ export default function AdminProdutosPage() {
     }
   }
 
+  // Mesmo padrão do toggle da Shopee: pausar tira o produto da loja (vitrine,
+  // categoria, busca, destaque, página de detalhe) sem apagar nada — ao
+  // contrário de remover, que trava se o produto está em algum pedido.
+  async function alternarAtivo(produto: ProdutoAdmin) {
+    setErro("");
+    const valor = !produto.ativo;
+    const aplicar = (v: boolean) =>
+      setProdutos((prev) =>
+        (prev ?? []).map((p) => (p.id === produto.id ? { ...p, ativo: v } : p))
+      );
+
+    aplicar(valor);
+    const r = await fetch(`/api/admin/produtos/${produto.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ativo: valor }),
+    });
+    if (!r.ok) {
+      aplicar(produto.ativo);
+      const data = await r.json().catch(() => ({}));
+      setErro(data.error ?? "Não foi possível salvar.");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-5 py-12">
       <h1 className="font-display text-3xl mb-1">Produtos</h1>
@@ -92,26 +116,27 @@ export default function AdminProdutosPage() {
               <th className="px-4 py-3 font-medium">Lucro</th>
               <th className="px-4 py-3 font-medium">Personalização</th>
               <th className="px-4 py-3 font-medium">Vendido na Shopee</th>
+              <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
             {carregando && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-ink/50">
+                <td colSpan={9} className="px-4 py-6 text-center text-ink/50">
                   Carregando...
                 </td>
               </tr>
             )}
             {produtos?.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-ink/50">
+                <td colSpan={9} className="px-4 py-6 text-center text-ink/50">
                   Nenhum produto cadastrado.
                 </td>
               </tr>
             )}
             {produtos?.map((p) => (
-              <tr key={p.id} className="border-t border-line">
+              <tr key={p.id} className={`border-t border-line ${!p.ativo ? "opacity-50" : ""}`}>
                 <td className="px-4 py-3">{p.emoji} {p.nome}</td>
                 <td className="px-4 py-3 text-ink/60">{p.categoriaLabel}</td>
                 <td className="px-4 py-3 font-mono">R$ {p.preco.toFixed(2).replace(".", ",")}</td>
@@ -154,6 +179,17 @@ export default function AdminProdutosPage() {
                     }`}
                   >
                     {p.vendidoNaShopee ? "Sim" : "Não"}
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => alternarAtivo(p)}
+                    aria-pressed={p.ativo}
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      p.ativo ? "bg-pine/10 text-pine-2" : "bg-berry/10 text-berry"
+                    }`}
+                  >
+                    {p.ativo ? "Ativo" : "Pausado"}
                   </button>
                 </td>
                 <td className="px-4 py-3 text-right space-x-3">

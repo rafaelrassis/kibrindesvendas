@@ -389,6 +389,19 @@ export async function solicitarDevolucao(usuarioId: string, id: string, motivoBr
   });
 }
 
+// Apaga o pedido de vez (itens e personalização vão junto, por cascade no
+// schema). Não devolve estoque nem uso de cupom — mesmo critério que o
+// resto do fluxo de status já segue (cancelar/marcar devolvido também não
+// mexe nisso), então um pedido de teste ou duplicado não deixa a loja com
+// número torto de estoque "sobrando" sem ter saído fisicamente. Ação
+// irreversível: existe sobretudo pra liberar produto preso em pedido de
+// teste, o que `removerProduto` bloqueia de propósito.
+export async function removerPedido(id: string) {
+  const pedido = await prisma.pedido.findUnique({ where: { id } });
+  if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
+  await prisma.pedido.delete({ where: { id } });
+}
+
 export async function getPedidosRecentes(limite = 50) {
   return prisma.pedido.findMany({
     orderBy: { createdAt: "desc" },
