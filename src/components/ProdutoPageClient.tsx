@@ -21,10 +21,11 @@ export default function ProdutoPageClient() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { produto, carregando } = useProduto(id);
-  const { iniciarItem } = useCart();
+  const { iniciarItem, definirQuantidade } = useCart();
   const { enderecos } = useConta();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
+  const [quantidade, setQuantidade] = useState(1);
 
   // Quem já tem endereço salvo começa com o CEP dele preenchido; digitar por
   // cima assume o controle do campo (`null` = ainda não mexeu).
@@ -114,6 +115,16 @@ export default function ProdutoPageClient() {
   const faltaEscolher =
     faltaSelecionar || combinacaoSemEstoque || (!porVariacao && esgotado);
 
+  // Teto pra quantidade: estoque da combinação escolhida (produto com
+  // variação) ou estoque geral (sem variação). null em qualquer um dos dois
+  // significa "não controlado" — sem teto, então.
+  const estoqueMaximo = porVariacao ? estoqueCombinacaoEscolhida : produto.estoque;
+  // Trocar cor/tamanho pode reduzir o estoque disponível pra menos do que já
+  // estava pedido no seletor — clampa na exibição em vez de deixar pedir mais
+  // do que tem (sem precisar de efeito pra sincronizar o estado de volta).
+  const quantidadeEfetiva =
+    estoqueMaximo != null ? Math.min(quantidade, Math.max(1, estoqueMaximo)) : quantidade;
+
   // Um valor de variação é marcado como indisponível só quando dá pra saber
   // que a combinação resultante está zerada — ou seja, quando faltar escolher
   // no máximo este tipo. Com outros tipos ainda em aberto não dá pra cravar,
@@ -140,6 +151,7 @@ export default function ProdutoPageClient() {
   function avancarPersonalizacao() {
     if (!produto || faltaEscolher) return;
     iniciarItem(produto.id, selecoes, normalizarCep(cep) ?? undefined);
+    definirQuantidade(quantidadeEfetiva);
     router.push(`/personalizar/${produto.id}`);
   }
 
@@ -148,6 +160,7 @@ export default function ProdutoPageClient() {
   function adicionarASacola() {
     if (!produto || faltaEscolher) return;
     iniciarItem(produto.id, selecoes, normalizarCep(cep) ?? undefined);
+    definirQuantidade(quantidadeEfetiva);
     router.push("/");
   }
 
@@ -156,6 +169,7 @@ export default function ProdutoPageClient() {
   function comprarAgora() {
     if (!produto || faltaEscolher) return;
     iniciarItem(produto.id, selecoes, normalizarCep(cep) ?? undefined);
+    definirQuantidade(quantidadeEfetiva);
     router.push("/checkout");
   }
 
@@ -213,6 +227,7 @@ export default function ProdutoPageClient() {
               emoji={produto.emoji}
               cor={produto.cor}
               nome={produto.nome}
+              descontoPercentual={desconto.ativo ? desconto.percentual : undefined}
             />
             <FavoritoButton produto={produto} tamanho="lg" className="absolute top-3 right-3" />
           </div>
@@ -367,7 +382,7 @@ export default function ProdutoPageClient() {
                       </p>
 
                       {ehCorComFoto ? (
-                        <div className="flex flex-wrap gap-2.5">
+                        <div className="grid grid-cols-5 gap-2 max-w-xs">
                           {v.valores.map((valor) => {
                             const ativo = selecoes[v.tipo] === valor;
                             const indisponivel = valorIndisponivel(v.tipo, valor);
@@ -377,12 +392,12 @@ export default function ProdutoPageClient() {
                                 key={valor}
                                 onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
                                 title={indisponivel ? "Sem estoque nessa combinação" : valor}
-                                className={`relative w-16 h-16 rounded-md overflow-hidden border-2 transition-colors ${
+                                className={`relative aspect-square rounded-sm overflow-hidden border-2 transition-colors ${
                                   ativo && indisponivel
                                     ? "border-berry"
                                     : ativo
-                                      ? "border-pine"
-                                      : "border-line hover:border-pine/50"
+                                      ? "border-ink"
+                                      : "border-line hover:border-ink/40"
                                 }`}
                               >
                                 {url ? (
@@ -395,7 +410,7 @@ export default function ProdutoPageClient() {
                                     }`}
                                   />
                                 ) : (
-                                  <span className="w-full h-full flex items-center justify-center text-[11px] bg-paper-2">
+                                  <span className="w-full h-full flex items-center justify-center text-[10px] bg-paper-2 px-0.5 text-center leading-tight">
                                     {valor}
                                   </span>
                                 )}
@@ -470,6 +485,41 @@ export default function ProdutoPageClient() {
               </div>
             )}
 
+            {/* Quantidade — acima do CTA, linha própria */}
+            <div className="mb-4">
+              <p className="text-sm font-medium mb-2">Quantidade</p>
+              <div className="inline-flex items-center border border-line rounded-full">
+                <button
+                  type="button"
+                  onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
+                  disabled={quantidadeEfetiva <= 1}
+                  aria-label="Diminuir quantidade"
+                  className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  −
+                </button>
+                <span className="w-10 text-center text-sm font-medium tabular-nums">
+                  {quantidadeEfetiva}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQuantidade((q) =>
+                      estoqueMaximo != null ? Math.min(estoqueMaximo, q + 1) : q + 1
+                    )
+                  }
+                  disabled={estoqueMaximo != null && quantidadeEfetiva >= estoqueMaximo}
+                  aria-label="Aumentar quantidade"
+                  className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  +
+                </button>
+              </div>
+              {estoqueMaximo != null && estoqueMaximo > 0 && quantidadeEfetiva >= estoqueMaximo && (
+                <p className="text-xs text-ink/40 mt-1">Máximo disponível em estoque.</p>
+              )}
+            </div>
+
             {/* CTA — produto com personalização tem só um botão (não dá pra
                 pular pro pagamento sem definir a arte antes); os demais têm
                 a escolha "guardar e continuar navegando" vs. "ir direto pagar" */}
@@ -535,12 +585,14 @@ function ProdutoGaleria({
   emoji,
   cor,
   nome,
+  descontoPercentual,
 }: {
   imagens: string[];
   video: string | null;
   emoji: string;
   cor: string;
   nome: string;
+  descontoPercentual?: number;
 }) {
   const itens: ItemGaleria[] = [
     ...imagens.map((url): ItemGaleria => ({ tipo: "foto", url })),
@@ -560,65 +612,72 @@ function ProdutoGaleria({
     );
   }
 
-  const item = itens[Math.min(ativo, itens.length - 1)];
+  const indiceAtivo = Math.min(ativo, itens.length - 1);
+  const item = itens[indiceAtivo];
+  const anterior = () => setAtivo((i) => (i - 1 + itens.length) % itens.length);
+  const proximo = () => setAtivo((i) => (i + 1) % itens.length);
 
   return (
     <div>
-      {item.tipo === "video" ? (
-        <div
-          className="w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center"
-          style={{ backgroundColor: `${cor}22` }}
-        >
-          <video src={item.url} className="w-full h-full object-cover" controls playsInline />
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setLightboxAberto(true)}
-          className="w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center relative group"
-          style={{ backgroundColor: `${cor}22` }}
-          aria-label="Ver foto em tela cheia"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.url} alt={nome} className="w-full h-full object-cover" />
-          <span className="absolute bottom-2 right-2 bg-black/50 text-white text-[11px] px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            🔍 Ampliar
+      <div className="relative">
+        {item.tipo === "video" ? (
+          <div
+            className="w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center"
+            style={{ backgroundColor: `${cor}22` }}
+          >
+            <video src={item.url} className="w-full h-full object-cover" controls playsInline />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setLightboxAberto(true)}
+            className="w-full aspect-square rounded-lg overflow-hidden flex items-center justify-center relative group"
+            style={{ backgroundColor: `${cor}22` }}
+            aria-label="Ver foto em tela cheia"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={item.url} alt={nome} className="w-full h-full object-cover" />
+            <span className="absolute bottom-2 right-2 bg-black/50 text-white text-[11px] px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              🔍 Ampliar
+            </span>
+          </button>
+        )}
+
+        {!!descontoPercentual && (
+          <span className="absolute top-3 left-3 bg-berry text-white text-xs font-semibold px-3 py-1 rounded-full">
+            {descontoPercentual}% OFF
           </span>
-        </button>
-      )}
+        )}
+      </div>
 
       {itens.length > 1 && (
-        <div className="flex gap-2 mt-3">
-          {itens.map((it, i) => (
-            <button
-              key={it.url}
-              type="button"
-              onClick={() => setAtivo(i)}
-              className={`w-14 h-14 rounded overflow-hidden border-2 shrink-0 relative ${
-                i === ativo ? "border-pine" : "border-transparent"
-              }`}
-              style={{ backgroundColor: `${cor}22` }}
-            >
-              {it.tipo === "video" ? (
-                <>
-                  <video src={it.url} className="w-full h-full object-cover" muted />
-                  <span className="absolute inset-0 flex items-center justify-center text-white text-lg bg-black/25">
-                    ▶
-                  </span>
-                </>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={it.url} alt="" className="w-full h-full object-cover" />
-              )}
-            </button>
-          ))}
+        <div className="flex items-center justify-center gap-6 mt-3">
+          <button
+            type="button"
+            onClick={anterior}
+            aria-label="Foto anterior"
+            className="w-8 h-8 flex items-center justify-center text-ink/50 hover:text-ink transition-colors"
+          >
+            ←
+          </button>
+          <span className="text-sm text-ink/60 tabular-nums">
+            {indiceAtivo + 1} / {itens.length}
+          </span>
+          <button
+            type="button"
+            onClick={proximo}
+            aria-label="Próxima foto"
+            className="w-8 h-8 flex items-center justify-center text-ink/50 hover:text-ink transition-colors"
+          >
+            →
+          </button>
         </div>
       )}
 
       {lightboxAberto && (
         <Lightbox
           itens={itens}
-          indiceInicial={Math.min(ativo, itens.length - 1)}
+          indiceInicial={indiceAtivo}
           nome={nome}
           onFechar={() => setLightboxAberto(false)}
         />
