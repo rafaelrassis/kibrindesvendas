@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Categoria, ProdutoAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
@@ -39,6 +39,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [descricaoDetalhada, setDescricaoDetalhada] = useState(
     produto?.descricaoDetalhada ?? ""
   );
+  const [enviandoImagemDescricao, setEnviandoImagemDescricao] = useState(false);
+  const [erroImagemDescricao, setErroImagemDescricao] = useState("");
+  const descricaoDetalhadaRef = useRef<HTMLTextAreaElement>(null);
   const [categoriaSlug, setCategoriaSlug] = useState(produto?.categoria ?? "");
   const [preco, setPreco] = useState(produto?.preco?.toString() ?? "");
   const [precoOriginal, setPrecoOriginal] = useState(produto?.precoOriginal?.toString() ?? "");
@@ -183,6 +186,40 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         return { ...v, imagensValores };
       })
     );
+  }
+
+  // Sobe a imagem e insere a sintaxe `![](url)` numa linha própria no ponto
+  // do cursor (ou no fim, se o campo não estiver focado) — a página do
+  // produto reconhece esse padrão e troca a linha por uma foto de verdade.
+  async function inserirImagemDescricao(arquivo: File | undefined) {
+    if (!arquivo) return;
+    setErroImagemDescricao("");
+    setEnviandoImagemDescricao(true);
+    const form = new FormData();
+    form.append("arquivo", arquivo);
+    try {
+      const r = await fetch("/api/admin/imagens", { method: "POST", body: form });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar a imagem.");
+
+      const campo = descricaoDetalhadaRef.current;
+      const trecho = `![](${data.url})`;
+      if (campo) {
+        const inicio = campo.selectionStart ?? descricaoDetalhada.length;
+        const fim = campo.selectionEnd ?? descricaoDetalhada.length;
+        const antes = descricaoDetalhada.slice(0, inicio);
+        const depois = descricaoDetalhada.slice(fim);
+        const precisaQuebraAntes = antes.length > 0 && !antes.endsWith("\n\n");
+        const novo = `${antes}${precisaQuebraAntes ? "\n\n" : ""}${trecho}\n\n${depois}`;
+        setDescricaoDetalhada(novo);
+      } else {
+        setDescricaoDetalhada((prev) => `${prev}${prev ? "\n\n" : ""}${trecho}\n\n`);
+      }
+    } catch (e) {
+      setErroImagemDescricao(e instanceof Error ? e.message : "Não foi possível enviar a imagem.");
+    } finally {
+      setEnviandoImagemDescricao(false);
+    }
   }
 
   // A escolha do arquivo abre o editor (zoom/arraste/rotação); só depois de
@@ -376,12 +413,33 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
       <Campo label="Descrição detalhada">
         <textarea
+          ref={descricaoDetalhadaRef}
           value={descricaoDetalhada}
           onChange={(e) => setDescricaoDetalhada(e.target.value)}
           className="w-full border border-line rounded px-3 py-2 text-sm"
           rows={5}
           placeholder="Materiais, medidas, cuidados, o que vem incluso... aparece numa seção própria na página do produto."
         />
+        <div className="flex items-center gap-3 mt-2">
+          <label
+            className={`text-xs px-3 py-1.5 rounded-full border border-line cursor-pointer ${
+              enviandoImagemDescricao ? "opacity-50" : "hover:bg-paper-2"
+            }`}
+          >
+            {enviandoImagemDescricao ? "Enviando..." : "+ Inserir imagem"}
+            <input
+              type="file"
+              accept="image/*,.heic,.heif"
+              className="hidden"
+              disabled={enviandoImagemDescricao}
+              onChange={(e) => {
+                inserirImagemDescricao(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {erroImagemDescricao && <p className="text-xs text-berry">{erroImagemDescricao}</p>}
+        </div>
         <p className="text-xs text-ink/50 mt-1">Opcional. Sem isso, a página mostra só a descrição curta.</p>
       </Campo>
 

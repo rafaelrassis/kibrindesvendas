@@ -248,6 +248,17 @@ function validar(dados: Partial<DadosProduto>) {
   if (dados.video !== undefined && dados.video && !ehUrlDeVideo(dados.video)) {
     throw new ErroDeNegocio("Vídeo inválido — envie pelo campo de upload.");
   }
+  if (dados.descricaoDetalhada) {
+    // Mesmo padrão que o botão "+ Inserir imagem" do admin grava: uma linha
+    // sozinha `![](url)`. Cada URL encontrada tem que ser foto que passou
+    // pelo upload da loja — nunca uma URL digitada à mão.
+    const urlsDeImagem = [...dados.descricaoDetalhada.matchAll(/^!\[\]\(([^)]+)\)$/gm)].map(
+      (m) => m[1]
+    );
+    if (urlsDeImagem.some((url) => !ehUrlDeImagem(url))) {
+      throw new ErroDeNegocio("Imagem inválida na descrição detalhada — envie pelo campo de upload.");
+    }
+  }
   if (dados.variacoes) {
     for (const v of dados.variacoes) {
       for (const [valor, urls] of Object.entries(v.imagensValores ?? {})) {

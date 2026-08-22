@@ -560,9 +560,7 @@ export default function ProdutoPageClient() {
           <div className="mx-auto max-w-5xl px-5 pt-8">
             <div className="bg-white border border-line rounded-lg p-5">
               <p className="text-sm font-medium mb-3">Detalhes do produto</p>
-              <p className="text-sm text-ink/70 whitespace-pre-line">
-                {produto.descricaoDetalhada}
-              </p>
+              <DescricaoDetalhada texto={produto.descricaoDetalhada} nome={produto.nome} />
             </div>
           </div>
         )}
@@ -682,6 +680,40 @@ function ProdutoGaleria({
           onFechar={() => setLightboxAberto(false)}
         />
       )}
+    </div>
+  );
+}
+
+// Reconhece `![](url)` numa linha própria (é o que o botão "+ Inserir
+// imagem" do admin grava) e troca essa linha por uma foto de verdade; o
+// resto do texto continua parágrafo normal, na ordem em que foi escrito.
+// Não é markdown de verdade — só esse padrão específico é reconhecido.
+const LINHA_DE_IMAGEM = /^!\[\]\(([^)]+)\)$/;
+
+function DescricaoDetalhada({ texto, nome }: { texto: string; nome: string }) {
+  const blocos = texto.split(/\n{2,}/).map((bloco) => bloco.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-4">
+      {blocos.map((bloco, i) => {
+        const imagem = bloco.match(LINHA_DE_IMAGEM);
+        if (imagem) {
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={i}
+              src={imagem[1]}
+              alt={nome}
+              className="w-full rounded-lg object-cover"
+            />
+          );
+        }
+        return (
+          <p key={i} className="text-sm text-ink/70 whitespace-pre-line">
+            {bloco}
+          </p>
+        );
+      })}
     </div>
   );
 }
