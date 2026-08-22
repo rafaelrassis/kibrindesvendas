@@ -12,6 +12,8 @@ import { controladoPorVariacao, estoqueDaCombinacao, produtoEsgotado } from "@/l
 import FavoritoButton from "@/components/FavoritoButton";
 import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 import Lightbox from "@/components/Lightbox";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
@@ -690,36 +692,28 @@ function ProdutoGaleria({
   );
 }
 
-// Reconhece `![](url)` numa linha própria (é o que o botão "+ Inserir
-// imagem" do admin grava) e troca essa linha por uma foto de verdade; o
-// resto do texto continua parágrafo normal, na ordem em que foi escrito.
-// Não é markdown de verdade — só esse padrão específico é reconhecido.
-const LINHA_DE_IMAGEM = /^!\[\]\(([^)]+)\)$/;
-
+// Suporta markdown de verdade (negrito, listas, títulos, links etc). O
+// botão "+ Inserir imagem" do admin continua gravando `![](url)`, que o
+// react-markdown já resolve como imagem — só estilizamos a tag <img>.
 function DescricaoDetalhada({ texto, nome }: { texto: string; nome: string }) {
-  const blocos = texto.split(/\n{2,}/).map((bloco) => bloco.trim()).filter(Boolean);
-
   return (
-    <div className="space-y-4">
-      {blocos.map((bloco, i) => {
-        const imagem = bloco.match(LINHA_DE_IMAGEM);
-        if (imagem) {
-          return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={i}
-              src={imagem[1]}
-              alt={nome}
-              className="w-full rounded-lg object-cover"
-            />
-          );
-        }
-        return (
-          <p key={i} className="text-sm text-ink/70 whitespace-pre-line">
-            {bloco}
-          </p>
-        );
-      })}
+    <div className="text-sm text-ink/70 space-y-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-ink [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:font-semibold [&_h3]:text-ink [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_a]:underline [&_a]:text-berry">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          img: ({ src, alt }) =>
+            typeof src === "string" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={alt || nome}
+                className="w-full rounded-lg object-cover"
+              />
+            ) : null,
+        }}
+      >
+        {texto}
+      </ReactMarkdown>
     </div>
   );
 }

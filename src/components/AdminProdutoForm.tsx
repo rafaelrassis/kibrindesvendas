@@ -191,6 +191,44 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     );
   }
 
+  // Aplica marcação markdown no ponto do cursor. `envolver` embrulha a
+  // seleção (ex.: **texto**); sem seleção, insere o marcador e o cursor
+  // fica entre as marcas prontos pra digitar.
+  function aplicarMarkdown(prefixo: string, sufixo: string = prefixo) {
+    const campo = descricaoDetalhadaRef.current;
+    const inicio = campo?.selectionStart ?? descricaoDetalhada.length;
+    const fim = campo?.selectionEnd ?? descricaoDetalhada.length;
+    const selecionado = descricaoDetalhada.slice(inicio, fim);
+    const novo =
+      descricaoDetalhada.slice(0, inicio) +
+      prefixo +
+      selecionado +
+      sufixo +
+      descricaoDetalhada.slice(fim);
+    setDescricaoDetalhada(novo);
+    requestAnimationFrame(() => {
+      campo?.focus();
+      const pos = selecionado ? inicio + prefixo.length + selecionado.length + sufixo.length : inicio + prefixo.length;
+      campo?.setSelectionRange(pos, pos);
+    });
+  }
+
+  // Insere um marcador no início da linha atual (título, lista) — não
+  // embrulha seleção, só prefixa a linha onde o cursor está.
+  function aplicarMarkdownDeLinha(prefixo: string) {
+    const campo = descricaoDetalhadaRef.current;
+    const pos = campo?.selectionStart ?? descricaoDetalhada.length;
+    const inicioLinha = descricaoDetalhada.lastIndexOf("\n", pos - 1) + 1;
+    const novo =
+      descricaoDetalhada.slice(0, inicioLinha) + prefixo + descricaoDetalhada.slice(inicioLinha);
+    setDescricaoDetalhada(novo);
+    requestAnimationFrame(() => {
+      campo?.focus();
+      const novaPos = pos + prefixo.length;
+      campo?.setSelectionRange(novaPos, novaPos);
+    });
+  }
+
   // Sobe a imagem e insere a sintaxe `![](url)` numa linha própria no ponto
   // do cursor (ou no fim, se o campo não estiver focado) — a página do
   // produto reconhece esse padrão e troca a linha por uma foto de verdade.
@@ -424,7 +462,28 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           rows={5}
           placeholder="Materiais, medidas, cuidados, o que vem incluso... aparece numa seção própria na página do produto."
         />
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => aplicarMarkdown("**")}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full border border-line hover:bg-paper-2"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarMarkdownDeLinha("## ")}
+            className="text-xs px-3 py-1.5 rounded-full border border-line hover:bg-paper-2"
+          >
+            Título
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarMarkdownDeLinha("- ")}
+            className="text-xs px-3 py-1.5 rounded-full border border-line hover:bg-paper-2"
+          >
+            Lista
+          </button>
           <label
             className={`text-xs px-3 py-1.5 rounded-full border border-line cursor-pointer ${
               enviandoImagemDescricao ? "opacity-50" : "hover:bg-paper-2"
