@@ -29,6 +29,35 @@ function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
 }
 
+// Snippet inserido pelo botão "+ Tabela" — HTML com style inline, que a
+// página do produto já sanitiza e renderiza (junto com markdown normal).
+const TABELA_EXEMPLO = `\n\n<h3>TABELA DE MEDIDAS</h3>
+
+<table border="1" style="width: 100%; text-align: center; border-collapse: collapse; border: 1px solid #ccc;">
+  <thead>
+    <tr style="background-color: #f5f5f5;">
+      <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">TAMANHOS</th>
+      <th style="padding: 8px; border: 1px solid #ccc;">P</th>
+      <th style="padding: 8px; border: 1px solid #ccc;">M</th>
+      <th style="padding: 8px; border: 1px solid #ccc;">G</th>
+      <th style="padding: 8px; border: 1px solid #ccc;">GG</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding: 8px; border: 1px solid #ccc; text-align: left; font-weight: bold;">LARGURA</td>
+      <td style="padding: 8px; border: 1px solid #ccc;">00</td>
+      <td style="padding: 8px; border: 1px solid #ccc;">00</td>
+      <td style="padding: 8px; border: 1px solid #ccc;">00</td>
+      <td style="padding: 8px; border: 1px solid #ccc;">00</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><em>Unidade de medida em cm.<br>As medidas podem variar em até 2 cm.</em></p>
+
+`;
+
 export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }) {
   const router = useRouter();
   const editando = !!produto;
@@ -483,6 +512,13 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             className="text-xs px-3 py-1.5 rounded-full border border-line hover:bg-paper-2"
           >
             Lista
+          </button>
+          <button
+            type="button"
+            onClick={() => aplicarMarkdown(TABELA_EXEMPLO, "")}
+            className="text-xs px-3 py-1.5 rounded-full border border-line hover:bg-paper-2"
+          >
+            + Tabela
           </button>
           <label
             className={`text-xs px-3 py-1.5 rounded-full border border-line cursor-pointer ${

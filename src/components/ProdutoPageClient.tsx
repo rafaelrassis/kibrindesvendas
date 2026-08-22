@@ -14,6 +14,8 @@ import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 import Lightbox from "@/components/Lightbox";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
@@ -692,14 +694,25 @@ function ProdutoGaleria({
   );
 }
 
-// Suporta markdown de verdade (negrito, listas, títulos, links etc). O
-// botão "+ Inserir imagem" do admin continua gravando `![](url)`, que o
-// react-markdown já resolve como imagem — só estilizamos a tag <img>.
+// Suporta markdown (negrito, listas, títulos, tabelas) e também HTML colado
+// direto (ex.: tabela de medidas com style inline) — rehypeRaw interpreta as
+// tags e rehypeSanitize filtra pra não abrir brecha de script/onClick, só
+// liberando `style`/`class` a mais que o padrão já permite. O botão
+// "+ Inserir imagem" do admin grava `![](url)`, que cai na regra de <img>.
+const schemaSanitizacao = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    "*": [...(defaultSchema.attributes?.["*"] ?? []), "style", "className"],
+  },
+};
+
 function DescricaoDetalhada({ texto, nome }: { texto: string; nome: string }) {
   return (
-    <div className="text-sm text-ink/70 space-y-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-ink [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:font-semibold [&_h3]:text-ink [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_a]:underline [&_a]:text-berry">
+    <div className="text-sm text-ink/70 space-y-3 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-ink [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:font-semibold [&_h3]:text-ink [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_a]:underline [&_a]:text-berry [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:block">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, schemaSanitizacao]]}
         components={{
           img: ({ src, alt }) =>
             typeof src === "string" ? (
