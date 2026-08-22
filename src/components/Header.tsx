@@ -29,7 +29,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
       {/* Logo — no mobile aparece só na home; no desktop sempre, junto da nav.
           h-[92px]: ocupa do topo até o fim da barra inicial, como pedido. */}
       {home && (
-        <div className="md:hidden mx-auto max-w-6xl px-5 flex items-center h-[92px]">
+        <div className="md:hidden mx-auto max-w-6xl px-5 flex items-center justify-center h-[92px]">
           <Link href="/" className="inline-flex items-center h-full">
             <Image
               src="/logo.png"
@@ -37,7 +37,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
               width={220}
               height={92}
               priority
-              className="h-full w-auto"
+              className="h-[76%] w-auto"
             />
           </Link>
         </div>
