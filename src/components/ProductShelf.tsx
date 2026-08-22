@@ -18,7 +18,7 @@ export default function ProductShelf({
         {subtitulo && <p className="text-xs text-ink/50 hidden md:block">{subtitulo}</p>}
       </div>
 
-      <div className="pl-5 pr-5 flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide md:grid md:grid-cols-4 lg:grid-cols-6 md:overflow-visible md:snap-none">
+      <div className="pl-5 pr-5 flex gap-3 overflow-x-auto pb-2 scrollbar-hide md:grid md:grid-cols-4 lg:grid-cols-6 md:overflow-visible">
         {produtos.map((p) => {
           const comparacao = compararPreco(p.precoShopee, p.preco, p.vendidoNaShopee);
           const desconto = calcularDesconto(p.preco, p.precoOriginal);
@@ -26,7 +26,7 @@ export default function ProductShelf({
             <Link
               key={p.id}
               href={`/produto/${p.id}`}
-              className="snap-start shrink-0 w-36 md:w-auto bg-white border border-line rounded-lg p-3 hover:shadow-md transition-shadow"
+              className="shrink-0 w-36 md:w-auto bg-white border border-line rounded-lg p-3 hover:shadow-md transition-shadow"
             >
               <div
                 className="w-full aspect-square rounded flex items-center justify-center text-4xl mb-2 overflow-hidden"
