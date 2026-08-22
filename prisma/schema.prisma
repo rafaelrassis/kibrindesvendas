@@ -287,8 +287,16 @@ model Avaliacao {
   id         String   @id @default(cuid())
   produtoId  String
   produto    Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  usuarioId  String
-  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // Nula quando a avaliação é criada pelo admin (sem cliente real por trás) —
+  // nesse caso `autorNome` é quem aparece como autor. Postgres não conta
+  // NULL como duplicado num índice único, então várias avaliações do admin
+  // pro mesmo produto convivem sem esbarrar no @@unique abaixo.
+  usuarioId  String?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // Só usado quando usuarioId é nulo — nome exibido como autor da review
+  // criada pelo admin (ex.: "Cliente via WhatsApp", nome informado à loja).
+  autorNome  String?
+  criadoPorAdmin Boolean @default(false)
   nota       Int
   comentario String?
   aprovado   Boolean  @default(false)
