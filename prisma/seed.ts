@@ -48,6 +48,7 @@ async function main() {
         precoShopee: p.precoShopee,
         vendidoNaShopee: p.vendidoNaShopee,
         requerPersonalizacao: p.requerPersonalizacao,
+        mensagemPersonalizacao: p.mensagemPersonalizacao,
         diasProducaoExtra: p.diasProducaoExtra,
         emoji: p.emoji,
         cor: p.cor,
