@@ -18,7 +18,7 @@ export default function ProductShelf({
         {subtitulo && <p className="text-xs text-ink/50 hidden md:block">{subtitulo}</p>}
       </div>
 
-      <div className="pl-5 pr-5 flex flex-wrap gap-3 overflow-x-auto pb-2 scrollbar-hide md:overflow-visible">
+      <div className="pl-5 pr-5 flex flex-nowrap gap-3 overflow-x-auto pb-2 scrollbar-hide md:flex-wrap md:justify-center md:overflow-visible">
         {produtos.map((p) => {
           const comparacao = compararPreco(p.precoShopee, p.preco, p.vendidoNaShopee);
           const desconto = calcularDesconto(p.preco, p.precoOriginal);
