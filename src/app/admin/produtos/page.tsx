@@ -14,6 +14,8 @@ export default function AdminProdutosPage() {
   // antes da resposta.
   const [produtos, setProdutos] = useState<ProdutoAdmin[] | undefined>(undefined);
   const [erro, setErro] = useState("");
+  const [produtoParaRemover, setProdutoParaRemover] = useState<ProdutoAdmin | null>(null);
+  const [removendo, setRemovendo] = useState(false);
   const carregando = produtos === undefined;
 
   useEffect(() => {
@@ -33,13 +35,17 @@ export default function AdminProdutosPage() {
 
   async function remover(id: string) {
     setErro("");
+    setRemovendo(true);
     const r = await fetch(`/api/admin/produtos/${id}`, { method: "DELETE" });
     const data = await r.json();
+    setRemovendo(false);
     if (!r.ok) {
       setErro(data.error ?? "Não foi possível remover.");
+      setProdutoParaRemover(null);
       return;
     }
     setProdutos((prev) => (prev ?? []).filter((p) => p.id !== id));
+    setProdutoParaRemover(null);
   }
 
   // Troca na tela na hora e desfaz se a gravação falhar — o botão é um liga/
@@ -200,7 +206,7 @@ export default function AdminProdutosPage() {
                     Editar
                   </Link>
                   <button
-                    onClick={() => remover(p.id)}
+                    onClick={() => setProdutoParaRemover(p)}
                     className="text-berry hover:underline text-xs"
                   >
                     Remover
@@ -211,6 +217,42 @@ export default function AdminProdutosPage() {
           </tbody>
         </table>
       </div>
+
+      {produtoParaRemover && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+          onClick={() => !removendo && setProdutoParaRemover(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 border-2 border-berry"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-berry font-bold text-lg mb-2">⚠️ Remover produto?</p>
+            <p className="text-sm text-ink mb-1">
+              Você está prestes a remover <strong>{produtoParaRemover.nome}</strong>.
+            </p>
+            <p className="text-sm text-ink/70 mb-6">
+              Essa ação não pode ser desfeita.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setProdutoParaRemover(null)}
+                disabled={removendo}
+                className="px-4 py-2 text-sm rounded border border-line hover:bg-cream"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => remover(produtoParaRemover.id)}
+                disabled={removendo}
+                className="px-4 py-2 text-sm rounded bg-berry text-white hover:bg-berry/90 disabled:opacity-60"
+              >
+                {removendo ? "Removendo..." : "Remover"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
