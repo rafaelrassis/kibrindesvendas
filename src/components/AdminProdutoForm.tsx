@@ -94,6 +94,12 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [diasProducaoExtra, setDiasProducaoExtra] = useState(
     String(produto?.diasProducaoExtra ?? 0)
   );
+  const [quantidadeMinima, setQuantidadeMinima] = useState(
+    String(produto?.quantidadeMinima ?? 1)
+  );
+  const [quantidadePersonalizavel, setQuantidadePersonalizavel] = useState(
+    produto?.quantidadePersonalizavel ?? false
+  );
   const [destaque, setDestaque] = useState(produto?.destaque ?? false);
   const [destaqueCategoria, setDestaqueCategoria] = useState(
     produto?.destaqueCategoria ?? false
@@ -411,6 +417,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       requerPersonalizacao,
       mensagemPersonalizacao: mensagemPersonalizacao.trim() || null,
       diasProducaoExtra: Number(diasProducaoExtra) || 0,
+      quantidadeMinima: Math.max(1, Math.round(Number(quantidadeMinima)) || 1),
+      quantidadePersonalizavel,
       emoji,
       cor,
       imagens,
@@ -795,6 +803,25 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
         />
       </Campo>
+
+      <Campo label="Quantidade mínima por pedido">
+        <input
+          type="number"
+          min={1}
+          value={quantidadeMinima}
+          onChange={(e) => setQuantidadeMinima(e.target.value)}
+          className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
+        />
+      </Campo>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={quantidadePersonalizavel}
+          onChange={(e) => setQuantidadePersonalizavel(e.target.checked)}
+        />
+        Quantidade em campo livre (pedidos grandes, sem stepper +/-)
+      </label>
 
       <label className="flex items-center gap-2 text-sm">
         <input

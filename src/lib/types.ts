@@ -36,6 +36,11 @@ export type Produto = {
   // Dias extras de produção somados ao prazo de frete quando o produto exige
   // personalização. 0 = não soma nada.
   diasProducaoExtra: number;
+  // Menor quantidade que dá pra levar deste produto. 1 = sem pedido mínimo.
+  quantidadeMinima: number;
+  // true = seletor de quantidade vira campo numérico livre em vez do
+  // stepper +/-, pra pedido grande sem clicar um por um.
+  quantidadePersonalizavel: boolean;
   emoji: string;
   cor: string;
   // Galeria de mídia: até 4 fotos (nessa ordem) e 1 vídeo. Sem nada aqui, a

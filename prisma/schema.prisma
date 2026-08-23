@@ -41,6 +41,13 @@ model Produto {
   // Dias extras de produção somados ao prazo de frete retornado pelo Melhor
   // Envio, quando o produto exige personalização. 0 = não soma nada.
   diasProducaoExtra    Int               @default(0)
+  // Menor quantidade que o cliente pode levar deste produto (ex: sacolinha
+  // vendida em lote de 30). 1 = sem pedido mínimo, comportamento de sempre.
+  quantidadeMinima     Int               @default(1)
+  // true = o seletor de quantidade na página do produto e no checkout vira
+  // um campo numérico livre em vez do stepper +/-, pra digitar pedidos
+  // grandes (ex: 554un) sem clicar um por um.
+  quantidadePersonalizavel Boolean       @default(false)
   emoji                String
   cor                  String
   // Galeria do produto: até 4 fotos (ordem = ordem de exibição) e 1 vídeo,

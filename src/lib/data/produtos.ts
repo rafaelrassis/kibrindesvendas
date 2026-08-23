@@ -55,6 +55,8 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     requerPersonalizacao: p.requerPersonalizacao,
     mensagemPersonalizacao: p.mensagemPersonalizacao,
     diasProducaoExtra: p.diasProducaoExtra,
+    quantidadeMinima: p.quantidadeMinima,
+    quantidadePersonalizavel: p.quantidadePersonalizavel,
     emoji: p.emoji,
     cor: p.cor,
     imagens: p.imagens,
@@ -221,6 +223,10 @@ export type DadosProduto = {
   // Dias extras de produção somados ao prazo de frete, independente de
   // requerPersonalizacao — todo produto pode ter produção mais longa.
   diasProducaoExtra?: number;
+  // Menor quantidade que dá pra levar. undefined deixa como está.
+  quantidadeMinima?: number;
+  // true = seletor de quantidade vira campo numérico livre.
+  quantidadePersonalizavel?: boolean;
   emoji?: string;
   cor?: string;
   // Até 4 fotos (ordem = ordem de exibição) e 1 vídeo — ver validarMidia.
@@ -314,6 +320,12 @@ function validar(dados: Partial<DadosProduto>) {
   if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
     throw new ErroDeNegocio("O estoque precisa ser um número inteiro maior ou igual a zero.");
   }
+  if (
+    dados.quantidadeMinima !== undefined &&
+    (!Number.isInteger(dados.quantidadeMinima) || dados.quantidadeMinima < 1)
+  ) {
+    throw new ErroDeNegocio("A quantidade mínima precisa ser um número inteiro maior ou igual a 1.");
+  }
   if (dados.estoqueVariacoes) {
     for (const linha of dados.estoqueVariacoes) {
       if (!linha.combinacao.trim()) {
@@ -354,6 +366,8 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       requerPersonalizacao: !!dados.requerPersonalizacao,
       mensagemPersonalizacao: dados.mensagemPersonalizacao?.trim() || null,
       diasProducaoExtra: dados.diasProducaoExtra ?? 0,
+      quantidadeMinima: dados.quantidadeMinima ?? 1,
+      quantidadePersonalizavel: !!dados.quantidadePersonalizavel,
       emoji: dados.emoji || EMOJI_PADRAO,
       cor: dados.cor || COR_PADRAO,
       imagens: dados.imagens ?? [],
@@ -438,6 +452,8 @@ export async function atualizarProduto(
             ? dados.mensagemPersonalizacao?.trim() || null
             : undefined,
         diasProducaoExtra: dados.diasProducaoExtra,
+        quantidadeMinima: dados.quantidadeMinima,
+        quantidadePersonalizavel: dados.quantidadePersonalizavel,
         emoji: dados.emoji,
         cor: dados.cor,
         imagens: dados.imagens,

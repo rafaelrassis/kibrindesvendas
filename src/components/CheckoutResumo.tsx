@@ -43,6 +43,7 @@ export default function CheckoutResumo({
   const cep = cepDigitado ?? (cepInicial ? formatarCep(cepInicial) : "");
 
   const quantidade = item?.quantidade ?? 1;
+  const quantidadeMinima = Math.max(1, produto?.quantidadeMinima || 1);
   const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(
     cep,
     item?.produtoId,
@@ -269,24 +270,39 @@ export default function CheckoutResumo({
             {!produto.requerPersonalizacao && (
               <div className="flex items-center gap-3 mt-2">
                 <span className="text-xs text-ink/50">Quantidade</span>
-                <div className="flex items-center border border-line rounded-full">
-                  <button
-                    onClick={() => definirQuantidade(quantidade - 1)}
-                    disabled={quantidade <= 1}
-                    className="w-7 h-7 flex items-center justify-center text-sm disabled:opacity-30"
-                    aria-label="Diminuir quantidade"
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-mono">{quantidade}</span>
-                  <button
-                    onClick={() => definirQuantidade(quantidade + 1)}
-                    className="w-7 h-7 flex items-center justify-center text-sm"
-                    aria-label="Aumentar quantidade"
-                  >
-                    +
-                  </button>
-                </div>
+                {produto.quantidadePersonalizavel ? (
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={quantidadeMinima}
+                    value={quantidade}
+                    onChange={(e) => {
+                      const valor = Math.round(Number(e.target.value));
+                      definirQuantidade(Number.isFinite(valor) && valor > 0 ? valor : quantidadeMinima);
+                    }}
+                    onBlur={() => definirQuantidade(Math.max(quantidadeMinima, quantidade))}
+                    className="w-16 h-7 border border-line rounded-full text-center text-sm font-mono"
+                  />
+                ) : (
+                  <div className="flex items-center border border-line rounded-full">
+                    <button
+                      onClick={() => definirQuantidade(quantidade - 1)}
+                      disabled={quantidade <= quantidadeMinima}
+                      className="w-7 h-7 flex items-center justify-center text-sm disabled:opacity-30"
+                      aria-label="Diminuir quantidade"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center text-sm font-mono">{quantidade}</span>
+                    <button
+                      onClick={() => definirQuantidade(quantidade + 1)}
+                      className="w-7 h-7 flex items-center justify-center text-sm"
+                      aria-label="Aumentar quantidade"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

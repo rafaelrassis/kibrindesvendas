@@ -50,6 +50,8 @@ async function main() {
         requerPersonalizacao: p.requerPersonalizacao,
         mensagemPersonalizacao: p.mensagemPersonalizacao,
         diasProducaoExtra: p.diasProducaoExtra,
+        quantidadeMinima: p.quantidadeMinima,
+        quantidadePersonalizavel: p.quantidadePersonalizavel,
         emoji: p.emoji,
         cor: p.cor,
         destaque: p.destaque ?? false,

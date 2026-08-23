@@ -41,13 +41,10 @@ export async function criarPedido(
 ) {
   if (!item?.produtoId) throw new ErroDeNegocio("Item do pedido inválido.");
 
-  // Quantidade também não é confiada do navegador: valida aqui e trava o
-  // item nela antes de usar em qualquer cálculo. Item com personalização
-  // fica preso em 1 — não faz sentido pedir n artes num único item.
+  // Quantidade também não é confiada do navegador: normaliza aqui, valida
+  // contra o produto mais abaixo (mínima + personalização) antes de usar em
+  // qualquer cálculo.
   const quantidade = Math.max(1, Math.round(Number(item.quantidade)) || 1);
-  if (item.personalizacao && quantidade !== 1) {
-    throw new ErroDeNegocio("Item personalizado só pode ter quantidade 1.");
-  }
 
   // O frete é recalculado aqui de propósito: o valor que o navegador mostrou
   // é só pra visualização, quem define o que vai ser cobrado é o servidor.
@@ -64,6 +61,17 @@ export async function criarPedido(
 
   if (produto.requerPersonalizacao && !item.personalizacao?.aceite) {
     throw new ErroDeNegocio("Falta confirmar a personalização antes de pagar.");
+  }
+
+  // Item com personalização fica preso em 1 — não faz sentido pedir n artes
+  // num único item. Sem personalização, o piso é o cadastrado no produto
+  // (quantidadeMinima), nunca confiado só do navegador.
+  if (item.personalizacao && quantidade !== 1) {
+    throw new ErroDeNegocio("Item personalizado só pode ter quantidade 1.");
+  }
+  const quantidadeMinima = Math.max(1, produto.quantidadeMinima || 1);
+  if (!item.personalizacao && quantidade < quantidadeMinima) {
+    throw new ErroDeNegocio(`Pedido mínimo de ${quantidadeMinima} unidade(s) para este produto.`);
   }
 
   // Produto com variações e controle ligado (tem linha em estoqueVariacoes)

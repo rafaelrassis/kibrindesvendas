@@ -31,6 +31,15 @@ export default function ProdutoPageClient() {
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
   const [corHover, setCorHover] = useState<string | null>(null);
   const [quantidade, setQuantidade] = useState(1);
+  // Produto carrega assíncrono — assim que a quantidade mínima chega, o
+  // seletor já parte dela em vez de 1 (que pode nem ser um valor válido).
+  // setState durante a renderização (não em efeito) é o padrão recomendado
+  // pra ajustar estado quando um prop muda — evita o passo extra de efeito.
+  const [produtoIdVisto, setProdutoIdVisto] = useState(produto?.id);
+  if (produto && produto.id !== produtoIdVisto) {
+    setProdutoIdVisto(produto.id);
+    setQuantidade(produto.quantidadeMinima || 1);
+  }
 
   // Quem já tem endereço salvo começa com o CEP dele preenchido; digitar por
   // cima assume o controle do campo (`null` = ainda não mexeu).
@@ -138,11 +147,14 @@ export default function ProdutoPageClient() {
   // variação) ou estoque geral (sem variação). null em qualquer um dos dois
   // significa "não controlado" — sem teto, então.
   const estoqueMaximo = porVariacao ? estoqueCombinacaoEscolhida : produto.estoque;
+  const quantidadeMinima = Math.max(1, produto.quantidadeMinima || 1);
   // Trocar cor/tamanho pode reduzir o estoque disponível pra menos do que já
   // estava pedido no seletor — clampa na exibição em vez de deixar pedir mais
   // do que tem (sem precisar de efeito pra sincronizar o estado de volta).
-  const quantidadeEfetiva =
-    estoqueMaximo != null ? Math.min(quantidade, Math.max(1, estoqueMaximo)) : quantidade;
+  const quantidadeEfetiva = Math.max(
+    quantidadeMinima,
+    estoqueMaximo != null ? Math.min(quantidade, Math.max(quantidadeMinima, estoqueMaximo)) : quantidade
+  );
 
   // Um valor de variação é marcado como indisponível só quando dá pra saber
   // que a combinação resultante está zerada — ou seja, quando faltar escolher
@@ -455,36 +467,57 @@ export default function ProdutoPageClient() {
               </div>
             )}
 
-            {/* Quantidade — acima do CTA, linha própria */}
+            {/* Quantidade — acima do CTA, linha própria. Produto com
+                quantidadePersonalizavel troca o stepper por um campo livre,
+                pra pedido grande (ex: 554un) sem clicar um por um. */}
             <div className="mb-4">
               <p className="text-sm font-medium mb-2">Quantidade</p>
-              <div className="inline-flex items-center border border-line rounded-full">
-                <button
-                  type="button"
-                  onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
-                  disabled={quantidadeEfetiva <= 1}
-                  aria-label="Diminuir quantidade"
-                  className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  −
-                </button>
-                <span className="w-10 text-center text-sm font-medium tabular-nums">
-                  {quantidadeEfetiva}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setQuantidade((q) =>
-                      estoqueMaximo != null ? Math.min(estoqueMaximo, q + 1) : q + 1
-                    )
-                  }
-                  disabled={estoqueMaximo != null && quantidadeEfetiva >= estoqueMaximo}
-                  aria-label="Aumentar quantidade"
-                  className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  +
-                </button>
-              </div>
+              {produto.quantidadePersonalizavel ? (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={quantidadeMinima}
+                  max={estoqueMaximo ?? undefined}
+                  value={quantidade}
+                  onChange={(e) => {
+                    const valor = Math.round(Number(e.target.value));
+                    setQuantidade(Number.isFinite(valor) && valor > 0 ? valor : quantidadeMinima);
+                  }}
+                  onBlur={() => setQuantidade(quantidadeEfetiva)}
+                  className="w-24 h-10 border border-line rounded-full text-center text-sm font-medium tabular-nums"
+                />
+              ) : (
+                <div className="inline-flex items-center border border-line rounded-full">
+                  <button
+                    type="button"
+                    onClick={() => setQuantidade((q) => Math.max(quantidadeMinima, q - 1))}
+                    disabled={quantidadeEfetiva <= quantidadeMinima}
+                    aria-label="Diminuir quantidade"
+                    className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center text-sm font-medium tabular-nums">
+                    {quantidadeEfetiva}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setQuantidade((q) =>
+                        estoqueMaximo != null ? Math.min(estoqueMaximo, q + 1) : q + 1
+                      )
+                    }
+                    disabled={estoqueMaximo != null && quantidadeEfetiva >= estoqueMaximo}
+                    aria-label="Aumentar quantidade"
+                    className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+              {quantidadeMinima > 1 && (
+                <p className="text-xs text-ink/40 mt-1">Pedido mínimo: {quantidadeMinima} unidades.</p>
+              )}
               {estoqueMaximo != null && estoqueMaximo > 0 && quantidadeEfetiva >= estoqueMaximo && (
                 <p className="text-xs text-ink/40 mt-1">Máximo disponível em estoque.</p>
               )}
