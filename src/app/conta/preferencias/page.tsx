@@ -31,8 +31,12 @@ export default function PreferenciasPage() {
   const router = useRouter();
   const { preferencias, atualizarPreferencias } = useConta();
 
-  function alternar(chave: keyof Preferencias) {
-    atualizarPreferencias({ ...preferencias, [chave]: !preferencias[chave] });
+  async function alternar(chave: keyof Preferencias) {
+    try {
+      await atualizarPreferencias({ ...preferencias, [chave]: !preferencias[chave] });
+    } catch {
+      // Falhou: mantém o estado anterior, sem trocar o switch na tela.
+    }
   }
 
   return (

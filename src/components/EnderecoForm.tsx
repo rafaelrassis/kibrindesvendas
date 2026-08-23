@@ -6,7 +6,7 @@ import { formatarCep, normalizarCep } from "@/lib/frete";
 
 type Props = {
   inicial: Endereco;
-  onSalvar: (endereco: Endereco) => void;
+  onSalvar: (endereco: Endereco) => void | Promise<void>;
   onExcluir?: () => void;
 };
 
@@ -14,6 +14,8 @@ export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
   const [form, setForm] = useState<Endereco>(inicial);
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [erroCep, setErroCep] = useState("");
+  const [erroSalvar, setErroSalvar] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   function campo<K extends keyof Endereco>(chave: K, valor: Endereco[K]) {
     setForm((f) => ({ ...f, [chave]: valor }));
@@ -48,9 +50,17 @@ export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
 
   return (
     <form
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        onSalvar(form);
+        setErroSalvar("");
+        setSalvando(true);
+        try {
+          await onSalvar(form);
+        } catch (err) {
+          setErroSalvar(err instanceof Error ? err.message : "Não foi possível salvar.");
+        } finally {
+          setSalvando(false);
+        }
       }}
       className="space-y-4"
     >
@@ -155,11 +165,14 @@ export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
         Usar como endereço padrão
       </label>
 
+      {erroSalvar && <p className="text-xs text-berry -mt-2">{erroSalvar}</p>}
+
       <button
         type="submit"
-        className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2"
+        disabled={salvando}
+        className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2 disabled:opacity-60"
       >
-        Salvar endereço
+        {salvando ? "Salvando..." : "Salvar endereço"}
       </button>
 
       {onExcluir && (

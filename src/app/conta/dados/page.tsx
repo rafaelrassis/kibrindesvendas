@@ -7,19 +7,37 @@ import type { Perfil } from "@/lib/conta-data";
 
 export default function DadosPage() {
   const router = useRouter();
-  const { perfil, atualizarPerfil } = useConta();
+  const { perfil, atualizarPerfil, carregando } = useConta();
   const [form, setForm] = useState<Perfil>(perfil);
   const [salvo, setSalvo] = useState(false);
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  // O perfil chega depois via fetch (useConta); ajuste de estado derivado da
+  // prop, feito durante o render — sem isso o form abriria sempre vazio.
+  const [perfilAnterior, setPerfilAnterior] = useState(perfil);
+  if (!carregando && perfil !== perfilAnterior) {
+    setPerfilAnterior(perfil);
+    setForm(perfil);
+  }
 
   function campo<K extends keyof Perfil>(chave: K, valor: Perfil[K]) {
     setForm((f) => ({ ...f, [chave]: valor }));
     setSalvo(false);
   }
 
-  function salvar(e: React.FormEvent) {
+  async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    atualizarPerfil(form);
-    setSalvo(true);
+    setErro("");
+    setSalvando(true);
+    try {
+      await atualizarPerfil(form);
+      setSalvo(true);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
   return (
@@ -49,10 +67,12 @@ export default function DadosPage() {
           <input
             type="email"
             value={form.email}
-            onChange={(e) => campo("email", e.target.value)}
-            className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
-            required
+            disabled
+            className="w-full bg-paper-2 border border-line rounded-lg px-4 py-3 text-sm text-ink/50 outline-none"
           />
+          <span className="block text-xs text-ink/40 mt-1">
+            Pra trocar o e-mail, use a aba Segurança.
+          </span>
         </Campo>
 
         <Campo label="Telefone / WhatsApp">
@@ -82,13 +102,15 @@ export default function DadosPage() {
 
         <button
           type="submit"
-          className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2"
+          disabled={salvando}
+          className="w-full bg-pine text-paper py-3.5 rounded-full text-sm mt-2 disabled:opacity-60"
         >
-          Salvar alterações
+          {salvando ? "Salvando..." : "Salvar alterações"}
         </button>
         {salvo && (
           <p className="text-center text-xs text-pine">Dados salvos ✓</p>
         )}
+        {erro && <p className="text-center text-xs text-berry">{erro}</p>}
       </form>
     </div>
   );

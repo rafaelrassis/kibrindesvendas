@@ -35,8 +35,8 @@ export default function NovoEnderecoPage() {
 
       <EnderecoForm
         inicial={{ ...vazio, id: novoIdEndereco() }}
-        onSalvar={(endereco) => {
-          salvarEndereco(endereco);
+        onSalvar={async (endereco) => {
+          await salvarEndereco(endereco);
           router.push("/conta/enderecos");
         }}
       />

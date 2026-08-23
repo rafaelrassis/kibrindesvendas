@@ -37,12 +37,12 @@ export default function EditarEnderecoPage() {
 
       <EnderecoForm
         inicial={endereco}
-        onSalvar={(dados) => {
-          salvarEndereco(dados);
+        onSalvar={async (dados) => {
+          await salvarEndereco(dados);
           router.push("/conta/enderecos");
         }}
-        onExcluir={() => {
-          removerEndereco(endereco.id);
+        onExcluir={async () => {
+          await removerEndereco(endereco.id);
           router.push("/conta/enderecos");
         }}
       />

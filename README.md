@@ -80,9 +80,17 @@ inseguro. O ciclo todo fica em `src/lib/session.ts` e nas rotas
 `src/app/api/auth/` (`registro`, `login`, `logout`, `me`, `senha`); no client,
 `useAuth()` (`src/lib/auth-context.tsx`) lê `/api/auth/me` no primeiro render.
 
-O resto do perfil (telefone, endereços, preferências) continua local em
-`localStorage`, via `conta-context` — inclusive o campo de CPF de
-`/conta/dados`, que ainda é o do perfil local e não o gravado no registro.
+O resto do perfil (telefone, aniversário, CPF, endereços e preferências de
+notificação) mora em `Usuario` e `Endereco` no banco, um por usuário logado —
+sem `localStorage`, pra um dado salvo no celular aparecer no desktop também.
+`/conta/dados` edita o CPF de verdade (o mesmo gravado no registro): mudou de
+ser um campo à parte no perfil local. O e-mail continua fora dessa tela, só
+trocado pelo fluxo de segurança (com senha). As queries e validações ficam em
+`src/lib/data/conta.ts`, as rotas em `src/app/api/conta/` (`perfil`,
+`preferencias`, `enderecos`) e o client lê tudo por `useConta()`
+(`src/lib/conta-context.tsx`), que busca os três recursos ao logar e limpa o
+estado no logout. Só um endereço pode ser padrão por usuário — regra aplicada
+em `data/conta.ts`, não por constraint no banco.
 
 ## Área interna (`/admin`)
 

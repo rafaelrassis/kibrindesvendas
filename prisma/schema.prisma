@@ -166,12 +166,47 @@ model Usuario {
   cpf          String?       @unique // nullable p/ não quebrar contas antigas; obrigatório na API de registro
   senhaHash    String
   admin        Boolean       @default(false) // libera /admin e /api/admin (ver npm run db:admin)
+  // Dados de perfil vindos da tela "Meus dados". E-mail continua sendo trocado
+  // só pelo fluxo de segurança (com senha) — não entra aqui.
+  telefone     String?
+  aniversario  String? // "YYYY-MM-DD"; opcional, sem uso em regra de negócio
+  // Preferências de notificação da tela "Notificações".
+  prefEmail     Boolean      @default(true)
+  prefWhatsapp  Boolean      @default(true)
+  prefSms       Boolean      @default(false)
+  prefPromocoes Boolean      @default(false)
   pedidos      Pedido[]
   favoritos    Favorito[]
   notificacoes Notificacao[]
   avaliacoes   Avaliacao[]
   carrinho     CarrinhoItem?
+  enderecos    Endereco[]
   createdAt    DateTime      @default(now())
+}
+
+// Endereços salvos na tela "Conta > Endereços". O endereço usado de fato em
+// cada compra fica congelado em Pedido.enderecoResumo — mudar ou apagar aqui
+// não afeta pedido já feito.
+model Endereco {
+  id           String   @id @default(cuid())
+  usuarioId    String
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  rotulo       String
+  destinatario String
+  cep          String
+  rua          String
+  numero       String
+  complemento  String?
+  bairro       String
+  cidade       String
+  uf           String
+  // Só um padrão por usuário — garantido em código (ver data/conta.ts), não
+  // por constraint, porque exige olhar os outros endereços do mesmo dono.
+  padrao       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([usuarioId])
 }
 
 // A sacola do usuário logado, espelhando o `ItemCarrinho` do client (um item
