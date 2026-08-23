@@ -29,6 +29,7 @@ export default function ProdutoPageClient() {
   const { enderecos } = useConta();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
+  const [corHover, setCorHover] = useState<string | null>(null);
   const [quantidade, setQuantidade] = useState(1);
 
   // Quem já tem endereço salvo começa com o CEP dele preenchido; digitar por
@@ -99,7 +100,10 @@ export default function ProdutoPageClient() {
   // Sem cor selecionada (ou cor sem fotos cadastradas), cai nas fotos gerais.
   const variacaoCor = produto.variacoes.find((v) => v.tipo.trim().toLowerCase() === "cor");
   const corSelecionada = variacaoCor ? selecoes[variacaoCor.tipo] : undefined;
-  const imagensDaCor = corSelecionada ? variacaoCor?.imagensValores?.[corSelecionada] : undefined;
+  // Passar o mouse sobre o swatch prevalece sobre a cor já escolhida — some
+  // ao tirar o mouse, voltando pra cor selecionada (ou pras fotos gerais).
+  const corParaGaleria = corHover ?? corSelecionada;
+  const imagensDaCor = corParaGaleria ? variacaoCor?.imagensValores?.[corParaGaleria] : undefined;
   const imagensGaleria =
     imagensDaCor && imagensDaCor.length > 0 ? imagensDaCor : produto.imagens;
 
@@ -225,7 +229,7 @@ export default function ProdutoPageClient() {
           {/* Galeria com favorito e compartilhar */}
           <div className="relative h-fit">
             <ProdutoGaleria
-              key={corSelecionada ?? "padrao"}
+              key={corParaGaleria ?? "padrao"}
               imagens={imagensGaleria}
               video={produto.video}
               emoji={produto.emoji}
@@ -344,6 +348,8 @@ export default function ProdutoPageClient() {
                               <button
                                 key={valor}
                                 onClick={() => setSelecoes((s) => ({ ...s, [v.tipo]: valor }))}
+                                onMouseEnter={() => setCorHover(valor)}
+                                onMouseLeave={() => setCorHover(null)}
                                 title={indisponivel ? "Sem estoque nessa combinação" : valor}
                                 className={`relative aspect-square rounded-sm overflow-hidden border-2 transition-colors ${
                                   ativo && indisponivel
