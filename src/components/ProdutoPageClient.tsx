@@ -106,6 +106,17 @@ export default function ProdutoPageClient() {
   const imagensDaCor = corParaGaleria ? variacaoCor?.imagensValores?.[corParaGaleria] : undefined;
   const imagensGaleria =
     imagensDaCor && imagensDaCor.length > 0 ? imagensDaCor : produto.imagens;
+  // Sem cor escolhida/hover, as setas também alcançam as fotos de cada cor —
+  // assim um produto com só 1 foto principal ainda dá pra passar pra frente
+  // e cair nas fotos das variações cadastradas.
+  const imagensTodasCores =
+    !corParaGaleria && variacaoCor?.imagensValores
+      ? Object.values(variacaoCor.imagensValores).flat()
+      : [];
+  const imagensGaleriaCompleta = [
+    ...imagensGaleria,
+    ...imagensTodasCores.filter((url) => !imagensGaleria.includes(url)),
+  ];
 
   // Com variações e controle ligado, o estoque é por combinação — o aviso
   // de "esgotado" no bloco de preço vira só um resumo geral (soma de tudo);
@@ -230,7 +241,7 @@ export default function ProdutoPageClient() {
           <div className="relative h-fit">
             <ProdutoGaleria
               key={corParaGaleria ?? "padrao"}
-              imagens={imagensGaleria}
+              imagens={imagensGaleriaCompleta}
               video={produto.video}
               emoji={produto.emoji}
               cor={produto.cor}
