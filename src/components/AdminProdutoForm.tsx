@@ -770,17 +770,15 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         Requer personalização
       </label>
 
-      {requerPersonalizacao && (
-        <Campo label="Dias extras de produção (somados ao prazo de frete)">
-          <input
-            type="number"
-            min={0}
-            value={diasProducaoExtra}
-            onChange={(e) => setDiasProducaoExtra(e.target.value)}
-            className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
-          />
-        </Campo>
-      )}
+      <Campo label="Dias extras de produção (somados ao prazo de frete)">
+        <input
+          type="number"
+          min={0}
+          value={diasProducaoExtra}
+          onChange={(e) => setDiasProducaoExtra(e.target.value)}
+          className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
+        />
+      </Campo>
 
       <label className="flex items-center gap-2 text-sm">
         <input

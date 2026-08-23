@@ -215,8 +215,8 @@ export type DadosProduto = {
   precoShopee?: number;
   vendidoNaShopee?: boolean;
   requerPersonalizacao?: boolean;
-  // Dias extras de produção somados ao prazo de frete. Só relevante com
-  // requerPersonalizacao ligado, mas o campo aceita valor independente disso.
+  // Dias extras de produção somados ao prazo de frete, independente de
+  // requerPersonalizacao — todo produto pode ter produção mais longa.
   diasProducaoExtra?: number;
   emoji?: string;
   cor?: string;

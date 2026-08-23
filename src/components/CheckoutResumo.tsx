@@ -335,8 +335,7 @@ export default function CheckoutResumo({
             </p>
             <p className="text-xs text-pine-2 mt-1.5">
               Entrega em até{" "}
-              {endereco.frete.prazoDias +
-                (produto.requerPersonalizacao ? produto.diasProducaoExtra : 0)}{" "}
+              {endereco.frete.prazoDias + produto.diasProducaoExtra}{" "}
               dias úteis após a postagem
             </p>
           </div>
