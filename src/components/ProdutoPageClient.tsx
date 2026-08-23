@@ -8,7 +8,12 @@ import { useConta } from "@/lib/conta-context";
 import { useCep } from "@/lib/use-cep";
 import { calcularDesconto, compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
-import { controladoPorVariacao, estoqueDaCombinacao, produtoEsgotado } from "@/lib/estoque-variacao";
+import {
+  controladoPorVariacao,
+  estoqueDaCombinacao,
+  produtoEsgotado,
+  tipoTemFotoPorValor,
+} from "@/lib/estoque-variacao";
 import FavoritoButton from "@/components/FavoritoButton";
 import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 import Lightbox from "@/components/Lightbox";
@@ -107,7 +112,7 @@ export default function ProdutoPageClient() {
   // Variação de cor com fotos próprias: ao selecionar um valor, a galeria
   // grande passa a mostrar essas fotos em vez das fotos gerais do produto.
   // Sem cor selecionada (ou cor sem fotos cadastradas), cai nas fotos gerais.
-  const variacaoCor = produto.variacoes.find((v) => v.tipo.trim().toLowerCase() === "cor");
+  const variacaoCor = produto.variacoes.find((v) => tipoTemFotoPorValor(v.tipo));
   const corSelecionada = variacaoCor ? selecoes[variacaoCor.tipo] : undefined;
   // Passar o mouse sobre o swatch prevalece sobre a cor já escolhida — some
   // ao tirar o mouse, voltando pra cor selecionada (ou pras fotos gerais).
@@ -348,7 +353,7 @@ export default function ProdutoPageClient() {
                   // imagem (com risco diagonal pra indisponível); sem foto
                   // nenhuma, ou outro tipo qualquer, continua chip de texto.
                   const ehCorComFoto =
-                    v.tipo.trim().toLowerCase() === "cor" &&
+                    tipoTemFotoPorValor(v.tipo) &&
                     v.imagensValores &&
                     Object.keys(v.imagensValores).length > 0;
 

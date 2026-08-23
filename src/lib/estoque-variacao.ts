@@ -7,6 +7,14 @@ import type { Produto } from "./types";
 // chave, não importa em que ordem o admin cadastrou os tipos ou o cliente
 // escolheu na tela. É essa chave que fica salva em EstoqueVariacao.combinacao
 // e em ItemPedido.variacaoEscolhida.
+// Tipos de variação que suportam foto por valor (upload no admin + troca de
+// galeria na página do produto), igual já funcionava só pra "Cor".
+const TIPOS_COM_FOTO_POR_VALOR = ["cor", "tamanho imã", "tamanho ima"];
+
+export function tipoTemFotoPorValor(tipo: string): boolean {
+  return TIPOS_COM_FOTO_POR_VALOR.includes(tipo.trim().toLowerCase());
+}
+
 export function buildCombinacaoKey(escolhas: Record<string, string>): string {
   return Object.keys(escolhas)
     .sort()

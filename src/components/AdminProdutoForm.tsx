@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Categoria, ProdutoAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
-import { buildCombinacaoKey, gerarCombinacoes } from "@/lib/estoque-variacao";
+import { buildCombinacaoKey, gerarCombinacoes, tipoTemFotoPorValor } from "@/lib/estoque-variacao";
 
 type VariacaoForm = { tipo: string; valores: string; imagensValores: Record<string, string[]> };
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
@@ -843,7 +843,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         <p className="text-sm font-medium mb-2">Variações</p>
         <div className="space-y-3">
           {variacoes.map((v, i) => {
-            const ehCor = v.tipo.trim().toLowerCase() === "cor";
+            const ehCor = tipoTemFotoPorValor(v.tipo);
             const valoresLista = v.valores
               .split(",")
               .map((x) => x.trim())
