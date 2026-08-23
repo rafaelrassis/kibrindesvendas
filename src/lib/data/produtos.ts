@@ -53,6 +53,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     precoShopee: Number(p.precoShopee),
     vendidoNaShopee: p.vendidoNaShopee,
     requerPersonalizacao: p.requerPersonalizacao,
+    mensagemPersonalizacao: p.mensagemPersonalizacao,
     diasProducaoExtra: p.diasProducaoExtra,
     emoji: p.emoji,
     cor: p.cor,
@@ -215,6 +216,8 @@ export type DadosProduto = {
   precoShopee?: number;
   vendidoNaShopee?: boolean;
   requerPersonalizacao?: boolean;
+  // Texto do alerta de personalização. null/"" = usa o texto padrão.
+  mensagemPersonalizacao?: string | null;
   // Dias extras de produção somados ao prazo de frete, independente de
   // requerPersonalizacao — todo produto pode ter produção mais longa.
   diasProducaoExtra?: number;
@@ -349,6 +352,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       precoShopee: dados.precoShopee ?? dados.preco,
       vendidoNaShopee: dados.vendidoNaShopee ?? true,
       requerPersonalizacao: !!dados.requerPersonalizacao,
+      mensagemPersonalizacao: dados.mensagemPersonalizacao?.trim() || null,
       diasProducaoExtra: dados.diasProducaoExtra ?? 0,
       emoji: dados.emoji || EMOJI_PADRAO,
       cor: dados.cor || COR_PADRAO,
@@ -429,6 +433,10 @@ export async function atualizarProduto(
         precoShopee: dados.precoShopee,
         vendidoNaShopee: dados.vendidoNaShopee,
         requerPersonalizacao: dados.requerPersonalizacao,
+        mensagemPersonalizacao:
+          dados.mensagemPersonalizacao !== undefined
+            ? dados.mensagemPersonalizacao?.trim() || null
+            : undefined,
         diasProducaoExtra: dados.diasProducaoExtra,
         emoji: dados.emoji,
         cor: dados.cor,

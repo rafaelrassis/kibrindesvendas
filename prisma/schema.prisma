@@ -34,6 +34,10 @@ model Produto {
   precoShopee          Decimal           @db.Decimal(10, 2)
   vendidoNaShopee      Boolean           @default(true)
   requerPersonalizacao Boolean           @default(false)
+  // Texto do alerta exibido na página do produto quando requerPersonalizacao
+  // = true. null = usa o texto padrão ("Este produto passa por um fluxo de
+  // personalização depois de escolhidas as variações.").
+  mensagemPersonalizacao String?
   // Dias extras de produção somados ao prazo de frete retornado pelo Melhor
   // Envio, quando o produto exige personalização. 0 = não soma nada.
   diasProducaoExtra    Int               @default(0)

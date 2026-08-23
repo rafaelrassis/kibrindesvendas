@@ -88,6 +88,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [requerPersonalizacao, setRequerPersonalizacao] = useState(
     produto?.requerPersonalizacao ?? false
   );
+  const [mensagemPersonalizacao, setMensagemPersonalizacao] = useState(
+    produto?.mensagemPersonalizacao ?? ""
+  );
   const [diasProducaoExtra, setDiasProducaoExtra] = useState(
     String(produto?.diasProducaoExtra ?? 0)
   );
@@ -406,6 +409,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       precoShopee: precoShopee ? Number(precoShopee) : Number(preco),
       vendidoNaShopee,
       requerPersonalizacao,
+      mensagemPersonalizacao: mensagemPersonalizacao.trim() || null,
       diasProducaoExtra: Number(diasProducaoExtra) || 0,
       emoji,
       cor,
@@ -769,6 +773,18 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         />
         Requer personalização
       </label>
+
+      {requerPersonalizacao && (
+        <Campo label="Texto do alerta de personalização (opcional — deixe em branco para usar o texto padrão)">
+          <textarea
+            value={mensagemPersonalizacao}
+            onChange={(e) => setMensagemPersonalizacao(e.target.value)}
+            placeholder="Este produto passa por um fluxo de personalização depois de escolhidas as variações."
+            rows={3}
+            className="w-full border border-line rounded px-3 py-2 text-sm"
+          />
+        </Campo>
+      )}
 
       <Campo label="Dias extras de produção (somados ao prazo de frete)">
         <input
