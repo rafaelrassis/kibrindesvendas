@@ -14,7 +14,7 @@ export default function Footer() {
         <div>
           <Image src="/logo.png" alt="LeoKibrindes" width={140} height={45} className="h-9 w-auto mb-2" />
           <p className="mt-1 max-w-xs">
-            Presentes personalizados feitos pra durar. Protótipo interno — não é loja real.
+            Presentes personalizados feitos pra durar.
           </p>
         </div>
         <div className="flex gap-10">
@@ -50,9 +50,6 @@ export default function Footer() {
             <Link href="/suporte" className="block hover:text-mustard transition-colors">
               Suporte / FAQ
             </Link>
-            <Link href="/suporte" className="block hover:text-mustard transition-colors">
-              Trocas e devoluções
-            </Link>
           </div>
         </div>
       </div>
@@ -78,8 +75,8 @@ export default function Footer() {
           <p>LeoKibrindes Personalizados — CNPJ: 53.686.886/0001-35</p>
           <p>
             E-mail de contato:{" "}
-            <a href="mailto:contato@leokibrindes.com.br" className="hover:text-mustard transition-colors">
-              contato@leokibrindes.com.br
+            <a href="mailto:leokibrindes@gmail.com" className="hover:text-mustard transition-colors">
+              leokibrindes@gmail.com
             </a>
           </p>
         </div>
