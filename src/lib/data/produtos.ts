@@ -59,6 +59,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
     imagens: p.imagens,
     video: p.video,
     destaque: p.destaque,
+    destaqueCategoria: p.destaqueCategoria,
     ativo: p.ativo,
     variacoes: p.variacoes.map((v) => ({
       tipo: v.tipo,
@@ -153,6 +154,27 @@ export async function getProdutoAdmin(id: string): Promise<ProdutoAdmin | undefi
   return produto ? toProdutoAdmin(produto) : undefined;
 }
 
+// Usado só na home: até `limite` produtos por categoria, com os marcados
+// como destaqueCategoria vindo primeiro. Categoria sem produto ativo não
+// entra no resultado.
+export async function getProdutosAgrupadosPorCategoria(
+  limite = 5
+): Promise<{ categoria: { slug: string; label: string }; produtos: Produto[] }[]> {
+  const categorias = await prisma.categoria.findMany({ orderBy: { label: "asc" } });
+  const grupos = await Promise.all(
+    categorias.map(async (c) => {
+      const produtos = await prisma.produto.findMany({
+        where: { categoriaId: c.id, ativo: true },
+        include: relacoesProduto,
+        orderBy: [{ destaqueCategoria: "desc" }, { nome: "asc" }],
+        take: limite,
+      });
+      return { categoria: { slug: c.slug, label: c.label }, produtos: produtos.map(toProduto) };
+    })
+  );
+  return grupos.filter((g) => g.produtos.length > 0);
+}
+
 export async function getProdutosPorCategoria(slug: string): Promise<Produto[]> {
   const produtos = await prisma.produto.findMany({
     where: { categoria: { slug }, ativo: true },
@@ -202,6 +224,7 @@ export type DadosProduto = {
   imagens?: string[];
   video?: string | null;
   destaque?: boolean;
+  destaqueCategoria?: boolean;
   // false pausa o produto (some da loja); undefined deixa como está.
   ativo?: boolean;
   variacoes?: { tipo: string; valores: string[]; imagensValores?: Record<string, string[]> | null }[];
@@ -332,6 +355,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       imagens: dados.imagens ?? [],
       video: dados.video || null,
       destaque: !!dados.destaque,
+      destaqueCategoria: !!dados.destaqueCategoria,
       estoque: dados.estoque ?? null,
       pesoGramas: dados.pesoGramas ?? PESO_PADRAO_G,
       alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
@@ -411,6 +435,7 @@ export async function atualizarProduto(
         imagens: dados.imagens,
         video: dados.video !== undefined ? dados.video || null : undefined,
         destaque: dados.destaque,
+        destaqueCategoria: dados.destaqueCategoria,
         ativo: dados.ativo,
         estoque: dados.estoque !== undefined ? dados.estoque : undefined,
         pesoGramas: dados.pesoGramas,

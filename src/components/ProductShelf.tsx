@@ -6,16 +6,32 @@ export default function ProductShelf({
   titulo,
   subtitulo,
   produtos,
+  href,
 }: {
   titulo: string;
   subtitulo?: string;
   produtos: Produto[];
+  // Quando passado, o título vira link e aparece um "ver todos" (ex.: home
+  // agrupada por categoria, cada prateleira aponta pra /categoria/[slug]).
+  href?: string;
 }) {
   return (
     <section className="py-6">
       <div className="mx-auto max-w-6xl px-5 flex items-end justify-between mb-3">
-        <h2 className="font-display text-xl">{titulo}</h2>
-        {subtitulo && <p className="text-xs text-ink/50 hidden md:block">{subtitulo}</p>}
+        {href ? (
+          <Link href={href} className="font-display text-xl hover:underline">
+            {titulo}
+          </Link>
+        ) : (
+          <h2 className="font-display text-xl">{titulo}</h2>
+        )}
+        {href ? (
+          <Link href={href} className="text-xs text-ink/50 hover:underline shrink-0">
+            ver todos
+          </Link>
+        ) : (
+          subtitulo && <p className="text-xs text-ink/50 hidden md:block">{subtitulo}</p>
+        )}
       </div>
 
       <div className="pl-5 pr-5 flex flex-nowrap gap-3 overflow-x-auto pb-2 scrollbar-hide md:flex-wrap md:justify-center md:overflow-visible">

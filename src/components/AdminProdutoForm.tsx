@@ -92,6 +92,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     String(produto?.diasProducaoExtra ?? 0)
   );
   const [destaque, setDestaque] = useState(produto?.destaque ?? false);
+  const [destaqueCategoria, setDestaqueCategoria] = useState(
+    produto?.destaqueCategoria ?? false
+  );
   const [variacoes, setVariacoes] = useState<VariacaoForm[]>(
     produto ? paraVariacaoForm(produto.variacoes) : []
   );
@@ -409,6 +412,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       imagens,
       video,
       destaque,
+      destaqueCategoria,
       // Sem variação, o controle é o número único de sempre. Com variação,
       // o controle é por combinação (estoqueVariacoes) — este campo fica
       // sempre null nesse caso.
@@ -785,6 +789,15 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           onChange={(e) => setDestaque(e.target.checked)}
         />
         Produto em destaque
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={destaqueCategoria}
+          onChange={(e) => setDestaqueCategoria(e.target.checked)}
+        />
+        Destaque na categoria (aparece primeiro na prateleira da home)
       </label>
 
       <div>
