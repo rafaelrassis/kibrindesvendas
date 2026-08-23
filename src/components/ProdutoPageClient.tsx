@@ -334,7 +334,7 @@ export default function ProdutoPageClient() {
               </div>
             )}
 
-            {produto.requerPersonalizacao && (
+            {(produto.requerPersonalizacao || produto.mensagemPersonalizacao) && (
               <div className="bg-mustard/15 border border-mustard/40 text-pine-2 text-sm rounded-md px-4 py-3 mb-6">
                 {produto.mensagemPersonalizacao ||
                   "Este produto passa por um fluxo de personalização depois de escolhidas as variações."}
