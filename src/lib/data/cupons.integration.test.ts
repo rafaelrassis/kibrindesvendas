@@ -162,6 +162,75 @@ describe("limite de usos sob concorrência", () => {
   });
 });
 
+// `validarCupom` (o preview) confere validade e pedido mínimo antes da
+// transação, mas só `usoMaximo`/`ativo` eram reconferidos atomicamente pelo
+// próprio UPDATE — um cupom que expirasse ou um pedido que caísse abaixo do
+// mínimo bem no intervalo entre o preview e o commit passava batido. Estes
+// casos simulam esse intervalo escrevendo o estado "mudou" direto no banco
+// antes de chamar `registrarUsoCupom`, do mesmo jeito que os testes de
+// concorrência acima chamam a função isolada, sem passar por `criarPedido`.
+describe("revalidação atômica de validade e pedido mínimo", () => {
+  it("recusa incrementar um cupom que expirou depois do preview", async () => {
+    const cupom = await criarCupom({ codigo: "TESTEEXPIROU", tipo: "FIXO", valor: 5 });
+    await prisma.cupom.update({
+      where: { id: cupom.id },
+      data: { validoAte: new Date(Date.now() - 1000) },
+    });
+
+    await expect(
+      prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx))
+    ).rejects.toMatchObject({ status: 409 });
+
+    const depois = await prisma.cupom.findUnique({ where: { id: cupom.id } });
+    expect(depois?.usos).toBe(0);
+  });
+
+  it("incrementa normalmente um cupom ainda válido, com ou sem valorPedido informado", async () => {
+    const cupom = await criarCupom({
+      codigo: "TESTEVALIDO",
+      tipo: "FIXO",
+      valor: 5,
+      validoAte: "2999-01-01",
+    });
+
+    await prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx));
+
+    const depois = await prisma.cupom.findUnique({ where: { id: cupom.id } });
+    expect(depois?.usos).toBe(1);
+  });
+
+  it("recusa incrementar quando o valor do pedido está abaixo do mínimo exigido", async () => {
+    const cupom = await criarCupom({
+      codigo: "TESTEMINIMORACE",
+      tipo: "FIXO",
+      valor: 5,
+      valorMinimoPedido: 100,
+    });
+
+    await expect(
+      prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx, 50))
+    ).rejects.toMatchObject({ status: 409 });
+
+    const depois = await prisma.cupom.findUnique({ where: { id: cupom.id } });
+    expect(depois?.usos).toBe(0);
+
+    await prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx, 150));
+    expect((await prisma.cupom.findUnique({ where: { id: cupom.id } }))?.usos).toBe(1);
+  });
+
+  it("sem valorPedido informado, não exige pedido mínimo (compatível com quem chama fora do fluxo de pedido)", async () => {
+    const cupom = await criarCupom({
+      codigo: "TESTESEMVALORPEDIDO",
+      tipo: "FIXO",
+      valor: 5,
+      valorMinimoPedido: 100,
+    });
+
+    await prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx));
+    expect((await prisma.cupom.findUnique({ where: { id: cupom.id } }))?.usos).toBe(1);
+  });
+});
+
 describe("reversão do uso quando o pedido não vinga", () => {
   it("falha ao abrir o pagamento apaga o pedido e devolve o uso do cupom", async () => {
     gateway.pagamentoReal = true;

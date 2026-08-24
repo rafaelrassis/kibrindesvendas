@@ -68,16 +68,40 @@ export async function validarCupom(codigoBruto: unknown, valorPedido: number) {
 // a primeira commitar e só então lê o contador já atualizado. Ler o cupom e
 // gravar depois (o que `validarCupom` faz, pro preview) deixaria as duas
 // enxergarem o mesmo valor antigo e as duas passarem.
-export async function registrarUsoCupom(cupomId: string, tx: Prisma.TransactionClient) {
+//
+// `ativo` e `usoMaximo` não eram os únicos jeitos do cupom parar de valer
+// entre o preview (`validarCupom`) e este UPDATE — validade e pedido mínimo
+// também podiam mudar nesse intervalo (cupom expira no meio da compra,
+// admin edita o mínimo) e ficavam sem reconferência atômica nenhuma.
+// `validoAte` entra sempre; `valorPedido` é opcional pra não quebrar quem já
+// chama isto fora do fluxo de pedido (ex: teste de concorrência do limite de
+// usos, que não tem um valor de pedido pra comparar).
+export async function registrarUsoCupom(
+  cupomId: string,
+  tx: Prisma.TransactionClient,
+  valorPedido?: number
+) {
   // Prisma não compara duas colunas em `updateMany` (`usos < "usoMaximo"`),
   // então a condição vai em SQL cru mesmo.
-  const linhas = await tx.$executeRaw`
-    UPDATE "Cupom"
-    SET usos = usos + 1, "updatedAt" = NOW()
-    WHERE id = ${cupomId}
-      AND ativo = true
-      AND ("usoMaximo" IS NULL OR usos < "usoMaximo")
-  `;
+  const linhas =
+    valorPedido === undefined
+      ? await tx.$executeRaw`
+          UPDATE "Cupom"
+          SET usos = usos + 1, "updatedAt" = NOW()
+          WHERE id = ${cupomId}
+            AND ativo = true
+            AND ("usoMaximo" IS NULL OR usos < "usoMaximo")
+            AND ("validoAte" IS NULL OR "validoAte" >= NOW())
+        `
+      : await tx.$executeRaw`
+          UPDATE "Cupom"
+          SET usos = usos + 1, "updatedAt" = NOW()
+          WHERE id = ${cupomId}
+            AND ativo = true
+            AND ("usoMaximo" IS NULL OR usos < "usoMaximo")
+            AND ("validoAte" IS NULL OR "validoAte" >= NOW())
+            AND "valorMinimoPedido" <= ${valorPedido}
+        `;
   if (linhas === 0) {
     throw new ErroDeNegocio("Este cupom acabou de atingir o limite de usos.", 409);
   }

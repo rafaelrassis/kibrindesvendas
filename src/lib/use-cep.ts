@@ -12,9 +12,13 @@ export type EnderecoConsultado = {
   frete: Frete;
 };
 
-// Como em useProduto: a resposta guarda o CEP que originou a busca, então
-// "consultando" é derivado e resposta atrasada de um CEP antigo não vale.
-type Resposta = { cep: string; endereco?: EnderecoConsultado; erro?: string };
+// Como em useProduto: a resposta guarda o CEP (e a quantidade) que originou
+// a busca, então "consultando" é derivado e resposta atrasada não vale.
+// Só o CEP não bastava: o frete real (Melhor Envio) depende do peso total,
+// que depende da quantidade — sem guardá-la aqui, mudar a quantidade com o
+// mesmo CEP fazia o frete da quantidade antiga continuar de pé, sem nenhum
+// aviso de "Calculando...", até a resposta nova chegar.
+type Resposta = { cep: string; quantidade: number; endereco?: EnderecoConsultado; erro?: string };
 
 // Consulta o CEP (endereço + frete) sempre que ele fica completo. CEP
 // incompleto não dispara nada — é o estado normal de quem está digitando.
@@ -38,12 +42,12 @@ export function useCep(valor: string, produtoId?: string, quantidade = 1) {
         if (!ativo) return;
         setResposta(
           r.ok
-            ? { cep, endereco: dados }
-            : { cep, erro: dados.error ?? "Não foi possível consultar o CEP." }
+            ? { cep, quantidade, endereco: dados }
+            : { cep, quantidade, erro: dados.error ?? "Não foi possível consultar o CEP." }
         );
       })
       .catch(() => {
-        if (ativo) setResposta({ cep, erro: "Não foi possível consultar o CEP agora." });
+        if (ativo) setResposta({ cep, quantidade, erro: "Não foi possível consultar o CEP agora." });
       });
 
     return () => {
@@ -51,7 +55,8 @@ export function useCep(valor: string, produtoId?: string, quantidade = 1) {
     };
   }, [cep, produtoId, quantidade]);
 
-  const atual = cep && resposta?.cep === cep ? resposta : undefined;
+  const atual =
+    cep && resposta?.cep === cep && resposta?.quantidade === quantidade ? resposta : undefined;
 
   return {
     endereco: atual?.endereco ?? null,

@@ -28,11 +28,18 @@ export type Desconto = { ativo: false } | { ativo: true; percentual: number };
 // Desconto próprio da loja (precoOriginal riscado), independente da
 // comparação com a Shopee acima. precoOriginal null/undefined ou <= preco
 // não mostra nada — evita badge de desconto negativo por cadastro errado.
+//
+// `usaPrecoVariacao` cobre outro cadastro errado: precoOriginal é fixado pro
+// preço base do produto, mas uma variação (ex: "Tamanho imã": 7x7 = R$1) pode
+// ter preço próprio, bem mais barato, sem relação nenhuma com aquele
+// "riscado". Sem essa flag, escolher um valor de variação barato faria
+// aparecer um "-90% OFF" inventado — o preço nunca foi R$ daquele valor.
 export function calcularDesconto(
   preco: number,
-  precoOriginal: number | null | undefined
+  precoOriginal: number | null | undefined,
+  opts?: { usaPrecoVariacao?: boolean }
 ): Desconto {
-  if (!precoOriginal || precoOriginal <= preco) {
+  if (opts?.usaPrecoVariacao || !precoOriginal || precoOriginal <= preco) {
     return { ativo: false };
   }
   const percentual = Math.round(((precoOriginal - preco) / precoOriginal) * 100);
