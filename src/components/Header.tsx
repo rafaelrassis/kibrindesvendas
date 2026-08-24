@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Categoria } from "@/lib/types";
-import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useNotificacoes } from "@/lib/notificacoes-context";
 import { Search } from "lucide-react";
@@ -15,7 +14,6 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const home = pathname === "/";
-  const { item } = useCart();
   const { logado } = useAuth();
   const { naoLidas } = useNotificacoes();
 
@@ -117,19 +115,6 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
             {naoLidas > 0 && (
               <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                 {naoLidas > 9 ? "9+" : naoLidas}
-              </span>
-            )}
-          </Link>
-
-          <Link
-            href="/checkout"
-            aria-label="Sacola"
-            className="relative text-xl hover:text-mustard transition-colors"
-          >
-            👜
-            {item && (
-              <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                1
               </span>
             )}
           </Link>

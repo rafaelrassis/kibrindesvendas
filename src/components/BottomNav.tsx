@@ -2,25 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCart } from "@/lib/cart-context";
 import { useFavoritos } from "@/lib/favoritos-context";
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { item } = useCart();
   const { total } = useFavoritos();
 
   const itens = [
     { href: "/", label: "Início", icon: "🏠" },
     { href: "/categorias", label: "Departamentos", icon: "📂" },
     { href: "/favoritos", label: "Favoritos", icon: "🤍", badge: total },
-    { href: "/checkout", label: "Sacola", icon: "👜", badge: item ? 1 : 0 },
     { href: "/conta", label: "Conta", icon: "👤" },
   ];
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-line">
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-4">
         {itens.map((it) => {
           const ativo = pathname === it.href;
           return (

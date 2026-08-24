@@ -196,15 +196,6 @@ export default function ProdutoPageClient() {
     router.push(`/personalizar/${produto.id}`);
   }
 
-  // Guarda o item e volta pra loja — pra quem quer continuar navegando antes
-  // de fechar a compra.
-  function adicionarASacola() {
-    if (!produto || faltaEscolher) return;
-    iniciarItem(produto.id, selecoes, normalizarCep(cep) ?? undefined);
-    definirQuantidade(quantidadeEfetiva);
-    router.push("/");
-  }
-
   // Guarda o item e já manda direto pro checkout — o CEP calculado aqui segue
   // junto, o checkout começa com ele preenchido em vez de pedir de novo.
   function comprarAgora() {
@@ -589,9 +580,8 @@ export default function ProdutoPageClient() {
               )}
             </div>
 
-            {/* CTA — produto com personalização tem só um botão (não dá pra
-                pular pro pagamento sem definir a arte antes); os demais têm
-                a escolha "guardar e continuar navegando" vs. "ir direto pagar" */}
+            {/* CTA — botão único: personalização avança pro editor de arte,
+                os demais produtos vão direto pro checkout */}
             {produto.requerPersonalizacao ? (
               <button
                 onClick={avancarPersonalizacao}
@@ -601,22 +591,13 @@ export default function ProdutoPageClient() {
                 Avançar para personalização
               </button>
             ) : (
-              <div className="space-y-2.5">
-                <button
-                  onClick={adicionarASacola}
-                  disabled={faltaEscolher}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-pine text-white font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
-                >
-                  👜 Adicionar à sacola
-                </button>
-                <button
-                  onClick={comprarAgora}
-                  disabled={faltaEscolher}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-white text-pine border border-pine font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:bg-pine/5 transition"
-                >
-                  ⚡ Comprar agora
-                </button>
-              </div>
+              <button
+                onClick={comprarAgora}
+                disabled={faltaEscolher}
+                className="w-full inline-flex items-center justify-center gap-2 bg-pine text-white font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
+              >
+                ⚡ Comprar agora
+              </button>
             )}
             {faltaEscolher && !combinacaoSemEstoque && faltaSelecionar && (
               <p className="text-xs text-ink/40 mt-2">Escolha todas as variações pra continuar.</p>
