@@ -53,7 +53,7 @@ export default function ProdutoPageClient() {
   const cepPadrao = enderecoPadrao ? normalizarCep(enderecoPadrao.cep) : null;
   const [cepDigitado, setCepDigitado] = useState<string | null>(null);
   const cep = cepDigitado ?? (cepPadrao ? formatarCep(cepPadrao) : "");
-  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep, id);
+  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep, id, quantidade);
 
   // Começa fechado (mostra só o resumo) enquanto houver um endereço resolvido
   // — o CEP padrão da conta só chega depois da hidratação, então isso é
