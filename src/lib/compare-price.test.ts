@@ -65,4 +65,15 @@ describe("calcularDesconto", () => {
     expect(r.ativo).toBe(true);
     if (r.ativo) expect(r.percentual).toBe(33);
   });
+
+  it("não mostra quando o preço vem de um valor de variação, mesmo bem abaixo do precoOriginal", () => {
+    // precoOriginal é do produto base (ex: R$ 39,90). Um valor de variação
+    // barato (ex: "Tamanho imã": 7x7 = R$ 1) não tem relação nenhuma com
+    // aquele "riscado" — mostrar "-97% OFF" aqui seria um desconto inventado.
+    expect(calcularDesconto(1, 39.9, { usaPrecoVariacao: true }).ativo).toBe(false);
+  });
+
+  it("continua mostrando o desconto normal quando o preço é o do produto base", () => {
+    expect(calcularDesconto(20, 30, { usaPrecoVariacao: false }).ativo).toBe(true);
+  });
 });

@@ -187,7 +187,7 @@ export async function criarPedido(
     // derruba a transação inteira: o cliente ouve "cupom esgotado" e não sobra
     // pedido gravado com um desconto que o cupom não podia mais dar.
     if (cupom) {
-      await registrarUsoCupom(cupom.id, tx);
+      await registrarUsoCupom(cupom.id, tx, precoTotalProduto);
     }
 
     // Mesmo raciocínio pro estoque: produto sem controle passa direto, com

@@ -112,7 +112,12 @@ export default function ProdutoPageClient() {
   // preço normal do produto — mesma regra do servidor em criarPedido.
   const precoAtual = precoEfetivo(produto, selecoes);
   const comparacao = compararPreco(produto.precoShopee, precoAtual, produto.vendidoNaShopee);
-  const desconto = calcularDesconto(precoAtual, produto.precoOriginal);
+  // precoOriginal (o "riscado") é do produto base — não vale pra um valor de
+  // variação com preço próprio, então o badge de desconto some nesse caso
+  // (ver o porquê em calcularDesconto).
+  const desconto = calcularDesconto(precoAtual, produto.precoOriginal, {
+    usaPrecoVariacao: precoAtual !== produto.preco,
+  });
 
   // Variação de cor com fotos próprias: ao selecionar um valor, a galeria
   // grande passa a mostrar essas fotos em vez das fotos gerais do produto.
@@ -161,10 +166,17 @@ export default function ProdutoPageClient() {
   // Trocar cor/tamanho pode reduzir o estoque disponível pra menos do que já
   // estava pedido no seletor — clampa na exibição em vez de deixar pedir mais
   // do que tem (sem precisar de efeito pra sincronizar o estado de volta).
-  const quantidadeEfetiva = Math.max(
-    quantidadeMinima,
-    estoqueMaximo != null ? Math.min(quantidade, Math.max(quantidadeMinima, estoqueMaximo)) : quantidade
-  );
+  // Item personalizado é sempre 1 unidade (ver criarPedido) — mesmo se o
+  // produto também tiver quantidadePersonalizavel ligado, ninguém escolhe
+  // quantidade aqui: o seletor nem aparece, mais abaixo.
+  const quantidadeEfetiva = produto.requerPersonalizacao
+    ? 1
+    : Math.max(
+        quantidadeMinima,
+        estoqueMaximo != null
+          ? Math.min(quantidade, Math.max(quantidadeMinima, estoqueMaximo))
+          : quantidade
+      );
 
   // Um valor de variação é marcado como indisponível só quando dá pra saber
   // que a combinação resultante está zerada — ou seja, quando faltar escolher
@@ -470,59 +482,65 @@ export default function ProdutoPageClient() {
 
             {/* Quantidade — acima do CTA, linha própria. Produto com
                 quantidadePersonalizavel troca o stepper por um campo livre,
-                pra pedido grande (ex: 554un) sem clicar um por um. */}
-            <div className="mb-4">
-              <p className="text-sm font-medium mb-2">Quantidade</p>
-              {produto.quantidadePersonalizavel ? (
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={quantidadeMinima}
-                  max={estoqueMaximo ?? undefined}
-                  value={quantidade}
-                  onChange={(e) => {
-                    const valor = Math.round(Number(e.target.value));
-                    setQuantidade(Number.isFinite(valor) && valor > 0 ? valor : quantidadeMinima);
-                  }}
-                  onBlur={() => setQuantidade(quantidadeEfetiva)}
-                  className="w-24 h-10 border border-line rounded-full text-center text-sm font-medium tabular-nums"
-                />
-              ) : (
-                <div className="inline-flex items-center border border-line rounded-full">
-                  <button
-                    type="button"
-                    onClick={() => setQuantidade((q) => Math.max(quantidadeMinima, q - 1))}
-                    disabled={quantidadeEfetiva <= quantidadeMinima}
-                    aria-label="Diminuir quantidade"
-                    className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    −
-                  </button>
-                  <span className="w-10 text-center text-sm font-medium tabular-nums">
-                    {quantidadeEfetiva}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setQuantidade((q) =>
-                        estoqueMaximo != null ? Math.min(estoqueMaximo, q + 1) : q + 1
-                      )
-                    }
-                    disabled={estoqueMaximo != null && quantidadeEfetiva >= estoqueMaximo}
-                    aria-label="Aumentar quantidade"
-                    className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    +
-                  </button>
-                </div>
-              )}
-              {quantidadeMinima > 1 && (
-                <p className="text-xs text-ink/40 mt-1">Pedido mínimo: {quantidadeMinima} unidades.</p>
-              )}
-              {estoqueMaximo != null && estoqueMaximo > 0 && quantidadeEfetiva >= estoqueMaximo && (
-                <p className="text-xs text-ink/40 mt-1">Máximo disponível em estoque.</p>
-              )}
-            </div>
+                pra pedido grande (ex: 554un) sem clicar um por um.
+                Sem seletor nenhum quando o produto requer personalização:
+                item personalizado é sempre 1 unidade (ver criarPedido), então
+                deixar escolher aqui só levaria a um erro no fim do fluxo de
+                arte, depois do cliente já ter preenchido tudo. */}
+            {!produto.requerPersonalizacao && (
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2">Quantidade</p>
+                {produto.quantidadePersonalizavel ? (
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={quantidadeMinima}
+                    max={estoqueMaximo ?? undefined}
+                    value={quantidade}
+                    onChange={(e) => {
+                      const valor = Math.round(Number(e.target.value));
+                      setQuantidade(Number.isFinite(valor) && valor > 0 ? valor : quantidadeMinima);
+                    }}
+                    onBlur={() => setQuantidade(quantidadeEfetiva)}
+                    className="w-24 h-10 border border-line rounded-full text-center text-sm font-medium tabular-nums"
+                  />
+                ) : (
+                  <div className="inline-flex items-center border border-line rounded-full">
+                    <button
+                      type="button"
+                      onClick={() => setQuantidade((q) => Math.max(quantidadeMinima, q - 1))}
+                      disabled={quantidadeEfetiva <= quantidadeMinima}
+                      aria-label="Diminuir quantidade"
+                      className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center text-sm font-medium tabular-nums">
+                      {quantidadeEfetiva}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQuantidade((q) =>
+                          estoqueMaximo != null ? Math.min(estoqueMaximo, q + 1) : q + 1
+                        )
+                      }
+                      disabled={estoqueMaximo != null && quantidadeEfetiva >= estoqueMaximo}
+                      aria-label="Aumentar quantidade"
+                      className="w-10 h-10 flex items-center justify-center text-lg text-ink/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                {quantidadeMinima > 1 && (
+                  <p className="text-xs text-ink/40 mt-1">Pedido mínimo: {quantidadeMinima} unidades.</p>
+                )}
+                {estoqueMaximo != null && estoqueMaximo > 0 && quantidadeEfetiva >= estoqueMaximo && (
+                  <p className="text-xs text-ink/40 mt-1">Máximo disponível em estoque.</p>
+                )}
+              </div>
+            )}
 
             {/* Frete — resumo com "alterar", estilo Magalu; abre pra digitar
                 de novo o CEP quando não há um endereço resolvido ainda */}
