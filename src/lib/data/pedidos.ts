@@ -22,7 +22,8 @@ import {
   devolverEstoque,
   devolverEstoqueVariacao,
 } from "./produtos";
-import { buildCombinacaoKey } from "@/lib/estoque-variacao";
+import { buildCombinacaoKey, precoEfetivo } from "@/lib/estoque-variacao";
+import { normalizarPrecosValores } from "./produtos";
 
 // Dinheiro em ponto flutuante estoura a casa dos centavos (39.9 + 16.9 dá
 // 56.800000000000004); a coluna é Decimal(10,2), então arredonda antes.
@@ -52,7 +53,7 @@ export async function criarPedido(
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
     prisma.produto.findUnique({
       where: { id: item.produtoId },
-      include: { estoqueVariacoes: true },
+      include: { estoqueVariacoes: true, variacoes: true },
     }),
     consultarCep(cep, item.produtoId, quantidade),
   ]);
@@ -111,7 +112,20 @@ export async function criarPedido(
   // o que o navegador mostrou é preview, quem decide é a validação aqui.
   // `valorPedido` já considera a quantidade — cupom percentual incide sobre
   // o total das unidades, não só sobre uma.
-  const precoTotalProduto = Number(produto.preco) * quantidade;
+  // Preço final considerando variação selecionada (ex: "Tamanho imã": 7x7 =
+  // R$1) — substitui o preço base do produto quando o valor tem entrada em
+  // precosValores. Sem entrada aplicável, cai no preço normal.
+  const precoUnitario = precoEfetivo(
+    {
+      preco: Number(produto.preco),
+      variacoes: produto.variacoes.map((v) => ({
+        tipo: v.tipo,
+        precosValores: normalizarPrecosValores(v.precosValores),
+      })),
+    },
+    item.variacoesEscolhidas ?? {}
+  );
+  const precoTotalProduto = precoUnitario * quantidade;
   const temCupom = typeof cupomCodigo === "string" && cupomCodigo.trim();
   const { cupom, desconto, freteGratis: freteGratisPorCupom } = temCupom
     ? await validarCupom(cupomCodigo, precoTotalProduto)
@@ -149,7 +163,7 @@ export async function criarPedido(
             {
               produtoId: produto.id,
               quantidade,
-              precoUnitario: produto.preco,
+              precoUnitario,
               variacaoEscolhida: item.variacoesEscolhidas ?? {},
               ...(item.personalizacao && {
                 personalizacao: {

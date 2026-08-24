@@ -6,7 +6,14 @@ import type { Categoria, ProdutoAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
 import { buildCombinacaoKey, gerarCombinacoes, tipoTemFotoPorValor } from "@/lib/estoque-variacao";
 
-type VariacaoForm = { tipo: string; valores: string; imagensValores: Record<string, string[]> };
+type VariacaoForm = {
+  tipo: string;
+  valores: string;
+  imagensValores: Record<string, string[]>;
+  // Preço final por valor (string do campo controlado, ex: "1", "5"). Valor
+  // sem entrada aqui (ou entrada vazia) usa o preço normal do produto.
+  precosValores: Record<string, string>;
+};
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
 
 function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
@@ -14,6 +21,9 @@ function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
     tipo: x.tipo,
     valores: x.valores.join(", "),
     imagensValores: x.imagensValores ?? {},
+    precosValores: Object.fromEntries(
+      Object.entries(x.precosValores ?? {}).map(([valor, preco]) => [valor, String(preco)])
+    ),
   }));
 }
 
@@ -173,6 +183,23 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
   function atualizarGradeEstoque(combinacao: string, valor: string) {
     setGradeEstoque((prev) => ({ ...prev, [combinacao]: valor }));
+  }
+
+  // Preço por valor (ex: "Tamanho imã": 7x7 = R$1). Campo vazio remove a
+  // entrada — o valor volta a usar o preço normal do produto.
+  function atualizarPrecoValor(i: number, valor: string, preco: string) {
+    setVariacoes((prev) =>
+      prev.map((v, idx) => {
+        if (idx !== i) return v;
+        const precosValores = { ...v.precosValores };
+        if (preco.trim()) {
+          precosValores[valor] = preco;
+        } else {
+          delete precosValores[valor];
+        }
+        return { ...v, precosValores };
+      })
+    );
   }
 
   // Fotos por cor: upload direto, sem passar pelo editor de recorte das
@@ -449,6 +476,14 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           tipo: v.tipo.trim(),
           valores: v.valores.split(",").map((x) => x.trim()).filter(Boolean),
           imagensValores: Object.keys(v.imagensValores).length > 0 ? v.imagensValores : undefined,
+          precosValores:
+            Object.keys(v.precosValores).length > 0
+              ? Object.fromEntries(
+                  Object.entries(v.precosValores)
+                    .map(([valor, preco]) => [valor, Number(preco.replace(",", "."))] as const)
+                    .filter(([, preco]) => Number.isFinite(preco) && preco > 0)
+                )
+              : undefined,
         })),
       materiais: materiais
         .filter((m) => m.nome.trim())
@@ -931,15 +966,44 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                     })}
                   </div>
                 )}
+
+                {/* Preço por valor — substitui o preço base do produto quando
+                    o cliente escolhe esse valor (ex: "Tamanho imã": 7x7 = R$1,
+                    10x10 = R$5). Campo vazio = usa o preço normal. */}
+                {valoresLista.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pl-1">
+                    {valoresLista.map((valor) => (
+                      <label key={valor} className="flex items-center gap-1 text-xs">
+                        <span className="text-ink/60 max-w-[6rem] truncate">{valor}</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={v.precosValores[valor] ?? ""}
+                          onChange={(e) => atualizarPrecoValor(i, valor, e.target.value)}
+                          placeholder={reais(preco ? Number(preco) : 0)}
+                          className="w-20 border border-line rounded px-2 py-1 text-xs"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
         {erroImagemCor && <p className="text-xs text-berry mt-2">{erroImagemCor}</p>}
+        <p className="text-[11px] text-ink/40 mt-1">
+          Preço por valor: opcional, substitui o preço base do produto pra quem escolher aquele
+          valor.
+        </p>
         <button
           type="button"
           onClick={() =>
-            setVariacoes((prev) => [...prev, { tipo: "", valores: "", imagensValores: {} }])
+            setVariacoes((prev) => [
+              ...prev,
+              { tipo: "", valores: "", imagensValores: {}, precosValores: {} },
+            ])
           }
           className="text-pine text-xs mt-2 hover:underline"
         >

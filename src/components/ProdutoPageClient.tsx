@@ -11,6 +11,7 @@ import { formatarCep, normalizarCep } from "@/lib/frete";
 import {
   controladoPorVariacao,
   estoqueDaCombinacao,
+  precoEfetivo,
   produtoEsgotado,
   tipoTemFotoPorValor,
 } from "@/lib/estoque-variacao";
@@ -106,8 +107,12 @@ export default function ProdutoPageClient() {
     );
   }
 
-  const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
-  const desconto = calcularDesconto(produto.preco, produto.precoOriginal);
+  // Preço final considerando a variação escolhida (ex: "Tamanho imã": 7x7 =
+  // R$1). Sem seleção ainda, ou sem preço específico pro valor, cai no
+  // preço normal do produto — mesma regra do servidor em criarPedido.
+  const precoAtual = precoEfetivo(produto, selecoes);
+  const comparacao = compararPreco(produto.precoShopee, precoAtual, produto.vendidoNaShopee);
+  const desconto = calcularDesconto(precoAtual, produto.precoOriginal);
 
   // Variação de cor com fotos próprias: ao selecionar um valor, a galeria
   // grande passa a mostrar essas fotos em vez das fotos gerais do produto.
@@ -226,7 +231,7 @@ export default function ProdutoPageClient() {
         <div className="min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <p className="font-mono text-lg font-semibold leading-none truncate">
-              {reais(produto.preco)}
+              {reais(precoAtual)}
             </p>
             {desconto.ativo && (
               <p className="font-mono text-xs text-ink/40 line-through">
@@ -279,7 +284,7 @@ export default function ProdutoPageClient() {
             <div ref={precoRef} className="pb-5 mb-5 border-b border-line">
               <div className="flex items-baseline gap-3 flex-wrap">
                 <p className="font-mono text-4xl font-semibold leading-none">
-                  {reais(produto.preco)}
+                  {reais(precoAtual)}
                 </p>
                 {desconto.ativo && (
                   <>
@@ -328,7 +333,7 @@ export default function ProdutoPageClient() {
                       {reais(produto.precoShopee)} na Shopee
                     </p>
                     <p className="font-mono text-lg font-semibold">
-                      {reais(produto.preco)}{" "}
+                      {reais(precoAtual)}{" "}
                       <span className="text-berry text-sm font-normal">
                         -{comparacao.percentual}%
                       </span>

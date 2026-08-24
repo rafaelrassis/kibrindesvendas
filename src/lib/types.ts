@@ -6,6 +6,10 @@ export type Variacao = {
   // ao selecionar a cor, a galeria grande passa a mostrar essas fotos.
   // Valor sem entrada aqui cai no chip de texto de sempre.
   imagensValores?: Record<string, string[]> | null;
+  // Preço final por valor (substitui produto.preco quando o valor escolhido
+  // tem entrada aqui). Ex: "7x7" => 1, "10x10" => 5. Sem entrada, usa o
+  // preço normal do produto — ver precoEfetivo em estoque-variacao.ts.
+  precosValores?: Record<string, number> | null;
 };
 
 // Estoque de uma combinação específica (ex: Cor=Preta + Tamanho=G).

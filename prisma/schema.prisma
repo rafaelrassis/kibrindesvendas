@@ -136,6 +136,11 @@ model Variacao {
   // sempre. Json em vez de tabela à parte porque é um mapa pequeno e nunca
   // é consultado por fora do próprio produto.
   imagensValores Json?
+  // Preço final por valor (ex: "7x7" => 1.00, "10x10" => 5.00). Substitui o
+  // preço base do produto quando o valor escolhido tem entrada aqui — não é
+  // acréscimo. Sem entrada pro valor, usa o preço normal do produto. Ver
+  // precoEfetivo em lib/estoque-variacao.ts.
+  precosValores  Json?
 }
 
 // Slide do carrossel da home, editável em /admin/banners. `ordem` é a posição

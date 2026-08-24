@@ -37,6 +37,17 @@ function normalizarImagensValores(
   return Object.fromEntries(entradas);
 }
 
+// Mesma ideia do normalizador de fotos acima, mas pra preço por valor: json
+// solto no banco vira Record<string, number>, descartando entrada inválida
+// (não-numérica ou negativa) em vez de quebrar a leitura do produto.
+export function normalizarPrecosValores(bruto: unknown): Record<string, number> | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const entradas = Object.entries(bruto as Record<string, unknown>)
+    .map(([valor, preco]) => [valor, Number(preco)] as const)
+    .filter(([, preco]) => Number.isFinite(preco) && preco >= 0);
+  return entradas.length > 0 ? Object.fromEntries(entradas) : null;
+}
+
 // Exportado porque outras consultas (favoritos, por exemplo) chegam no produto
 // por outro caminho e precisam do mesmo formato de saída. Nunca inclui custo
 // de material — isso só existe na versão admin, mais abaixo.
@@ -68,6 +79,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
       tipo: v.tipo,
       valores: v.valores,
       imagensValores: normalizarImagensValores(v.imagensValores),
+      precosValores: normalizarPrecosValores(v.precosValores),
     })),
     estoque: p.estoque,
     estoqueVariacoes: p.estoqueVariacoes.map((e) => ({
@@ -236,7 +248,12 @@ export type DadosProduto = {
   destaqueCategoria?: boolean;
   // false pausa o produto (some da loja); undefined deixa como está.
   ativo?: boolean;
-  variacoes?: { tipo: string; valores: string[]; imagensValores?: Record<string, string[]> | null }[];
+  variacoes?: {
+    tipo: string;
+    valores: string[];
+    imagensValores?: Record<string, string[]> | null;
+    precosValores?: Record<string, number> | null;
+  }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
   // Só se aplica a produto sem variações — com variações o controle é por
@@ -315,6 +332,11 @@ function validar(dados: Partial<DadosProduto>) {
           throw new ErroDeNegocio(`Foto inválida em "${valor}" — envie pelo campo de upload.`);
         }
       }
+      for (const [valor, preco] of Object.entries(v.precosValores ?? {})) {
+        if (!(Number(preco) > 0)) {
+          throw new ErroDeNegocio(`Preço inválido em "${valor}" — precisa ser maior que zero.`);
+        }
+      }
     }
   }
   if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
@@ -384,6 +406,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
           tipo: v.tipo,
           valores: v.valores,
           imagensValores: v.imagensValores ?? undefined,
+          precosValores: v.precosValores ?? undefined,
         })),
       },
       estoqueVariacoes: {
@@ -472,6 +495,7 @@ export async function atualizarProduto(
               tipo: v.tipo,
               valores: v.valores,
               imagensValores: v.imagensValores ?? undefined,
+              precosValores: v.precosValores ?? undefined,
             })),
           },
         }),

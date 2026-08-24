@@ -9,6 +9,7 @@ import { useConta } from "@/lib/conta-context";
 import { useCep } from "@/lib/use-cep";
 import { compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
+import { precoEfetivo } from "@/lib/estoque-variacao";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
@@ -63,10 +64,12 @@ export default function CheckoutResumo({
   const [validandoCupom, setValidandoCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
 
-  // Preço já multiplicado pela quantidade — é o valor que o cupom valida e
+  // Preço final considerando a variação escolhida (ex: "Tamanho imã": 7x7 =
+  // R$1) já multiplicado pela quantidade — é o valor que o cupom valida e
   // que compõe o subtotal exibido. Sem produto carregado ainda não há preço,
   // e o efeito abaixo não tem o que revalidar.
-  const precoProduto = (produto?.preco ?? 0) * quantidade;
+  const precoUnitario = produto ? precoEfetivo(produto, item?.variacoesEscolhidas ?? {}) : 0;
+  const precoProduto = precoUnitario * quantidade;
 
   // Cupom validado sobre um valor que não é mais o da tela: o desconto em mãos
   // está velho até a revalidação abaixo responder. É estado derivado — dá pra
@@ -151,7 +154,7 @@ export default function CheckoutResumo({
   }
 
   const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
-  const comparacao = compararPreco(produto.precoShopee, produto.preco, produto.vendidoNaShopee);
+  const comparacao = compararPreco(produto.precoShopee, precoUnitario, produto.vendidoNaShopee);
   const freteCalculado = endereco?.frete ?? null;
   const desconto = cupomAplicado?.desconto ?? 0;
   const subtotal = Math.max(0, precoProduto - desconto);
@@ -373,7 +376,7 @@ export default function CheckoutResumo({
           </div>
           <div className="flex justify-between text-sm font-medium mb-1.5">
             <span>Aqui no site</span>
-            <span className="font-mono text-pine-2">{reais(produto.preco)}</span>
+            <span className="font-mono text-pine-2">{reais(precoUnitario)}</span>
           </div>
           <div className="flex justify-between text-sm text-berry">
             <span>Você economiza</span>

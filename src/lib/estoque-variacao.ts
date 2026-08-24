@@ -15,6 +15,23 @@ export function tipoTemFotoPorValor(tipo: string): boolean {
   return TIPOS_COM_FOTO_POR_VALOR.includes(tipo.trim().toLowerCase());
 }
 
+// Preço final do produto pra uma seleção de variações: percorre as
+// variações na ordem cadastrada e usa o preço do primeiro valor escolhido
+// que tenha entrada em precosValores (substitui, não soma). Sem nenhuma
+// entrada aplicável, cai no preço normal do produto.
+export function precoEfetivo(
+  produto: { preco: number; variacoes: { tipo: string; precosValores?: Record<string, number> | null }[] },
+  selecoes: Record<string, string>
+): number {
+  for (const v of produto.variacoes) {
+    const valor = selecoes[v.tipo];
+    if (valor == null) continue;
+    const preco = v.precosValores?.[valor];
+    if (preco != null) return preco;
+  }
+  return produto.preco;
+}
+
 export function buildCombinacaoKey(escolhas: Record<string, string>): string {
   return Object.keys(escolhas)
     .sort()
