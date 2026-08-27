@@ -150,7 +150,7 @@ export default function Lightbox({
         <button
           type="button"
           onClick={onFechar}
-          className="text-white text-2xl leading-none px-2"
+          className="text-white text-2xl leading-none px-2 font-bold"
           aria-label="Fechar"
         >
           ×
