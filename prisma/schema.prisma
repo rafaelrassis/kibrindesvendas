@@ -285,6 +285,9 @@ model Pedido {
   // frete caiu na estimativa por região (sem transportadora configurada) ou
   // veio zerado por frete grátis.
   freteServico    String?
+  // Prazo em dias cotado junto com o frete escolhido — congelado aqui pelo
+  // mesmo motivo do endereço: a cotação pode mudar depois, o pedido não.
+  fretePrazoDias  Int?
   // true quando `frete` é 0 por cupom de frete grátis ou pelo limiar
   // automático (ConfiguracaoLoja.freteGratisAcimaDe) — sem isso, um frete
   // zerado no histórico pareceria erro de cálculo em vez de benefício aplicado.

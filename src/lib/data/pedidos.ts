@@ -156,6 +156,7 @@ export async function criarPedido(
         // Sem frete cobrado (grátis), não faz sentido gravar qual serviço
         // teria sido usado — fica null, igual já era antes deste campo existir.
         freteServico: freteGratis ? null : endereco.frete.servico,
+        fretePrazoDias: endereco.frete.prazoDias ?? null,
         freteGratis,
         desconto,
         cupomCodigo: cupom ? normalizarCodigo(cupom.codigo) : null,
@@ -335,6 +336,7 @@ export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
     total: Number(pedido.total),
     frete: Number(pedido.frete),
     freteServico: pedido.freteServico,
+    fretePrazoDias: pedido.fretePrazoDias,
     freteGratis: pedido.freteGratis,
     desconto: Number(pedido.desconto),
     cupomCodigo: pedido.cupomCodigo,

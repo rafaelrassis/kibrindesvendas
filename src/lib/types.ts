@@ -156,6 +156,9 @@ export type Pedido = {
   // Nome do serviço cotado (ex: "PAC", "SEDEX", "Estimativa") — null quando
   // o frete saiu grátis.
   freteServico: string | null;
+  // Prazo em dias cotado junto com o frete escolhido — null em pedidos
+  // antigos (campo não existia) ou quando saiu grátis.
+  fretePrazoDias: number | null;
   // Frete cobrado zerado (cupom de frete grátis ou limiar automático) — sem
   // isso, um `frete: 0` no histórico pareceria erro de cálculo em vez de
   // benefício aplicado.

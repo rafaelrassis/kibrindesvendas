@@ -42,7 +42,10 @@ export default async function AdminPedidosPage() {
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-ink/50 mb-2">{p.usuario.email}</p>
+              <p className="text-xs text-ink/50 mb-2">
+                {p.usuario.email}
+                {p.usuario.telefone ? ` · ${p.usuario.telefone}` : ""}
+              </p>
 
               {/* Mudar o status aqui avisa o cliente na tela de notificações */}
               <AdminPedidoStatus pedidoId={p.id} statusAtual={p.status} />
@@ -86,6 +89,23 @@ export default async function AdminPedidosPage() {
                     }`
                   : "Pedido antigo, sem endereço registrado."}
               </p>
+
+              {/* Transportadora e prazo: sem isso o admin não sabe o que
+                  prometeu ao cliente na hora de despachar. */}
+              <p className="text-xs text-ink/50 mt-1">
+                {p.freteGratis
+                  ? "Frete grátis"
+                  : p.freteServico
+                  ? `Transportadora: ${p.freteServico}`
+                  : "Transportadora: estimativa por região"}
+                {p.fretePrazoDias ? ` · prazo ${p.fretePrazoDias} dia(s)` : ""}
+              </p>
+
+              {p.pagamentoId && (
+                <p className="text-xs text-ink/40 mt-0.5">
+                  Pagamento MP: {p.pagamentoId}
+                </p>
+              )}
 
               {p.motivoDevolucao && (
                 <p className="text-xs text-berry mt-1">
