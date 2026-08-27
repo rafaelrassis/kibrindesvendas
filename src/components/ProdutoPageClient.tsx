@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
 import { useConta } from "@/lib/conta-context";
@@ -723,9 +722,9 @@ function ProdutoGaleria({
             type="button"
             onClick={anterior}
             aria-label="Foto anterior"
-            className="w-8 h-8 flex items-center justify-center text-ink/50 hover:text-ink transition-colors"
+            className="w-10 h-10 flex items-center justify-center text-3xl font-bold text-ink/80 hover:text-ink transition-colors"
           >
-            <ChevronLeft className="w-6 h-6" strokeWidth={2.5} />
+            ←
           </button>
           <span className="text-sm text-ink/60 tabular-nums">
             {indiceAtivo + 1} / {itens.length}
@@ -734,9 +733,9 @@ function ProdutoGaleria({
             type="button"
             onClick={proximo}
             aria-label="Próxima foto"
-            className="w-8 h-8 flex items-center justify-center text-ink/50 hover:text-ink transition-colors"
+            className="w-10 h-10 flex items-center justify-center text-3xl font-bold text-ink/80 hover:text-ink transition-colors"
           >
-            <ChevronRight className="w-6 h-6" strokeWidth={2.5} />
+            →
           </button>
         </div>
       )}
