@@ -23,12 +23,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { item, cep, cupomCodigo } = await corpoJson<{
+    const { item, cep, cupomCodigo, servicoFrete } = await corpoJson<{
       item: ItemCarrinho;
       cep: string;
       cupomCodigo?: string;
+      servicoFrete?: string;
     }>(req);
-    const { pedido, checkoutUrl } = await criarPedido(usuarioId, item, cep, cupomCodigo);
+    const { pedido, checkoutUrl } = await criarPedido(
+      usuarioId,
+      item,
+      cep,
+      cupomCodigo,
+      servicoFrete
+    );
     return NextResponse.json({ id: pedido.id, checkoutUrl });
   } catch (e) {
     return respostaDeErro(e);

@@ -67,6 +67,11 @@ export type PacoteFrete = {
   comprimentoCm: number;
 };
 
+// Uma opção cotada de um serviço específico (ex: PAC, SEDEX). O Melhor
+// Envio devolve só a mais barata embrulhada nisso (lista de 1); o SuperFrete
+// devolve todas, pra o cliente escolher no checkout.
+export type OpcaoFrete = Frete & { servico: string };
+
 type ServicoMelhorEnvio = {
   id: number;
   name: string;
@@ -145,6 +150,70 @@ export async function cotarFreteMelhorEnvio(
     valor: Number(maisBarato.price),
     prazoDias: maisBarato.delivery_time,
   };
+}
+
+// --- Cotação real via SuperFrete (agregador dos Correios, alternativa ao
+// Melhor Envio) ------------------------------------------------------------
+// A API v2 do SuperFrete segue o mesmo formato de request/response do
+// Melhor Envio (mesmo modelo de negócio: agregador de transportadoras).
+// ATENÇÃO: confirme o endpoint e o formato exato na doc do SuperFrete ao
+// gerar o token — se divergir do Melhor Envio, só este trecho muda.
+//
+// Ao contrário do cotarFreteMelhorEnvio (que fica só com a mais barata), esta
+// função devolve todas as opções válidas, pra o cliente escolher no checkout.
+export async function cotarFreteSuperFrete(
+  token: string,
+  cepOrigem: string,
+  cepDestino: string,
+  pacote: PacoteFrete,
+  quantidade = 1
+): Promise<OpcaoFrete[] | null> {
+  const body = {
+    from: { postal_code: cepOrigem },
+    to: { postal_code: cepDestino },
+    products: [
+      {
+        id: "1",
+        width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
+        height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
+        length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
+        weight: Math.max(pacote.pesoGramas, 1) / 1000,
+        insurance_value: 0,
+        quantity: Math.max(1, Math.round(quantidade) || 1),
+      },
+    ],
+  };
+
+  let resposta: Response;
+  try {
+    resposta = await fetch("https://api.superfrete.com/api/v2/me/shipment/calculate", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "LeoKibrindes (contato@leokibrindes.com.br)",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    return null;
+  }
+
+  if (!resposta.ok) return null;
+
+  const servicos = (await resposta.json().catch(() => null)) as ServicoMelhorEnvio[] | null;
+  if (!Array.isArray(servicos)) return null;
+
+  const validos = servicos.filter((s) => !s.error && s.price);
+  if (validos.length === 0) return null;
+
+  // Ordenado do mais barato pro mais caro — o checkout usa a primeira posição
+  // como pré-selecionada e lista o resto como alternativa.
+  return validos
+    .map((s) => ({ valor: Number(s.price), prazoDias: s.delivery_time, servico: s.name }))
+    .sort((a, b) => a.valor - b.valor);
 }
 
 // Aceita "01310-100" ou "01310100"; devolve null quando não são 8 dígitos.

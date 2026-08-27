@@ -1,5 +1,12 @@
 import "server-only";
-import { calcularFrete, cotarFreteMelhorEnvio, normalizarCep, type Frete } from "@/lib/frete";
+import { TransportadoraFrete } from "@prisma/client";
+import {
+  calcularFrete,
+  cotarFreteMelhorEnvio,
+  cotarFreteSuperFrete,
+  normalizarCep,
+  type OpcaoFrete,
+} from "@/lib/frete";
 import { prisma } from "@/lib/prisma";
 import { ErroDeNegocio } from "./erros";
 
@@ -9,7 +16,13 @@ export type EnderecoDeEntrega = {
   bairro: string;
   cidade: string;
   uf: string;
-  frete: Frete;
+  // Todas as opções cotadas (mais de uma só quando a transportadora ativa
+  // devolve várias, ex: SuperFrete com PAC e SEDEX). Ordenado do mais barato
+  // pro mais caro.
+  opcoesFrete: OpcaoFrete[];
+  // A opção usada de fato no cálculo do total — a mais barata por padrão, ou
+  // a que o cliente escolheu (ver `servicoEscolhido` em consultarCep).
+  frete: OpcaoFrete;
 };
 
 // O ViaCEP é público e sem credencial, mas é serviço de terceiro: cai, tem
@@ -24,16 +37,17 @@ type RespostaViaCep = {
   uf?: string;
 };
 
-// Cotação real (Correios via Melhor Envio) quando há produto e token
-// configurado; cai pra estimativa por região quando falta um dos dois ou a
-// API do agregador não responde. Nunca deixa o cliente sem número de frete.
-async function calcularFreteReal(
+// Cotação real (Correios, via Melhor Envio ou SuperFrete — o que estiver
+// ativo em /admin/configuracoes) quando há produto e token configurado; cai
+// pra estimativa por região quando falta um dos dois ou a API do agregador
+// não responde. Nunca deixa o cliente sem número de frete.
+async function cotarOpcoesFrete(
   uf: string,
   cepDestino: string,
   produtoId?: string,
   quantidade = 1
-): Promise<Frete> {
-  const estimativa = calcularFrete(uf);
+): Promise<OpcaoFrete[]> {
+  const estimativa: OpcaoFrete[] = [{ ...calcularFrete(uf), servico: "Estimativa" }];
   if (!produtoId) return estimativa;
 
   const [config, produto] = await Promise.all([
@@ -44,17 +58,32 @@ async function calcularFreteReal(
     }),
   ]);
 
-  if (!config?.melhorEnvioToken || !produto) return estimativa;
+  if (!config || !produto) return estimativa;
 
+  const cepOrigem = normalizarCep(config.cepOrigem) ?? config.cepOrigem;
+
+  if (config.transportadoraAtiva === TransportadoraFrete.SUPER_FRETE) {
+    if (!config.superFreteToken) return estimativa;
+    const opcoes = await cotarFreteSuperFrete(
+      config.superFreteToken,
+      cepOrigem,
+      cepDestino,
+      produto,
+      quantidade
+    );
+    return opcoes && opcoes.length > 0 ? opcoes : estimativa;
+  }
+
+  // MELHOR_ENVIO — mantém o comportamento de sempre: só a mais barata.
+  if (!config.melhorEnvioToken) return estimativa;
   const cotacao = await cotarFreteMelhorEnvio(
     config.melhorEnvioToken,
-    normalizarCep(config.cepOrigem) ?? config.cepOrigem,
+    cepOrigem,
     cepDestino,
     produto,
     quantidade
   );
-
-  return cotacao ?? estimativa;
+  return cotacao ? [{ ...cotacao, servico: "Correios" }] : estimativa;
 }
 
 // Fonte da verdade do endereço e do frete: a tela do checkout consulta pra
@@ -67,7 +96,8 @@ async function calcularFreteReal(
 export async function consultarCep(
   cepBruto: unknown,
   produtoIdBruto?: unknown,
-  quantidadeBruta?: unknown
+  quantidadeBruta?: unknown,
+  servicoEscolhidoBruto?: unknown
 ): Promise<EnderecoDeEntrega> {
   const cep = typeof cepBruto === "string" ? normalizarCep(cepBruto) : null;
   if (!cep) throw new ErroDeNegocio("CEP inválido: informe os 8 dígitos.");
@@ -75,6 +105,8 @@ export async function consultarCep(
   const quantidadeNum = Number(quantidadeBruta);
   const quantidade =
     Number.isFinite(quantidadeNum) && quantidadeNum > 0 ? Math.round(quantidadeNum) : 1;
+  const servicoEscolhido =
+    typeof servicoEscolhidoBruto === "string" ? servicoEscolhidoBruto : undefined;
 
   let resposta: Response;
   try {
@@ -98,13 +130,21 @@ export async function consultarCep(
     throw new ErroDeNegocio("CEP não encontrado.", 404);
   }
 
+  const opcoesFrete = await cotarOpcoesFrete(dados.uf, cep, produtoId, quantidade);
+  // Serviço escolhido pelo cliente no checkout (ex: "SEDEX"), se existir e
+  // continuar entre as opções cotadas agora; senão, a mais barata (primeira
+  // da lista, já vem ordenada).
+  const frete =
+    opcoesFrete.find((o) => o.servico === servicoEscolhido) ?? opcoesFrete[0];
+
   return {
     cep,
     logradouro: dados.logradouro ?? "",
     bairro: dados.bairro ?? "",
     cidade: dados.localidade ?? "",
     uf: dados.uf,
-    frete: await calcularFreteReal(dados.uf, cep, produtoId, quantidade),
+    opcoesFrete,
+    frete,
   };
 }
 

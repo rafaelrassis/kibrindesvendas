@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import AdminNav from "@/components/AdminNav";
+import type { TransportadoraFrete } from "@prisma/client";
 import type { ConfiguracaoLoja } from "@/lib/data/configuracao";
 
 export default function AdminConfiguracoesPage() {
   const [config, setConfig] = useState<ConfiguracaoLoja | null>(null);
   const [cepOrigem, setCepOrigem] = useState("");
-  const [token, setToken] = useState("");
+  const [transportadora, setTransportadora] = useState<TransportadoraFrete>("MELHOR_ENVIO");
+  const [tokenMelhorEnvio, setTokenMelhorEnvio] = useState("");
+  const [tokenSuperFrete, setTokenSuperFrete] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -19,6 +22,7 @@ export default function AdminConfiguracoesPage() {
       .then((c: ConfiguracaoLoja) => {
         setConfig(c);
         setCepOrigem(c.cepOrigem);
+        setTransportadora(c.transportadoraAtiva);
       })
       .finally(() => setCarregando(false));
   }, []);
@@ -29,10 +33,16 @@ export default function AdminConfiguracoesPage() {
     setSucesso("");
     setSalvando(true);
 
-    const payload: { cepOrigem: string; melhorEnvioToken?: string } = { cepOrigem };
+    const payload: {
+      cepOrigem: string;
+      transportadoraAtiva: TransportadoraFrete;
+      melhorEnvioToken?: string;
+      superFreteToken?: string;
+    } = { cepOrigem, transportadoraAtiva: transportadora };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
-    if (token.trim()) payload.melhorEnvioToken = token.trim();
+    if (tokenMelhorEnvio.trim()) payload.melhorEnvioToken = tokenMelhorEnvio.trim();
+    if (tokenSuperFrete.trim()) payload.superFreteToken = tokenSuperFrete.trim();
 
     const r = await fetch("/api/admin/configuracoes", {
       method: "PATCH",
@@ -47,7 +57,8 @@ export default function AdminConfiguracoesPage() {
       return;
     }
     setConfig(data);
-    setToken("");
+    setTokenMelhorEnvio("");
+    setTokenSuperFrete("");
     setSucesso("Configurações salvas.");
   }
 
@@ -63,18 +74,12 @@ export default function AdminConfiguracoesPage() {
 
       <form onSubmit={salvar} className="max-w-md space-y-5">
         <div>
-          <p className="text-sm font-medium mb-2">Frete — Melhor Envio</p>
+          <p className="text-sm font-medium mb-2">Frete real</p>
           <p className="text-xs text-ink/50 mb-3">
-            Cotação real de PAC/SEDEX pelos Correios via{" "}
-            <a
-              href="https://melhorenvio.com.br"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              Melhor Envio
-            </a>
-            . Sem token configurado, o site usa uma estimativa por região.
+            Cotação de PAC/SEDEX pelos Correios, via Melhor Envio ou SuperFrete. Só a
+            transportadora ativa é consultada no checkout — a outra pode ficar com token
+            cadastrado, sem uso, pra trocar depois sem digitar tudo de novo. Sem token
+            configurado na ativa, o site usa uma estimativa por região.
           </p>
 
           <label className="block mb-3">
@@ -87,7 +92,19 @@ export default function AdminConfiguracoesPage() {
             />
           </label>
 
-          <label className="block">
+          <label className="block mb-4">
+            <span className="text-sm text-ink/70">Transportadora ativa</span>
+            <select
+              value={transportadora}
+              onChange={(e) => setTransportadora(e.target.value as TransportadoraFrete)}
+              className="w-full border border-line rounded px-3 py-2 text-sm mt-1 bg-white"
+            >
+              <option value="MELHOR_ENVIO">Melhor Envio</option>
+              <option value="SUPER_FRETE">SuperFrete</option>
+            </select>
+          </label>
+
+          <label className="block mb-3">
             <span className="text-sm text-ink/70">
               Token de API do Melhor Envio
               {config?.melhorEnvioTokenConfigurado && (
@@ -99,12 +116,35 @@ export default function AdminConfiguracoesPage() {
             </span>
             <input
               type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+              value={tokenMelhorEnvio}
+              onChange={(e) => setTokenMelhorEnvio(e.target.value)}
               placeholder={
                 config?.melhorEnvioTokenConfigurado
                   ? "Deixe em branco para manter o atual"
                   : "Cole aqui o token gerado no Melhor Envio"
+              }
+              className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm text-ink/70">
+              Token de API do SuperFrete
+              {config?.superFreteTokenConfigurado && (
+                <span className="text-ink/40">
+                  {" "}
+                  (cadastrado, termina em ****{config.superFreteTokenFinal})
+                </span>
+              )}
+            </span>
+            <input
+              type="password"
+              value={tokenSuperFrete}
+              onChange={(e) => setTokenSuperFrete(e.target.value)}
+              placeholder={
+                config?.superFreteTokenConfigurado
+                  ? "Deixe em branco para manter o atual"
+                  : "Cole aqui o token gerado no SuperFrete"
               }
               className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
             />

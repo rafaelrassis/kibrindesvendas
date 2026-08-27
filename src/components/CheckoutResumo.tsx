@@ -52,6 +52,17 @@ export default function CheckoutResumo({
   );
 
   const [codigoCupom, setCodigoCupom] = useState("");
+  // Serviço de frete escolhido no checkout (ex: "PAC", "SEDEX") — só existe
+  // rádio quando `opcoesFrete` tem mais de um item (SuperFrete com várias
+  // opções). Guarda o CEP junto: é estado derivado, igual ao padrão de
+  // `recalculandoCupom` abaixo — se o CEP mudou, a escolha antiga não vale
+  // mais e cai de volta pra "mais barata" sem precisar de um efeito.
+  const [servicoEscolhidoState, setServicoEscolhidoState] = useState<{
+    cep: string;
+    servico: string;
+  } | null>(null);
+  const servicoEscolhido =
+    servicoEscolhidoState?.cep === endereco?.cep ? (servicoEscolhidoState?.servico ?? null) : null;
   // `valorPedido` guarda sobre qual valor esse desconto foi calculado. Mudar a
   // quantidade muda o valor, e um desconto percentual sobre o total antigo
   // mostraria na tela um total que o servidor não vai cobrar.
@@ -155,7 +166,9 @@ export default function CheckoutResumo({
 
   const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
   const comparacao = compararPreco(produto.precoShopee, precoUnitario, produto.vendidoNaShopee);
-  const freteCalculado = endereco?.frete ?? null;
+  const opcoesFrete = endereco?.opcoesFrete ?? [];
+  const freteCalculado =
+    opcoesFrete.find((o) => o.servico === servicoEscolhido) ?? opcoesFrete[0] ?? null;
   const desconto = cupomAplicado?.desconto ?? 0;
   const subtotal = Math.max(0, precoProduto - desconto);
 
@@ -222,6 +235,7 @@ export default function CheckoutResumo({
         item,
         cep: normalizarCep(cep),
         cupomCodigo: cupomAplicado?.codigo,
+        servicoFrete: freteCalculado?.servico,
       }),
     })
       .then(async (r) => {
@@ -352,11 +366,46 @@ export default function CheckoutResumo({
             <p className="text-ink/70">
               {endereco.cidade}/{endereco.uf}
             </p>
-            <p className="text-xs text-pine-2 mt-1.5">
-              Entrega em até{" "}
-              {endereco.frete.prazoDias + produto.diasProducaoExtra}{" "}
-              dias úteis após a postagem
-            </p>
+
+            {opcoesFrete.length > 1 ? (
+              // Mais de uma opção (SuperFrete com PAC/SEDEX, por exemplo): o
+              // cliente escolhe qual serviço usar, em vez de já vir travado
+              // na mais barata.
+              <div className="mt-2.5 space-y-1.5">
+                {opcoesFrete.map((opcao) => (
+                  <label
+                    key={opcao.servico}
+                    className="flex items-center justify-between gap-3 border border-line rounded-md px-3 py-2 cursor-pointer has-[:checked]:border-pine has-[:checked]:bg-pine/5"
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="servicoFrete"
+                        checked={freteCalculado?.servico === opcao.servico}
+                        onChange={() =>
+                          endereco &&
+                          setServicoEscolhidoState({ cep: endereco.cep, servico: opcao.servico })
+                        }
+                        className="accent-pine"
+                      />
+                      <span className="text-xs">
+                        <span className="font-medium">{opcao.servico}</span>{" "}
+                        <span className="text-ink/50">
+                          — até {opcao.prazoDias + produto.diasProducaoExtra} dias úteis
+                        </span>
+                      </span>
+                    </span>
+                    <span className="text-xs font-mono shrink-0">{reais(opcao.valor)}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-pine-2 mt-1.5">
+                Entrega em até{" "}
+                {(freteCalculado?.prazoDias ?? 0) + produto.diasProducaoExtra}{" "}
+                dias úteis após a postagem
+              </p>
+            )}
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { TransportadoraFrete } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizarCep } from "@/lib/frete";
 import { ErroDeNegocio } from "./erros";
@@ -7,10 +8,15 @@ const CEP_ORIGEM_PADRAO = "01310100";
 
 export type ConfiguracaoLoja = {
   cepOrigem: string;
+  // Qual transportadora é consultada de fato no checkout. Só uma fica ativa
+  // por vez — trocar não apaga o token da outra, só para de usá-lo.
+  transportadoraAtiva: TransportadoraFrete;
   // Token nunca sai por completo pra tela — só os últimos 4 caracteres,
   // pra confirmar visualmente que está cadastrado sem expor o segredo.
   melhorEnvioTokenConfigurado: boolean;
   melhorEnvioTokenFinal: string | null;
+  superFreteTokenConfigurado: boolean;
+  superFreteTokenFinal: string | null;
   // null = frete grátis automático desligado. Com um valor, todo pedido cujo
   // total de produtos (sem frete) bater ou passar disso tem o frete zerado
   // — independe de cupom, e soma sem conflito com um cupom FRETE_GRATIS
@@ -22,10 +28,13 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
   const config = await prisma.configuracaoLoja.findUnique({ where: { id: "singleton" } });
   return {
     cepOrigem: config?.cepOrigem ?? CEP_ORIGEM_PADRAO,
+    transportadoraAtiva: config?.transportadoraAtiva ?? TransportadoraFrete.MELHOR_ENVIO,
     melhorEnvioTokenConfigurado: !!config?.melhorEnvioToken,
     melhorEnvioTokenFinal: config?.melhorEnvioToken
       ? config.melhorEnvioToken.slice(-4)
       : null,
+    superFreteTokenConfigurado: !!config?.superFreteToken,
+    superFreteTokenFinal: config?.superFreteToken ? config.superFreteToken.slice(-4) : null,
     freteGratisAcimaDe:
       config?.freteGratisAcimaDe != null ? Number(config.freteGratisAcimaDe) : null,
   };
@@ -33,14 +42,18 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
 
 export async function atualizarConfiguracaoLoja(dados: {
   cepOrigem?: string;
+  transportadoraAtiva?: TransportadoraFrete;
   // string vazia apaga o token; undefined deixa como está.
   melhorEnvioToken?: string;
+  superFreteToken?: string;
   // null desliga a regra; undefined deixa como está.
   freteGratisAcimaDe?: number | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
+    transportadoraAtiva?: TransportadoraFrete;
     melhorEnvioToken?: string | null;
+    superFreteToken?: string | null;
     freteGratisAcimaDe?: number | null;
   } = {};
 
@@ -50,8 +63,19 @@ export async function atualizarConfiguracaoLoja(dados: {
     data.cepOrigem = cep;
   }
 
+  if (dados.transportadoraAtiva !== undefined) {
+    if (!Object.values(TransportadoraFrete).includes(dados.transportadoraAtiva)) {
+      throw new ErroDeNegocio("Transportadora inválida.");
+    }
+    data.transportadoraAtiva = dados.transportadoraAtiva;
+  }
+
   if (dados.melhorEnvioToken !== undefined) {
     data.melhorEnvioToken = dados.melhorEnvioToken.trim() || null;
+  }
+
+  if (dados.superFreteToken !== undefined) {
+    data.superFreteToken = dados.superFreteToken.trim() || null;
   }
 
   if (dados.freteGratisAcimaDe !== undefined) {
@@ -66,7 +90,9 @@ export async function atualizarConfiguracaoLoja(dados: {
     create: {
       id: "singleton",
       cepOrigem: data.cepOrigem ?? CEP_ORIGEM_PADRAO,
+      transportadoraAtiva: data.transportadoraAtiva ?? TransportadoraFrete.MELHOR_ENVIO,
       melhorEnvioToken: data.melhorEnvioToken,
+      superFreteToken: data.superFreteToken,
       freteGratisAcimaDe: data.freteGratisAcimaDe,
     },
     update: data,

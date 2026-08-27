@@ -8,9 +8,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cep:
   const { cep } = await params;
   const produtoId = req.nextUrl.searchParams.get("produtoId") ?? undefined;
   const quantidade = req.nextUrl.searchParams.get("quantidade") ?? undefined;
+  const servico = req.nextUrl.searchParams.get("servico") ?? undefined;
 
   try {
-    return NextResponse.json(await consultarCep(cep, produtoId, quantidade));
+    return NextResponse.json(await consultarCep(cep, produtoId, quantidade, servico));
   } catch (e) {
     return respostaDeErro(e);
   }

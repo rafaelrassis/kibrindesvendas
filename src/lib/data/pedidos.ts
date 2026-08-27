@@ -38,7 +38,8 @@ export async function criarPedido(
   usuarioId: string,
   item: ItemCarrinho,
   cep: unknown,
-  cupomCodigo?: unknown
+  cupomCodigo?: unknown,
+  servicoFrete?: unknown
 ) {
   if (!item?.produtoId) throw new ErroDeNegocio("Item do pedido inválido.");
 
@@ -55,7 +56,7 @@ export async function criarPedido(
       where: { id: item.produtoId },
       include: { estoqueVariacoes: true, variacoes: true },
     }),
-    consultarCep(cep, item.produtoId, quantidade),
+    consultarCep(cep, item.produtoId, quantidade, servicoFrete),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
@@ -152,6 +153,9 @@ export async function criarPedido(
         status: pagamentoReal ? "AGUARDANDO_PAGAMENTO" : "PAGO",
         total,
         frete,
+        // Sem frete cobrado (grátis), não faz sentido gravar qual serviço
+        // teria sido usado — fica null, igual já era antes deste campo existir.
+        freteServico: freteGratis ? null : endereco.frete.servico,
         freteGratis,
         desconto,
         cupomCodigo: cupom ? normalizarCodigo(cupom.codigo) : null,
@@ -330,6 +334,7 @@ export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
     status: pedido.status,
     total: Number(pedido.total),
     frete: Number(pedido.frete),
+    freteServico: pedido.freteServico,
     freteGratis: pedido.freteGratis,
     desconto: Number(pedido.desconto),
     cupomCodigo: pedido.cupomCodigo,

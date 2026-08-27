@@ -220,11 +220,13 @@ neles depois — rodar `npm run db:seed` de novo não desfaz o que a loja editou
 ### Configurações da loja (`/admin/configuracoes`)
 
 Tabela de uma linha só (`ConfiguracaoLoja`, id fixo `singleton`) com o que a
-loja precisa mudar sem redeploy: o CEP de onde os Correios buscam a encomenda e
-o token da conta Melhor Envio usada na cotação. O token entra por campo de
-senha e **nunca volta inteiro** pela API — a tela só recebe se está cadastrado
-e os 4 últimos caracteres, o suficiente pra conferir sem expor o segredo.
-Salvar com o campo em branco mantém o token atual em vez de apagá-lo.
+loja precisa mudar sem redeploy: o CEP de onde os Correios buscam a encomenda,
+qual transportadora está ativa (Melhor Envio ou SuperFrete) e o token de cada
+uma. Os tokens entram por campo de senha e **nunca voltam inteiros** pela API
+— a tela só recebe se está cadastrado e os 4 últimos caracteres, o suficiente
+pra conferir sem expor o segredo. Salvar com o campo em branco mantém o token
+atual em vez de apagá-lo. Trocar a transportadora ativa não apaga o token da
+outra, só para de consultá-lo — dá pra voltar atrás sem recadastrar nada.
 
 ## Personalização: as duas vias
 
@@ -338,28 +340,33 @@ ViaCEP, devolve o endereço e o frete, e a tela soma tudo: produto + frete =
 total. Quem já tem endereço padrão salvo chega com o CEP preenchido; o mesmo
 endpoint preenche rua, bairro, cidade e UF no cadastro de endereço.
 
-Com `?produtoId=`, a rota cota o frete **real** dos Correios pelo Melhor Envio
-(`cotarFreteMelhorEnvio` em `src/lib/frete.ts`): API REST, sem contrato prévio,
-que devolve PAC/SEDEX com preço e prazo da rota. A tela do produto e o checkout
-mandam o id porque conhecem o item; o cadastro de endereço avulso não manda,
-porque ali não há pacote pra cotar. Fica sempre a opção mais barata entre as
-que a API aceitou (as com `error` saem fora, ex: transportadora que não atende
-a rota).
+Com `?produtoId=`, a rota cota o frete **real** dos Correios pela transportadora
+ativa em `/admin/configuracoes` — Melhor Envio (`cotarFreteMelhorEnvio`) ou
+SuperFrete (`cotarFreteSuperFrete`), ambas em `src/lib/frete.ts`: APIs REST, sem
+contrato prévio, que devolvem PAC/SEDEX com preço e prazo da rota (as opções
+com `error` saem fora, ex: transportadora que não atende a rota). A tela do
+produto e o checkout mandam o id porque conhecem o item; o cadastro de
+endereço avulso não manda, porque ali não há pacote pra cotar. O Melhor Envio
+fica só com a opção mais barata; o SuperFrete devolve todas (`OpcaoFrete[]`,
+ordenadas da mais barata pra mais cara) e o checkout deixa o cliente escolher
+entre elas quando há mais de uma — a mais barata vem pré-selecionada.
 
-O valor que o navegador mostra é só visual: `POST /api/pedidos` recebe o CEP,
-**não** o frete, e recalcula tudo no servidor antes de gravar — senão bastaria
-editar a requisição pra pagar frete zero. O pedido guarda `frete`,
-`enderecoCep` e `enderecoResumo` congelados no momento da compra (o cadastro do
-cliente muda depois; o pedido tem que continuar mostrando pra onde foi), e a
-fila do admin mostra o endereço de despacho. Com pagamento real o frete vai
-como item separado na preferência do Mercado Pago, pra soma bater com o total.
+O valor que o navegador mostra é só visual: `POST /api/pedidos` recebe o CEP e
+o serviço escolhido (`servicoFrete`), **não** o frete, e recalcula tudo no
+servidor antes de gravar — senão bastaria editar a requisição pra pagar frete
+zero. O pedido guarda `frete`, `freteServico`, `enderecoCep` e `enderecoResumo`
+congelados no momento da compra (o cadastro do cliente muda depois; o pedido
+tem que continuar mostrando pra onde foi), e a fila do admin mostra o endereço
+de despacho. Com pagamento real o frete vai como item separado na preferência
+do Mercado Pago, pra soma bater com o total.
 
-A cotação real depende de três coisas cadastradas: o token do Melhor Envio e o
-CEP de origem em `/admin/configuracoes`, e o peso/dimensões da embalagem no
-cadastro do produto. Faltando qualquer uma delas — ou se a API não responder em
-8s, devolver erro ou não sobrar nenhuma opção — o cálculo cai na estimativa por
-região (`calcularFrete`, tabela `uf -> { valor, prazoDias }`). O cliente nunca
-fica sem número de frete, e nada nesse caminho pode derrubar o checkout.
+A cotação real depende de três coisas cadastradas: o token da transportadora
+ativa e o CEP de origem em `/admin/configuracoes`, e o peso/dimensões da
+embalagem no cadastro do produto. Faltando qualquer uma delas — ou se a API
+não responder em 8s, devolver erro ou não sobrar nenhuma opção — o cálculo cai
+na estimativa por região (`calcularFrete`, tabela `uf -> { valor, prazoDias }`).
+O cliente nunca fica sem número de frete, e nada nesse caminho pode derrubar o
+checkout.
 
 > Pacote menor que o mínimo dos Correios (16x11x2cm) é arredondado pra cima
 > antes de cotar, senão a cotação volta vazia.
@@ -448,7 +455,7 @@ src/
     ├── session.ts                # cookie de sessão assinado (server-only)
     ├── prisma.ts                 # PrismaClient singleton
     ├── types.ts                  # Produto, Categoria, Variacao, Pedido, Banner
-    ├── frete.ts                  # cotação Melhor Envio + tabela por UF + CEP
+    ├── frete.ts                  # cotação Melhor Envio/SuperFrete + tabela por UF + CEP
     ├── status-pedido.ts          # rótulos e cores do StatusPedido
     ├── use-produto.ts            # hooks de catálogo p/ client components
     ├── use-cep.ts                # consulta de CEP + frete p/ o checkout
@@ -545,10 +552,10 @@ npm run test:e2e  # e2e, sobe o próprio `next dev` (exige Postgres seedado)
 
 `npm test` roda os testes unitários (Vitest) das funções puras de negócio em
 `src/lib`: slug de categoria, comparativo de preço com a Shopee, frete (tabela
-por UF, normalização do CEP e a cotação do Melhor Envio, com `fetch` trocado por
-um stub) e as regras do status do pedido — incluindo quando a devolução pode ser
-pedida. Ficam ao lado do módulo, em `src/lib/*.test.ts`, e o ambiente é `node`:
-nada de banco, servidor ou DOM.
+por UF, normalização do CEP e a cotação via Melhor Envio e SuperFrete, com
+`fetch` trocado por um stub) e as regras do status do pedido — incluindo quando
+a devolução pode ser pedida. Ficam ao lado do módulo, em `src/lib/*.test.ts`, e
+o ambiente é `node`: nada de banco, servidor ou DOM.
 
 `npm run test:db` (`src/lib/data/*.integration.test.ts`, Vitest contra Postgres
 de verdade) cobre o que só o banco garante: limite de uso de cupom e estoque
@@ -599,8 +606,9 @@ tipos de rota que o `layout.tsx` usa são gerados pelo Next em `.next/types/`.
 - [x] Comparativo de preço ligado/desligado por produto (`vendidoNaShopee`)
 - [x] Persistir o carrinho no banco (visitante continua em `localStorage`,
       quem loga sincroniza com o banco — `CarrinhoItem`, `src/app/api/carrinho`)
-- [x] Cotação real de frete (Correios via Melhor Envio) com a tabela por região
-      como fallback, peso/dimensões por produto e token no `/admin/configuracoes`
+- [x] Cotação real de frete (Correios via Melhor Envio ou SuperFrete) com a
+      tabela por região como fallback, peso/dimensões por produto e token no
+      `/admin/configuracoes`
 - [x] Rastreio do envio no detalhe do pedido (`Pedido.codigoRastreio`, editável
       em `/admin/pedidos`, com link de rastreamento pro cliente)
 - [x] Guardar a sacola até o pagamento confirmar (só esvazia quando o pedido

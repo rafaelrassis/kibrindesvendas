@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { normalizarCep, type Frete } from "@/lib/frete";
+import { normalizarCep, type OpcaoFrete } from "@/lib/frete";
 
 export type EnderecoConsultado = {
   cep: string;
@@ -9,7 +9,8 @@ export type EnderecoConsultado = {
   bairro: string;
   cidade: string;
   uf: string;
-  frete: Frete;
+  opcoesFrete: OpcaoFrete[];
+  frete: OpcaoFrete;
 };
 
 // Como em useProduto: a resposta guarda o CEP (e a quantidade) que originou

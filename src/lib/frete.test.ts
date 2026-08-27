@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { calcularFrete, cotarFreteMelhorEnvio, formatarCep, normalizarCep } from "./frete";
+import {
+  calcularFrete,
+  cotarFreteMelhorEnvio,
+  cotarFreteSuperFrete,
+  formatarCep,
+  normalizarCep,
+} from "./frete";
 
 describe("calcularFrete", () => {
   it("cobra o menor valor pra SP, que é a origem da loja", () => {
@@ -172,5 +178,68 @@ describe("cotarFreteMelhorEnvio", () => {
   it("devolve null quando nenhuma opção sobrou", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => respostaCom([])));
     expect(await cotarFreteMelhorEnvio("token", "01310100", "60000000", pacote)).toBeNull();
+  });
+});
+
+describe("cotarFreteSuperFrete", () => {
+  const pacote = { pesoGramas: 300, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
+
+  function respostaCom(servicos: unknown) {
+    return {
+      ok: true,
+      json: async () => servicos,
+    } as unknown as Response;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("devolve todas as opções válidas, ordenadas da mais barata pra mais cara", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respostaCom([
+          { id: 2, name: "SEDEX", price: "42.10", delivery_time: 2, company: { name: "Correios" } },
+          { id: 1, name: "PAC", price: "23.50", delivery_time: 7, company: { name: "Correios" } },
+        ])
+      )
+    );
+
+    expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toEqual([
+      { valor: 23.5, prazoDias: 7, servico: "PAC" },
+      { valor: 42.1, prazoDias: 2, servico: "SEDEX" },
+    ]);
+  });
+
+  it("ignora serviços com erro (transportadora que não atende a rota)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respostaCom([
+          { id: 1, name: "PAC", price: "9.90", delivery_time: 5, company: { name: "X" }, error: "Rota não atendida" },
+          { id: 2, name: "SEDEX", price: "42.10", delivery_time: 2, company: { name: "Correios" } },
+        ])
+      )
+    );
+
+    expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toEqual([
+      { valor: 42.1, prazoDias: 2, servico: "SEDEX" },
+    ]);
+  });
+
+  it("devolve null quando a API responde erro", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false }) as Response));
+    expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
+  });
+
+  it("devolve null quando a rede falha", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("timeout");
+      })
+    );
+    expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
   });
 });
