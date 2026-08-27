@@ -144,7 +144,7 @@ export default function Lightbox({
   return (
     <div className="fixed inset-0 bg-black z-[60] flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 shrink-0">
-        <span className="text-white/70 text-xs">
+        <span className="text-white/90 text-base font-bold">
           {itens.length > 1 ? `${indice + 1} / ${itens.length}` : nome}
         </span>
         <button
@@ -187,7 +187,7 @@ export default function Lightbox({
             <button
               type="button"
               onClick={() => trocar(indice - 1)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/15 text-white text-lg flex items-center justify-center"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/20 text-white text-3xl font-bold flex items-center justify-center"
               aria-label="Foto anterior"
             >
               ‹
@@ -195,7 +195,7 @@ export default function Lightbox({
             <button
               type="button"
               onClick={() => trocar(indice + 1)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/15 text-white text-lg flex items-center justify-center"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/20 text-white text-3xl font-bold flex items-center justify-center"
               aria-label="Próxima foto"
             >
               ›
