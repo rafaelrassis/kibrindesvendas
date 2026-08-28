@@ -32,6 +32,23 @@ export function precoEfetivo(
   return produto.preco;
 }
 
+// Custo de material pra uma seleção de variações: mesmo algoritmo de
+// precoEfetivo, mas pra custosValores. Sem entrada aplicável, cai no
+// custoTotal normal do produto (soma de MaterialProduto). Uso restrito ao
+// admin — nunca chamado com dado vindo da API pública.
+export function custoEfetivo(
+  produto: { custoTotal: number; variacoes: { tipo: string; custosValores?: Record<string, number> | null }[] },
+  selecoes: Record<string, string>
+): number {
+  for (const v of produto.variacoes) {
+    const valor = selecoes[v.tipo];
+    if (valor == null) continue;
+    const custo = v.custosValores?.[valor];
+    if (custo != null) return custo;
+  }
+  return produto.custoTotal;
+}
+
 export function buildCombinacaoKey(escolhas: Record<string, string>): string {
   return Object.keys(escolhas)
     .sort()

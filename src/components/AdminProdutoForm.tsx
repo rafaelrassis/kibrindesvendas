@@ -13,6 +13,9 @@ type VariacaoForm = {
   // Preço final por valor (string do campo controlado, ex: "1", "5"). Valor
   // sem entrada aqui (ou entrada vazia) usa o preço normal do produto.
   precosValores: Record<string, string>;
+  // Custo de material final por valor (mesmo padrão de precosValores).
+  // Campo vazio usa o custoTotal normal do produto (soma de materiais).
+  custosValores: Record<string, string>;
 };
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
 
@@ -23,6 +26,11 @@ function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
     imagensValores: x.imagensValores ?? {},
     precosValores: Object.fromEntries(
       Object.entries(x.precosValores ?? {}).map(([valor, preco]) => [valor, String(preco)])
+    ),
+    custosValores: Object.fromEntries(
+      Object.entries((x as { custosValores?: Record<string, number> | null }).custosValores ?? {}).map(
+        ([valor, custo]) => [valor, String(custo)]
+      )
     ),
   }));
 }
@@ -198,6 +206,23 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           delete precosValores[valor];
         }
         return { ...v, precosValores };
+      })
+    );
+  }
+
+  // Custo por valor — mesmo padrão de atualizarPrecoValor. Campo vazio
+  // remove a entrada e o valor volta a usar o custoTotal do produto.
+  function atualizarCustoValor(i: number, valor: string, custo: string) {
+    setVariacoes((prev) =>
+      prev.map((v, idx) => {
+        if (idx !== i) return v;
+        const custosValores = { ...v.custosValores };
+        if (custo.trim()) {
+          custosValores[valor] = custo;
+        } else {
+          delete custosValores[valor];
+        }
+        return { ...v, custosValores };
       })
     );
   }
@@ -482,6 +507,14 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                   Object.entries(v.precosValores)
                     .map(([valor, preco]) => [valor, Number(preco.replace(",", "."))] as const)
                     .filter(([, preco]) => Number.isFinite(preco) && preco > 0)
+                )
+              : undefined,
+          custosValores:
+            Object.keys(v.custosValores).length > 0
+              ? Object.fromEntries(
+                  Object.entries(v.custosValores)
+                    .map(([valor, custo]) => [valor, Number(custo.replace(",", "."))] as const)
+                    .filter(([, custo]) => Number.isFinite(custo) && custo >= 0)
                 )
               : undefined,
         })),
@@ -972,20 +1005,56 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                     10x10 = R$5). Campo vazio = usa o preço normal. */}
                 {valoresLista.length > 0 && (
                   <div className="flex flex-wrap gap-2 pl-1">
-                    {valoresLista.map((valor) => (
-                      <label key={valor} className="flex items-center gap-1 text-xs">
-                        <span className="text-ink/60 max-w-[6rem] truncate">{valor}</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={v.precosValores[valor] ?? ""}
-                          onChange={(e) => atualizarPrecoValor(i, valor, e.target.value)}
-                          placeholder={reais(preco ? Number(preco) : 0)}
-                          className="w-20 border border-line rounded px-2 py-1 text-xs"
-                        />
-                      </label>
-                    ))}
+                    {valoresLista.map((valor) => {
+                      const precoValorNum = v.precosValores[valor]
+                        ? Number(v.precosValores[valor].replace(",", "."))
+                        : Number(preco || 0);
+                      const custoValorNum = v.custosValores[valor]
+                        ? Number(v.custosValores[valor].replace(",", "."))
+                        : custoTotal;
+                      const margemValor =
+                        precoValorNum > 0
+                          ? ((precoValorNum - custoValorNum) / precoValorNum) * 100
+                          : null;
+                      return (
+                        <div key={valor} className="flex items-center gap-1 text-xs">
+                          <span className="text-ink/60 max-w-[6rem] truncate">{valor}</span>
+                          <label className="flex items-center gap-1">
+                            <span className="text-ink/40">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={v.precosValores[valor] ?? ""}
+                              onChange={(e) => atualizarPrecoValor(i, valor, e.target.value)}
+                              placeholder={reais(preco ? Number(preco) : 0)}
+                              className="w-20 border border-line rounded px-2 py-1 text-xs"
+                            />
+                          </label>
+                          <label className="flex items-center gap-1">
+                            <span className="text-ink/40">custo</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={v.custosValores[valor] ?? ""}
+                              onChange={(e) => atualizarCustoValor(i, valor, e.target.value)}
+                              placeholder={reais(custoTotal)}
+                              className="w-20 border border-line rounded px-2 py-1 text-xs"
+                            />
+                          </label>
+                          {margemValor !== null && (
+                            <span
+                              className={
+                                margemValor < 0 ? "text-berry" : "text-pine/70"
+                              }
+                            >
+                              {margemValor.toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1002,7 +1071,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           onClick={() =>
             setVariacoes((prev) => [
               ...prev,
-              { tipo: "", valores: "", imagensValores: {}, precosValores: {} },
+              { tipo: "", valores: "", imagensValores: {}, precosValores: {}, custosValores: {} },
             ])
           }
           className="text-pine text-xs mt-2 hover:underline"

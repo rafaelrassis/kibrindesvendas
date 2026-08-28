@@ -94,7 +94,9 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
 }
 
 // Versão pra /admin: junto do produto normal, calcula o custo de material e a
-// margem — dado sensível que só sai por rota autenticada de admin.
+// margem — dado sensível que só sai por rota autenticada de admin. Também
+// injeta custosValores (custo por valor de variação) na grade, ausente na
+// versão pública — ver toProduto.
 export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
   const materiais = p.materiais.map((m) => ({
     id: m.id,
@@ -105,8 +107,13 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
   const custoTotal = materiais.reduce((soma, m) => soma + m.quantidade * m.custoUnitario, 0);
   const preco = Number(p.preco);
   const lucro = Math.round((preco - custoTotal) * 100) / 100;
+  const produtoPublico = toProduto(p);
   return {
-    ...toProduto(p),
+    ...produtoPublico,
+    variacoes: produtoPublico.variacoes.map((v, i) => ({
+      ...v,
+      custosValores: normalizarPrecosValores(p.variacoes[i]?.custosValores),
+    })),
     materiais,
     custoTotal: Math.round(custoTotal * 100) / 100,
     lucro,
@@ -253,6 +260,7 @@ export type DadosProduto = {
     valores: string[];
     imagensValores?: Record<string, string[]> | null;
     precosValores?: Record<string, number> | null;
+    custosValores?: Record<string, number> | null;
   }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
@@ -337,6 +345,11 @@ function validar(dados: Partial<DadosProduto>) {
           throw new ErroDeNegocio(`Preço inválido em "${valor}" — precisa ser maior que zero.`);
         }
       }
+      for (const [valor, custo] of Object.entries(v.custosValores ?? {})) {
+        if (!(Number(custo) >= 0)) {
+          throw new ErroDeNegocio(`Custo inválido em "${valor}" — não pode ser negativo.`);
+        }
+      }
     }
   }
   if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
@@ -407,6 +420,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
           valores: v.valores,
           imagensValores: v.imagensValores ?? undefined,
           precosValores: v.precosValores ?? undefined,
+          custosValores: v.custosValores ?? undefined,
         })),
       },
       estoqueVariacoes: {
@@ -496,6 +510,7 @@ export async function atualizarProduto(
               valores: v.valores,
               imagensValores: v.imagensValores ?? undefined,
               precosValores: v.precosValores ?? undefined,
+              custosValores: v.custosValores ?? undefined,
             })),
           },
         }),

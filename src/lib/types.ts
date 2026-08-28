@@ -10,6 +10,11 @@ export type Variacao = {
   // tem entrada aqui). Ex: "7x7" => 1, "10x10" => 5. Sem entrada, usa o
   // preço normal do produto — ver precoEfetivo em estoque-variacao.ts.
   precosValores?: Record<string, number> | null;
+  // Custo de material final por valor (substitui custoTotal quando o valor
+  // escolhido tem entrada aqui). Dado interno de admin — nunca populado na
+  // versão pública do produto (ver toDomainProduto). Ver custoEfetivo em
+  // estoque-variacao.ts.
+  custosValores?: Record<string, number> | null;
 };
 
 // Estoque de uma combinação específica (ex: Cor=Preta + Tamanho=G).

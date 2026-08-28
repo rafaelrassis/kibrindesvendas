@@ -141,6 +141,12 @@ model Variacao {
   // acréscimo. Sem entrada pro valor, usa o preço normal do produto. Ver
   // precoEfetivo em lib/estoque-variacao.ts.
   precosValores  Json?
+  // Custo de material final por valor (ex: "7x7" => 0.80, "10x10" => 2.30).
+  // Substitui a soma de MaterialProduto quando o valor escolhido tem entrada
+  // aqui — mesmo padrão substitutivo de precosValores, não é acréscimo. Sem
+  // entrada, usa o custoTotal normal do produto. Ver custoEfetivo em
+  // lib/estoque-variacao.ts. Dado interno, nunca sai pela API pública.
+  custosValores  Json?
 }
 
 // Slide do carrossel da home, editável em /admin/banners. `ordem` é a posição
