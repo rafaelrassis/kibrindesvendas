@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Banner } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -11,37 +11,65 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export default function PromoBanner({ banners }: { banners: Banner[] }) {
   const [ativo, setAtivo] = useState(0);
   const trilhoRef = useRef<HTMLDivElement>(null);
+  const interagindoRef = useRef(false);
 
   // Rola o carrossel até o slide `i` — usado pelas setas, pelos dots e pelo
-  // auto-advance. scrollIntoView respeita o scroll-snap já configurado no
-  // trilho, então não precisa calcular largura de slide na mão.
+  // auto-advance. Usa scrollTo com o offset calculado (em vez de
+  // scrollIntoView) porque scrollIntoView considera a página inteira e podia
+  // puxar um scroll vertical indesejado no mobile.
   function irPara(i: number) {
     const trilho = trilhoRef.current;
     if (!trilho) return;
     const alvo = trilho.children[i] as HTMLElement | undefined;
-    alvo?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+    if (!alvo) return;
+    const alvoLeft =
+      alvo.getBoundingClientRect().left - trilho.getBoundingClientRect().left + trilho.scrollLeft;
+    trilho.scrollTo({ left: alvoLeft, behavior: "smooth" });
     setAtivo(i);
   }
 
-  // Auto-advance removido: causava scroll vertical indesejado na home no
-  // mobile (scrollIntoView disparado sozinho a cada 5s). Navegação agora é
-  // só manual — setas e dots.
+  const temVarios = banners.length > 1;
+
+  // Auto-advance a cada 5s, mobile e desktop. Pausa quando o usuário interage
+  // com o dedo/mouse no trilho para não brigar com o gesto dele.
+  useEffect(() => {
+    if (!temVarios) return;
+    const id = setInterval(() => {
+      if (interagindoRef.current) return;
+      setAtivo((atual) => {
+        const proximo = (atual + 1) % banners.length;
+        irPara(proximo);
+        return proximo;
+      });
+    }, 5000);
+    return () => clearInterval(id);
+  }, [temVarios, banners.length]);
 
   if (banners.length === 0) return null;
-
-  const temVarios = banners.length > 1;
 
   return (
     <div className="mx-auto max-w-6xl px-5 relative">
       <div
         ref={trilhoRef}
         className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+        onPointerDown={() => {
+          interagindoRef.current = true;
+        }}
+        onPointerUp={() => {
+          interagindoRef.current = false;
+        }}
+        onPointerCancel={() => {
+          interagindoRef.current = false;
+        }}
+        onPointerLeave={() => {
+          interagindoRef.current = false;
+        }}
       >
         {banners.map((s, i) => (
           <Link
             key={s.id}
             href={s.ctaHref}
-            className="snap-start shrink-0 w-[88%] sm:w-full rounded-xl overflow-hidden relative h-40 md:h-52 bg-cover bg-center"
+            className="snap-start shrink-0 w-[88%] sm:w-full rounded-xl overflow-hidden relative aspect-[5/2] bg-cover bg-center"
             style={{
               backgroundColor: s.corFundo,
               backgroundImage: s.imagemUrl ? `url(${s.imagemUrl})` : undefined,
