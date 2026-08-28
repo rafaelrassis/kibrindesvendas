@@ -18,6 +18,7 @@ export default async function AdminPainelPage() {
     vendasPorFrete,
     estoqueBaixo,
     vendasPorCanal,
+    cuponsMaisUsados,
     resumo,
   } = await getDadosDoPainel();
 
@@ -32,7 +33,7 @@ export default async function AdminPainelPage() {
       </p>
       <AdminNav />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
         <Cartao label="Vendas" valor={reais(resumo.totalVendas)} />
         <Cartao label="Pedidos pagos" valor={String(resumo.totalPedidos)} />
         <Cartao label="Ticket médio" valor={reais(resumo.ticketMedio)} />
@@ -46,6 +47,7 @@ export default async function AdminPainelPage() {
           valor={`${reais(resumo.lucroEstimado)} (${resumo.margemPct.toFixed(0)}%)`}
           alerta={resumo.margemPct < 20 && resumo.totalPedidos > 0}
         />
+        <Cartao label="Desconto em cupons" valor={reais(resumo.descontoTotalConcedido)} />
       </div>
 
       <Bloco titulo="Vendas por dia">
@@ -79,10 +81,18 @@ export default async function AdminPainelPage() {
 
         <Bloco titulo="Site x Shopee">
           <GraficoCanal dados={vendasPorCanal} />
+          <ul className="mt-2 flex justify-around text-xs text-ink/60">
+            {vendasPorCanal.map((c) => (
+              <li key={c.canal} className="text-center">
+                <p>{c.canal}</p>
+                <p className="font-mono">{c.pedidos} ped. · {reais(c.ticketMedio)}</p>
+              </li>
+            ))}
+          </ul>
         </Bloco>
       </div>
 
-      <div className="mt-4">
+      <div className="grid md:grid-cols-2 gap-4 mt-4">
         <Bloco titulo={`Estoque baixo (≤ 5 un.)`}>
           {estoqueBaixo.length === 0 ? (
             <Vazio texto="Nenhum produto com estoque baixo." />
@@ -99,6 +109,22 @@ export default async function AdminPainelPage() {
                   <span className={`font-mono ml-3 ${item.estoque === 0 ? "text-berry" : ""}`}>
                     {item.estoque}
                   </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Bloco>
+
+        <Bloco titulo="Cupons mais usados">
+          {cuponsMaisUsados.length === 0 ? (
+            <Vazio texto="Nenhum cupom usado no período." />
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {cuponsMaisUsados.map((c) => (
+                <li key={c.codigo} className="flex items-center justify-between py-2">
+                  <span className="font-mono truncate">{c.codigo}</span>
+                  <span className="text-ink/60 text-xs">{c.usos} usos</span>
+                  <span className="font-mono ml-3">{reais(c.descontoTotal)}</span>
                 </li>
               ))}
             </ul>

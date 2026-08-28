@@ -63,7 +63,8 @@ export type FatiaDeStatus = { status: StatusPedido; label: string; cor: string; 
 export type ProdutoVendido = { nome: string; quantidade: number };
 export type FreteServico = { servico: string; quantidade: number };
 export type ProdutoEstoqueBaixo = { nome: string; combinacao: string | null; estoque: number };
-export type CanalDeVenda = { canal: "Site" | "Shopee"; total: number };
+export type CanalDeVenda = { canal: "Site" | "Shopee"; total: number; pedidos: number; ticketMedio: number };
+export type CupomUsado = { codigo: string; usos: number; descontoTotal: number };
 
 export type ResumoDoPainel = {
   totalVendas: number;
@@ -73,6 +74,7 @@ export type ResumoDoPainel = {
   taxaDevolucao: number;
   lucroEstimado: number;
   margemPct: number;
+  descontoTotalConcedido: number;
 };
 
 export type DadosDoPainel = {
@@ -82,6 +84,7 @@ export type DadosDoPainel = {
   vendasPorFrete: FreteServico[];
   estoqueBaixo: ProdutoEstoqueBaixo[];
   vendasPorCanal: CanalDeVenda[];
+  cuponsMaisUsados: CupomUsado[];
   resumo: ResumoDoPainel;
 };
 
@@ -99,20 +102,28 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
   const agora = Date.now();
   const inicio = new Date(`${CHAVE_DO_DIA.format(agora - (DIAS - 1) * UM_DIA)}T00:00:00-03:00`);
 
-  const [pedidos, produtosMaisVendidos, lucroEstimado, vendasPorFrete, estoqueBaixo, vendasPorCanal] =
-    await Promise.all([
-      // Só as três colunas que o painel usa: o gráfico não precisa dos itens nem
-      // do endereço de cada pedido do mês.
-      prisma.pedido.findMany({
-        where: { createdAt: { gte: inicio } },
-        select: { status: true, total: true, createdAt: true },
-      }),
-      getProdutosMaisVendidos(inicio),
-      getLucroEstimado(inicio),
-      getVendasPorFrete(inicio),
-      getEstoqueBaixo(),
-      getVendasPorCanal(inicio),
-    ]);
+  const [
+    pedidos,
+    produtosMaisVendidos,
+    lucroEstimado,
+    vendasPorFrete,
+    estoqueBaixo,
+    vendasPorCanal,
+    cupons,
+  ] = await Promise.all([
+    // Só as três colunas que o painel usa: o gráfico não precisa dos itens nem
+    // do endereço de cada pedido do mês.
+    prisma.pedido.findMany({
+      where: { createdAt: { gte: inicio } },
+      select: { status: true, total: true, createdAt: true },
+    }),
+    getProdutosMaisVendidos(inicio),
+    getLucroEstimado(inicio),
+    getVendasPorFrete(inicio),
+    getEstoqueBaixo(),
+    getVendasPorCanal(inicio),
+    getCuponsMaisUsados(inicio),
+  ]);
 
   // Dia sem venda tem que aparecer como zero, senão a linha do gráfico pula o
   // buraco e finge que o movimento foi contínuo.
@@ -169,6 +180,7 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
     vendasPorFrete,
     estoqueBaixo,
     vendasPorCanal,
+    cuponsMaisUsados: cupons.itens,
     resumo: {
       totalVendas,
       totalPedidos,
@@ -177,6 +189,7 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
       taxaDevolucao: totalPedidos > 0 ? (totalDevolucoes / totalPedidos) * 100 : 0,
       lucroEstimado,
       margemPct: totalVendas > 0 ? (lucroEstimado / totalVendas) * 100 : 0,
+      descontoTotalConcedido: cupons.descontoTotal,
     },
   };
 }
@@ -288,11 +301,54 @@ async function getVendasPorCanal(inicio: Date): Promise<CanalDeVenda[]> {
 
   const totalSite = pedidos.reduce((soma, p) => soma + emCentavos(p.total), 0) / 100;
   const totalShopee = shopee.reduce((soma, v) => soma + emCentavos(v.valorVenda), 0) / 100;
+  const qtdShopee = shopee.length;
 
   return [
-    { canal: "Site", total: totalSite },
-    { canal: "Shopee", total: totalShopee },
+    {
+      canal: "Site",
+      total: totalSite,
+      pedidos: pedidos.length,
+      ticketMedio: pedidos.length > 0 ? Math.round((totalSite / pedidos.length) * 100) / 100 : 0,
+    },
+    {
+      canal: "Shopee",
+      total: totalShopee,
+      pedidos: qtdShopee,
+      ticketMedio: qtdShopee > 0 ? Math.round((totalShopee / qtdShopee) * 100) / 100 : 0,
+    },
   ];
+}
+
+// Desconto concedido é congelado em Pedido.desconto no momento da compra —
+// não recalcula se o cupom mudar depois. Cupom apagado continua aparecendo
+// (o código fica gravado no pedido mesmo sem o registro do Cupom existir mais).
+async function getCuponsMaisUsados(
+  inicio: Date
+): Promise<{ itens: CupomUsado[]; descontoTotal: number }> {
+  const pedidos = await prisma.pedido.findMany({
+    where: {
+      createdAt: { gte: inicio },
+      status: { in: STATUS_DE_VENDA },
+      cupomCodigo: { not: null },
+    },
+    select: { cupomCodigo: true, desconto: true },
+  });
+
+  const porCupom = new Map<string, { usos: number; centavos: number }>();
+  let centavosTotal = 0;
+  for (const p of pedidos) {
+    const codigo = p.cupomCodigo!;
+    const centavos = emCentavos(p.desconto);
+    centavosTotal += centavos;
+    const atual = porCupom.get(codigo) ?? { usos: 0, centavos: 0 };
+    porCupom.set(codigo, { usos: atual.usos + 1, centavos: atual.centavos + centavos });
+  }
+
+  const itens = Array.from(porCupom.entries())
+    .map(([codigo, v]) => ({ codigo, usos: v.usos, descontoTotal: v.centavos / 100 }))
+    .sort((a, b) => b.usos - a.usos);
+
+  return { itens, descontoTotal: centavosTotal / 100 };
 }
 
 // A soma por produto sai do banco: a lista de itens do período inteiro não
