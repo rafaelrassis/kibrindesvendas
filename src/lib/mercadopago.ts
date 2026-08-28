@@ -32,7 +32,7 @@ export function paymentClient() {
 // absoluta e acessível por ele, então em dev o webhook só funciona de verdade
 // atrás de um túnel (ex: ngrok) apontado aqui.
 export function baseUrl() {
-  return process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  return process.env.BASE_URL ?? "http://localhost:3000";
 }
 
 // Assinatura do webhook (https://www.mercadopago.com.br/developers → suas

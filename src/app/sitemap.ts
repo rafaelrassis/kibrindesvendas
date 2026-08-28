@@ -10,7 +10,7 @@ import { getCategorias } from "@/lib/data/categorias";
 export const revalidate = 3600;
 
 function baseUrl() {
-  return process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  return process.env.BASE_URL ?? "http://localhost:3000";
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

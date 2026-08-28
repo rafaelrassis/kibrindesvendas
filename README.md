@@ -320,8 +320,8 @@ estiver aguardando, recarrega sozinha até o webhook chegar (Pix cai em
 segundos; boleto pode levar dias, e aí o aviso chega em `/notificacoes`).
 
 Em dev o Mercado Pago não alcança `localhost`: pra testar o webhook de ponta a
-ponta é preciso um túnel (ex: ngrok) e `NEXT_PUBLIC_BASE_URL` apontando pra
-URL pública dele.
+ponta é preciso um túnel (ex: ngrok) e `BASE_URL` apontando pra URL pública
+dele.
 
 ### A sacola só é esvaziada quando o pagamento é confirmado
 
@@ -476,9 +476,11 @@ src/
    (`openssl rand -hex 32`, diferente do valor de dev) e
    `BLOB_READ_WRITE_TOKEN` (o Blob Store já injeta esse ao ser vinculado).
    Pro pagamento real, também `MERCADOPAGO_ACCESS_TOKEN`,
-   `MERCADOPAGO_WEBHOOK_SECRET` e `NEXT_PUBLIC_BASE_URL` com o domínio de
-   produção — as duas primeiras saem do painel de desenvolvedor do Mercado
-   Pago, onde a URL de notificação deve ser cadastrada como
+   `MERCADOPAGO_WEBHOOK_SECRET` e `BASE_URL` com o domínio de produção
+   (o domínio de verdade em uso, não um alias `.vercel.app` — esse fica atrás
+   da Vercel Authentication e o Mercado Pago não consegue notificar nele) —
+   as duas primeiras saem do painel de desenvolvedor do Mercado Pago, onde a
+   URL de notificação deve ser cadastrada como
    `https://SEU-DOMINIO/api/webhooks/mercadopago`.
    Pra via "Criar com a gente" da personalização, `NEXT_PUBLIC_WHATSAPP_LOJA`
    com o número da loja (só dígitos, com DDI).

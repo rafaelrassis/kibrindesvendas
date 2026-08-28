@@ -11,7 +11,7 @@ import BottomNav from "@/components/BottomNav";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import { getCategorias } from "@/lib/data/categorias";
 
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+const baseUrl = process.env.BASE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
