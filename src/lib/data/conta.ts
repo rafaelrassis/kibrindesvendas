@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { ErroDeNegocio } from "./erros";
+import { apenasDigitos, cpfValido } from "@/lib/cpf";
 import type { Endereco, Perfil, Preferencias } from "@/lib/conta-data";
 
 // --- Perfil -------------------------------------------------------------
@@ -29,12 +30,19 @@ export async function atualizarPerfil(
   const nome = dados.nome?.trim();
   if (!nome) throw new ErroDeNegocio("Informe o nome.");
 
+  const cpfBruto = dados.cpf?.trim();
+  if (cpfBruto && !cpfValido(cpfBruto)) {
+    throw new ErroDeNegocio("CPF inválido.");
+  }
+
   const u = await prisma.usuario.update({
     where: { id: usuarioId },
     data: {
       nome,
       telefone: dados.telefone?.trim() || null,
-      cpf: dados.cpf?.trim() || null,
+      // Mesmo formato usado no cadastro (só dígitos) — é o que vai direto pro
+      // Mercado Pago na hora de gerar o Pix.
+      cpf: cpfBruto ? apenasDigitos(cpfBruto) : null,
       aniversario: dados.aniversario?.trim() || null,
     },
     select: { nome: true, email: true, telefone: true, cpf: true, aniversario: true },

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConta } from "@/lib/conta-context";
 import type { Perfil } from "@/lib/conta-data";
+import { formatarCpf } from "@/lib/cpf";
 
 export default function DadosPage() {
   const router = useRouter();
@@ -86,9 +87,15 @@ export default function DadosPage() {
         <Campo label="CPF">
           <input
             value={form.cpf}
-            onChange={(e) => campo("cpf", e.target.value)}
+            onChange={(e) => campo("cpf", formatarCpf(e.target.value))}
+            inputMode="numeric"
+            placeholder="000.000.000-00"
+            maxLength={14}
             className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
           />
+          <span className="block text-[11px] text-ink/40 mt-1">
+            Necessário pra pagar por Pix no Mercado Pago.
+          </span>
         </Campo>
 
         <Campo label="Data de aniversário (opcional)">

@@ -141,6 +141,15 @@ export async function criarPedido(
   const freteGratis = freteGratisPorCupom || freteGratisPorValor;
 
   const pagamentoReal = pagamentoRealConfigurado();
+  // Pix exige CPF do pagador — sem ele o Mercado Pago trava o botão "Criar
+  // Pix" na tela deles até preencher. Cadastro novo já obriga o campo (ver
+  // /api/auth/registro); isso aqui cobre só quem se cadastrou antes dele
+  // existir.
+  if (pagamentoReal && !usuario.cpf) {
+    throw new ErroDeNegocio(
+      "Complete seu CPF em Conta > Meus dados antes de finalizar o pagamento."
+    );
+  }
   const frete = freteGratis ? 0 : endereco.frete.valor;
   const subtotal = emReais(precoTotalProduto - desconto);
   const total = emReais(subtotal + frete);
@@ -278,7 +287,11 @@ export async function criarPedido(
               ]
             : []),
         ],
-        payer: { name: usuario.nome, email: usuario.email },
+        payer: {
+          name: usuario.nome,
+          email: usuario.email,
+          identification: usuario.cpf ? { type: "CPF", number: usuario.cpf } : undefined,
+        },
         back_urls: {
           success: `${baseUrl()}/pedido/confirmado?id=${pedido.id}`,
           pending: `${baseUrl()}/pedido/confirmado?id=${pedido.id}`,
