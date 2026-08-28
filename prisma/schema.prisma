@@ -89,6 +89,13 @@ model Produto {
   itensPedido          ItemPedido[]
   favoritos            Favorito[]
   avaliacoes           Avaliacao[]
+  vendasShopee         VendaShopee[]
+  // Overrides de margem pra venda manual na Shopee (área /admin/vendas-shopee).
+  // null = usa o default global de ConfiguracaoLoja. Nunca sai pela API
+  // pública, só pela rota /api/admin — mesmo tratamento de custo de material.
+  shopeeComissaoPct    Decimal?          @db.Decimal(5, 2)
+  shopeeFretePct       Decimal?          @db.Decimal(5, 2)
+  shopeeAdsPct         Decimal?          @db.Decimal(5, 2)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 }
@@ -437,5 +444,38 @@ model ConfiguracaoLoja {
   // FRETE_GRATIS aplicado (o resultado é o mesmo, frete zerado, mas as duas
   // origens coexistem sem conflito).
   freteGratisAcimaDe Decimal? @db.Decimal(10, 2)
+  // Defaults globais de margem pra venda manual na Shopee — usados quando o
+  // produto não tem override próprio (ver Produto.shopeeComissaoPct e cia).
+  // null = 0% nesse componente até ser configurado.
+  shopeeComissaoPct Decimal? @db.Decimal(5, 2)
+  shopeeFretePct    Decimal? @db.Decimal(5, 2)
+  shopeeAdsPct      Decimal? @db.Decimal(5, 2)
   updatedAt        DateTime @updatedAt
+}
+
+// Venda lançada manualmente pelo admin quando o mesmo produto é vendido fora
+// do site, na Shopee. Reaproveita o custo de material já cadastrado no
+// produto (custoEfetivo) em vez de duplicar cadastro. Comissão/frete/ads são
+// SNAPSHOT do que estava configurado (produto ou default global) no momento
+// do lançamento — mudar a config depois não recalcula vendas já lançadas.
+model VendaShopee {
+  id            String   @id @default(cuid())
+  produtoId     String
+  produto       Produto  @relation(fields: [produtoId], references: [id])
+  // Chave igual EstoqueVariacao.combinacao — null quando o produto não tem
+  // variação, ou quando a venda não distingue combinação.
+  combinacao    String?
+  quantidade    Int
+  // Valor total recebido pela venda (não é unitário).
+  valorVenda    Decimal  @db.Decimal(10, 2)
+  // Custo de material total da venda (quantidade × custoEfetivo), snapshot.
+  custoTotal    Decimal  @db.Decimal(10, 2)
+  comissaoPct   Decimal  @db.Decimal(5, 2)
+  fretePct      Decimal  @db.Decimal(5, 2)
+  adsPct        Decimal  @db.Decimal(5, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([produtoId])
+  @@index([createdAt])
 }

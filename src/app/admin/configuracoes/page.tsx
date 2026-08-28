@@ -11,6 +11,9 @@ export default function AdminConfiguracoesPage() {
   const [transportadora, setTransportadora] = useState<TransportadoraFrete>("MELHOR_ENVIO");
   const [tokenMelhorEnvio, setTokenMelhorEnvio] = useState("");
   const [tokenSuperFrete, setTokenSuperFrete] = useState("");
+  const [shopeeComissaoPct, setShopeeComissaoPct] = useState("");
+  const [shopeeFretePct, setShopeeFretePct] = useState("");
+  const [shopeeAdsPct, setShopeeAdsPct] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -23,6 +26,9 @@ export default function AdminConfiguracoesPage() {
         setConfig(c);
         setCepOrigem(c.cepOrigem);
         setTransportadora(c.transportadoraAtiva);
+        setShopeeComissaoPct(c.shopeeComissaoPct?.toString() ?? "");
+        setShopeeFretePct(c.shopeeFretePct?.toString() ?? "");
+        setShopeeAdsPct(c.shopeeAdsPct?.toString() ?? "");
       })
       .finally(() => setCarregando(false));
   }, []);
@@ -38,7 +44,16 @@ export default function AdminConfiguracoesPage() {
       transportadoraAtiva: TransportadoraFrete;
       melhorEnvioToken?: string;
       superFreteToken?: string;
-    } = { cepOrigem, transportadoraAtiva: transportadora };
+      shopeeComissaoPct: number | null;
+      shopeeFretePct: number | null;
+      shopeeAdsPct: number | null;
+    } = {
+      cepOrigem,
+      transportadoraAtiva: transportadora,
+      shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
+      shopeeFretePct: shopeeFretePct.trim() ? Number(shopeeFretePct) : null,
+      shopeeAdsPct: shopeeAdsPct.trim() ? Number(shopeeAdsPct) : null,
+    };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
     if (tokenMelhorEnvio.trim()) payload.melhorEnvioToken = tokenMelhorEnvio.trim();
@@ -149,6 +164,46 @@ export default function AdminConfiguracoesPage() {
               className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
             />
           </label>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium mb-2">Vendas Shopee — margens padrão</p>
+          <p className="text-xs text-ink/50 mb-3">
+            Usadas ao lançar uma venda em Vendas Shopee, quando o produto não tem margem
+            própria definida no cadastro. Em branco = 0%.
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="block">
+              <span className="text-sm text-ink/70">Comissão %</span>
+              <input
+                type="number"
+                step="0.01"
+                value={shopeeComissaoPct}
+                onChange={(e) => setShopeeComissaoPct(e.target.value)}
+                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-ink/70">Frete %</span>
+              <input
+                type="number"
+                step="0.01"
+                value={shopeeFretePct}
+                onChange={(e) => setShopeeFretePct(e.target.value)}
+                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-ink/70">Ads %</span>
+              <input
+                type="number"
+                step="0.01"
+                value={shopeeAdsPct}
+                onChange={(e) => setShopeeAdsPct(e.target.value)}
+                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
+              />
+            </label>
+          </div>
         </div>
 
         {erro && <p className="text-sm text-berry">{erro}</p>}

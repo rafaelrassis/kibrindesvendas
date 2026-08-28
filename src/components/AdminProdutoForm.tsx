@@ -152,6 +152,12 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
   const [comprimentoCm, setComprimentoCm] = useState(String(produto?.comprimentoCm ?? 16));
   const [materiais, setMateriais] = useState<MaterialForm[]>(paraMaterialForm(produto?.materiais));
+  // Overrides de margem Shopee — vazio = usa o default global (Configurações).
+  const [shopeeComissaoPct, setShopeeComissaoPct] = useState(
+    produto?.shopeeComissaoPct?.toString() ?? ""
+  );
+  const [shopeeFretePct, setShopeeFretePct] = useState(produto?.shopeeFretePct?.toString() ?? "");
+  const [shopeeAdsPct, setShopeeAdsPct] = useState(produto?.shopeeAdsPct?.toString() ?? "");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
@@ -495,6 +501,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       alturaCm: Number(alturaCm) || 4,
       larguraCm: Number(larguraCm) || 11,
       comprimentoCm: Number(comprimentoCm) || 16,
+      // Vazio = null = volta a usar o default global (Configurações).
+      shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
+      shopeeFretePct: shopeeFretePct.trim() ? Number(shopeeFretePct) : null,
+      shopeeAdsPct: shopeeAdsPct.trim() ? Number(shopeeAdsPct) : null,
       variacoes: variacoes
         .filter((v) => v.tipo.trim())
         .map((v) => ({
@@ -875,6 +885,53 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           )}
         </div>
             </div>
+      </Secao>
+
+      <Secao
+        title="Shopee"
+        subtitle={
+          shopeeComissaoPct || shopeeFretePct || shopeeAdsPct
+            ? "Margens próprias definidas"
+            : "Usando os defaults da loja"
+        }
+      >
+        <p className="text-xs text-ink/50">
+          Margens usadas ao lançar uma venda deste produto em{" "}
+          <span className="font-medium">Vendas Shopee</span>. Deixe em branco pra usar o
+          default da loja, definido em Configurações.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          <Campo label="Comissão %">
+            <input
+              type="number"
+              step="0.01"
+              value={shopeeComissaoPct}
+              onChange={(e) => setShopeeComissaoPct(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+              placeholder="padrão"
+            />
+          </Campo>
+          <Campo label="Frete %">
+            <input
+              type="number"
+              step="0.01"
+              value={shopeeFretePct}
+              onChange={(e) => setShopeeFretePct(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+              placeholder="padrão"
+            />
+          </Campo>
+          <Campo label="Ads %">
+            <input
+              type="number"
+              step="0.01"
+              value={shopeeAdsPct}
+              onChange={(e) => setShopeeAdsPct(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+              placeholder="padrão"
+            />
+          </Campo>
+        </div>
       </Secao>
 
       <Secao title="Variações" subtitle={temVariacoes ? `${variacoes.length} tipo(s) cadastrado(s)` : "Nenhuma variação"}>

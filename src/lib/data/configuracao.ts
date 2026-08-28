@@ -22,6 +22,12 @@ export type ConfiguracaoLoja = {
   // — independe de cupom, e soma sem conflito com um cupom FRETE_GRATIS
   // aplicado junto (o resultado final é o mesmo: frete 0).
   freteGratisAcimaDe: number | null;
+  // Defaults globais de margem pra venda manual na Shopee (/admin/vendas-shopee).
+  // Um produto pode sobrescrever cada campo individualmente — ver
+  // margensShopeeDoProduto em vendas-shopee.ts. null = 0% até configurar.
+  shopeeComissaoPct: number | null;
+  shopeeFretePct: number | null;
+  shopeeAdsPct: number | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -37,6 +43,10 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     superFreteTokenFinal: config?.superFreteToken ? config.superFreteToken.slice(-4) : null,
     freteGratisAcimaDe:
       config?.freteGratisAcimaDe != null ? Number(config.freteGratisAcimaDe) : null,
+    shopeeComissaoPct:
+      config?.shopeeComissaoPct != null ? Number(config.shopeeComissaoPct) : null,
+    shopeeFretePct: config?.shopeeFretePct != null ? Number(config.shopeeFretePct) : null,
+    shopeeAdsPct: config?.shopeeAdsPct != null ? Number(config.shopeeAdsPct) : null,
   };
 }
 
@@ -48,6 +58,10 @@ export async function atualizarConfiguracaoLoja(dados: {
   superFreteToken?: string;
   // null desliga a regra; undefined deixa como está.
   freteGratisAcimaDe?: number | null;
+  // null desliga o default (volta a valer 0%); undefined deixa como está.
+  shopeeComissaoPct?: number | null;
+  shopeeFretePct?: number | null;
+  shopeeAdsPct?: number | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -55,6 +69,9 @@ export async function atualizarConfiguracaoLoja(dados: {
     melhorEnvioToken?: string | null;
     superFreteToken?: string | null;
     freteGratisAcimaDe?: number | null;
+    shopeeComissaoPct?: number | null;
+    shopeeFretePct?: number | null;
+    shopeeAdsPct?: number | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -85,6 +102,15 @@ export async function atualizarConfiguracaoLoja(dados: {
     data.freteGratisAcimaDe = dados.freteGratisAcimaDe;
   }
 
+  for (const campo of ["shopeeComissaoPct", "shopeeFretePct", "shopeeAdsPct"] as const) {
+    const valor = dados[campo];
+    if (valor === undefined) continue;
+    if (valor !== null && (valor < 0 || valor > 100)) {
+      throw new ErroDeNegocio(`${campo} precisa estar entre 0 e 100.`);
+    }
+    data[campo] = valor;
+  }
+
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
     create: {
@@ -94,6 +120,9 @@ export async function atualizarConfiguracaoLoja(dados: {
       melhorEnvioToken: data.melhorEnvioToken,
       superFreteToken: data.superFreteToken,
       freteGratisAcimaDe: data.freteGratisAcimaDe,
+      shopeeComissaoPct: data.shopeeComissaoPct,
+      shopeeFretePct: data.shopeeFretePct,
+      shopeeAdsPct: data.shopeeAdsPct,
     },
     update: data,
   });

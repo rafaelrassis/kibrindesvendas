@@ -118,6 +118,9 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     custoTotal: Math.round(custoTotal * 100) / 100,
     lucro,
     margemPercentual: preco > 0 ? Math.round((lucro / preco) * 1000) / 10 : null,
+    shopeeComissaoPct: p.shopeeComissaoPct != null ? Number(p.shopeeComissaoPct) : null,
+    shopeeFretePct: p.shopeeFretePct != null ? Number(p.shopeeFretePct) : null,
+    shopeeAdsPct: p.shopeeAdsPct != null ? Number(p.shopeeAdsPct) : null,
   };
 }
 
@@ -275,6 +278,11 @@ export type DadosProduto = {
   alturaCm?: number;
   larguraCm?: number;
   comprimentoCm?: number;
+  // Override de margem pra venda manual na Shopee (/admin/vendas-shopee).
+  // null explícito volta a usar o default global; undefined deixa como está.
+  shopeeComissaoPct?: number | null;
+  shopeeFretePct?: number | null;
+  shopeeAdsPct?: number | null;
 };
 
 const EMOJI_PADRAO = "🎁";
@@ -361,6 +369,15 @@ function validar(dados: Partial<DadosProduto>) {
   ) {
     throw new ErroDeNegocio("A quantidade mínima precisa ser um número inteiro maior ou igual a 1.");
   }
+  for (const [campo, valor] of [
+    ["shopeeComissaoPct", dados.shopeeComissaoPct],
+    ["shopeeFretePct", dados.shopeeFretePct],
+    ["shopeeAdsPct", dados.shopeeAdsPct],
+  ] as const) {
+    if (valor != null && (valor < 0 || valor > 100)) {
+      throw new ErroDeNegocio(`${campo} precisa estar entre 0 e 100.`);
+    }
+  }
   if (dados.estoqueVariacoes) {
     for (const linha of dados.estoqueVariacoes) {
       if (!linha.combinacao.trim()) {
@@ -414,6 +431,9 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
       larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
       comprimentoCm: dados.comprimentoCm ?? COMPRIMENTO_PADRAO_CM,
+      shopeeComissaoPct: dados.shopeeComissaoPct ?? null,
+      shopeeFretePct: dados.shopeeFretePct ?? null,
+      shopeeAdsPct: dados.shopeeAdsPct ?? null,
       variacoes: {
         create: (dados.variacoes ?? []).map((v) => ({
           tipo: v.tipo,
@@ -503,6 +523,9 @@ export async function atualizarProduto(
         alturaCm: dados.alturaCm,
         larguraCm: dados.larguraCm,
         comprimentoCm: dados.comprimentoCm,
+        shopeeComissaoPct: dados.shopeeComissaoPct !== undefined ? dados.shopeeComissaoPct : undefined,
+        shopeeFretePct: dados.shopeeFretePct !== undefined ? dados.shopeeFretePct : undefined,
+        shopeeAdsPct: dados.shopeeAdsPct !== undefined ? dados.shopeeAdsPct : undefined,
         ...(dados.variacoes && {
           variacoes: {
             create: dados.variacoes.map((v) => ({

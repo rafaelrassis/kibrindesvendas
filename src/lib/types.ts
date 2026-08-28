@@ -91,6 +91,11 @@ export type ProdutoAdmin = Produto & {
   custoTotal: number;
   lucro: number;
   margemPercentual: number | null;
+  // Override de margem Shopee deste produto — null = usa o default global
+  // da loja (ver ConfiguracaoLoja.shopeeComissaoPct e cia).
+  shopeeComissaoPct: number | null;
+  shopeeFretePct: number | null;
+  shopeeAdsPct: number | null;
 };
 
 export type Cupom = {
