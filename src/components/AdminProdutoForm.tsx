@@ -547,7 +547,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   }
 
   return (
-    <form onSubmit={enviar} className="space-y-4 max-w-xl">
+    <form onSubmit={enviar} className="space-y-3 max-w-xl">
+      <Secao title="Informações básicas" defaultOpen>
       <Campo label="Nome">
         <input
           value={nome}
@@ -639,60 +640,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           ))}
         </select>
       </Campo>
+      </Secao>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Campo label="Preço (site)">
-          <input
-            type="number"
-            step="0.01"
-            value={preco}
-            onChange={(e) => setPreco(e.target.value)}
-            className="w-full border border-line rounded px-3 py-2 text-sm"
-            required
-          />
-        </Campo>
-        <Campo label="Preço original (riscado)">
-          <input
-            type="number"
-            step="0.01"
-            value={precoOriginal}
-            onChange={(e) => setPrecoOriginal(e.target.value)}
-            className="w-full border border-line rounded px-3 py-2 text-sm"
-            placeholder="opcional — maior que o preço"
-          />
-        </Campo>
-        <Campo label="Preço (Shopee)">
-          <input
-            type="number"
-            step="0.01"
-            value={precoShopee}
-            onChange={(e) => setPrecoShopee(e.target.value)}
-            className="w-full border border-line rounded px-3 py-2 text-sm"
-            placeholder="opcional"
-          />
-        </Campo>
-      </div>
-      {precoOriginal && Number(precoOriginal) <= Number(preco || 0) && (
-        <p className="text-xs text-berry -mt-2">
-          O preço original precisa ser maior que o preço do site.
-        </p>
-      )}
-
-      <div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={vendidoNaShopee}
-            onChange={(e) => setVendidoNaShopee(e.target.checked)}
-          />
-          Também vendido na Shopee
-        </label>
-        <p className="text-xs text-ink/50 mt-1">
-          Desligado, o site nunca mostra o comparativo de preço deste produto, mesmo com
-          o preço da Shopee preenchido.
-        </p>
-      </div>
-
+      <Secao title="Mídia" subtitle="Fotos, vídeo, emoji e cor">
       <div>
         <p className="text-sm font-medium mb-1">Fotos e vídeo</p>
         <p className="text-xs text-ink/50 mb-3">
@@ -794,121 +744,141 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           />
         </Campo>
       </div>
+      </Secao>
+
+      <Secao
+        title="Precificação"
+        subtitle={materiais.length > 0 ? `custo ${reais(custoTotal)} · margem base ${margem !== null ? margem.toFixed(0) + "%" : "—"}` : "Sem custo de material lançado"}
+        defaultOpen
+      >
+
+      <div className="grid grid-cols-3 gap-4">
+        <Campo label="Preço (site)">
+          <input
+            type="number"
+            step="0.01"
+            value={preco}
+            onChange={(e) => setPreco(e.target.value)}
+            className="w-full border border-line rounded px-3 py-2 text-sm"
+            required
+          />
+        </Campo>
+        <Campo label="Preço original (riscado)">
+          <input
+            type="number"
+            step="0.01"
+            value={precoOriginal}
+            onChange={(e) => setPrecoOriginal(e.target.value)}
+            className="w-full border border-line rounded px-3 py-2 text-sm"
+            placeholder="opcional — maior que o preço"
+          />
+        </Campo>
+        <Campo label="Preço (Shopee)">
+          <input
+            type="number"
+            step="0.01"
+            value={precoShopee}
+            onChange={(e) => setPrecoShopee(e.target.value)}
+            className="w-full border border-line rounded px-3 py-2 text-sm"
+            placeholder="opcional"
+          />
+        </Campo>
+      </div>
+      {precoOriginal && Number(precoOriginal) <= Number(preco || 0) && (
+        <p className="text-xs text-berry -mt-2">
+          O preço original precisa ser maior que o preço do site.
+        </p>
+      )}
 
       <div>
-        <p className="text-sm font-medium mb-2">Peso e dimensões (embalagem)</p>
-        <p className="text-xs text-ink/50 mb-2">
-          Usados na cotação real de frete pelos Correios. Sem esses dados o cálculo cai
-          na estimativa por região.
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={vendidoNaShopee}
+            onChange={(e) => setVendidoNaShopee(e.target.checked)}
+          />
+          Também vendido na Shopee
+        </label>
+        <p className="text-xs text-ink/50 mt-1">
+          Desligado, o site nunca mostra o comparativo de preço deste produto, mesmo com
+          o preço da Shopee preenchido.
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Campo label="Peso (g)">
-            <input
-              type="number"
-              min={1}
-              value={pesoGramas}
-              onChange={(e) => setPesoGramas(e.target.value)}
-              className="w-full border border-line rounded px-3 py-2 text-sm"
-            />
-          </Campo>
-          <Campo label="Altura (cm)">
-            <input
-              type="number"
-              min={1}
-              value={alturaCm}
-              onChange={(e) => setAlturaCm(e.target.value)}
-              className="w-full border border-line rounded px-3 py-2 text-sm"
-            />
-          </Campo>
-          <Campo label="Largura (cm)">
-            <input
-              type="number"
-              min={1}
-              value={larguraCm}
-              onChange={(e) => setLarguraCm(e.target.value)}
-              className="w-full border border-line rounded px-3 py-2 text-sm"
-            />
-          </Campo>
-          <Campo label="Comprimento (cm)">
-            <input
-              type="number"
-              min={1}
-              value={comprimentoCm}
-              onChange={(e) => setComprimentoCm(e.target.value)}
-              className="w-full border border-line rounded px-3 py-2 text-sm"
-            />
-          </Campo>
-        </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={requerPersonalizacao}
-          onChange={(e) => setRequerPersonalizacao(e.target.checked)}
-        />
-        Requer personalização
-      </label>
+      <div className="border-t border-line pt-4 mt-2">
+        <p className="text-xs font-medium text-ink/70 mb-2">Custo de material</p>
+        <p className="text-xs text-ink/50">
+          Lance tudo que é gasto pra fazer o produto — assim dá pra ver a margem real, não só o
+          preço de venda. Isso nunca aparece pro cliente, só aqui no admin.
+        </p>
+        <div className="space-y-2">
+          {materiais.map((m, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <input
+                value={m.nome}
+                onChange={(e) => atualizarMaterial(i, "nome", e.target.value)}
+                placeholder="Material (ex: Caneca branca)"
+                className="flex-1 border border-line rounded px-3 py-2 text-sm"
+              />
+              <input
+                value={m.quantidade}
+                onChange={(e) => atualizarMaterial(i, "quantidade", e.target.value)}
+                placeholder="Qtd"
+                inputMode="decimal"
+                className="w-16 border border-line rounded px-2 py-2 text-sm"
+              />
+              <input
+                value={m.custoUnitario}
+                onChange={(e) => atualizarMaterial(i, "custoUnitario", e.target.value)}
+                placeholder="Custo un."
+                inputMode="decimal"
+                className="w-24 border border-line rounded px-2 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => removerMaterial(i)}
+                className="text-berry text-xs px-2"
+              >
+                Remover
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            setMateriais((prev) => [...prev, { nome: "", quantidade: "1", custoUnitario: "" }])
+          }
+          className="text-pine text-xs mt-2 hover:underline"
+        >
+          + Adicionar material
+        </button>
 
-      <Campo label="Texto do alerta de personalização (opcional — deixe em branco para usar o texto padrão)">
-        <textarea
-          value={mensagemPersonalizacao}
-          onChange={(e) => setMensagemPersonalizacao(e.target.value)}
-          placeholder="Este produto passa por um fluxo de personalização depois de escolhidas as variações."
-          rows={3}
-          className="w-full border border-line rounded px-3 py-2 text-sm"
-        />
-      </Campo>
+        <div className="bg-paper-2 border border-line rounded-lg p-4 mt-4 text-sm space-y-1">
+          <div className="flex justify-between">
+            <span className="text-ink/60">Custo total de material</span>
+            <span className="font-mono">{reais(custoTotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink/60">Lucro por unidade</span>
+            <span className={`font-mono ${lucro < 0 ? "text-berry" : "text-pine-2"}`}>
+              {reais(lucro)}
+            </span>
+          </div>
+          {margem !== null && (
+            <div className="flex justify-between">
+              <span className="text-ink/60">Margem</span>
+              <span className={`font-mono ${lucro < 0 ? "text-berry" : "text-pine-2"}`}>
+                {margem.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+            </div>
+      </Secao>
 
-      <Campo label="Dias extras de produção (somados ao prazo de frete)">
-        <input
-          type="number"
-          min={0}
-          value={diasProducaoExtra}
-          onChange={(e) => setDiasProducaoExtra(e.target.value)}
-          className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
-        />
-      </Campo>
-
-      <Campo label="Quantidade mínima por pedido">
-        <input
-          type="number"
-          min={1}
-          value={quantidadeMinima}
-          onChange={(e) => setQuantidadeMinima(e.target.value)}
-          className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
-        />
-      </Campo>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={quantidadePersonalizavel}
-          onChange={(e) => setQuantidadePersonalizavel(e.target.checked)}
-        />
-        Quantidade em campo livre (pedidos grandes, sem stepper +/-)
-      </label>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={destaque}
-          onChange={(e) => setDestaque(e.target.checked)}
-        />
-        Produto em destaque
-      </label>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={destaqueCategoria}
-          onChange={(e) => setDestaqueCategoria(e.target.checked)}
-        />
-        Destaque na categoria (aparece primeiro na prateleira da home)
-      </label>
-
+      <Secao title="Variações" subtitle={temVariacoes ? `${variacoes.length} tipo(s) cadastrado(s)` : "Nenhuma variação"}>
       <div>
-        <p className="text-sm font-medium mb-2">Variações</p>
         <div className="space-y-3">
           {variacoes.map((v, i) => {
             const ehCor = tipoTemFotoPorValor(v.tipo);
@@ -1003,8 +973,12 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                 {/* Preço por valor — substitui o preço base do produto quando
                     o cliente escolhe esse valor (ex: "Tamanho imã": 7x7 = R$1,
                     10x10 = R$5). Campo vazio = usa o preço normal. */}
+                {/* Preço e custo por valor — cada valor vira um card próprio
+                    (em vez de tudo numa linha só) pra caber legível no
+                    mobile. Preço substitui o preço base do produto; custo
+                    substitui a soma de materiais — ambos opcionais. */}
                 {valoresLista.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pl-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pl-1">
                     {valoresLista.map((valor) => {
                       const precoValorNum = v.precosValores[valor]
                         ? Number(v.precosValores[valor].replace(",", "."))
@@ -1017,41 +991,45 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                           ? ((precoValorNum - custoValorNum) / precoValorNum) * 100
                           : null;
                       return (
-                        <div key={valor} className="flex items-center gap-1 text-xs">
-                          <span className="text-ink/60 max-w-[6rem] truncate">{valor}</span>
-                          <label className="flex items-center gap-1">
-                            <span className="text-ink/40">R$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={v.precosValores[valor] ?? ""}
-                              onChange={(e) => atualizarPrecoValor(i, valor, e.target.value)}
-                              placeholder={reais(preco ? Number(preco) : 0)}
-                              className="w-20 border border-line rounded px-2 py-1 text-xs"
-                            />
-                          </label>
-                          <label className="flex items-center gap-1">
-                            <span className="text-ink/40">custo</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={v.custosValores[valor] ?? ""}
-                              onChange={(e) => atualizarCustoValor(i, valor, e.target.value)}
-                              placeholder={reais(custoTotal)}
-                              className="w-20 border border-line rounded px-2 py-1 text-xs"
-                            />
-                          </label>
-                          {margemValor !== null && (
-                            <span
-                              className={
-                                margemValor < 0 ? "text-berry" : "text-pine/70"
-                              }
-                            >
-                              {margemValor.toFixed(0)}%
-                            </span>
-                          )}
+                        <div key={valor} className="border border-line rounded-lg p-2">
+                          <div className="flex items-center justify-between gap-1 mb-1.5">
+                            <span className="text-xs font-medium text-ink truncate">{valor}</span>
+                            {margemValor !== null && (
+                              <span
+                                className={`text-[11px] font-medium shrink-0 ${
+                                  margemValor < 0 ? "text-berry" : "text-pine/70"
+                                }`}
+                              >
+                                {margemValor.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <label className="block">
+                              <span className="block text-[10px] text-ink/40 mb-0.5">Preço</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={v.precosValores[valor] ?? ""}
+                                onChange={(e) => atualizarPrecoValor(i, valor, e.target.value)}
+                                placeholder={reais(preco ? Number(preco) : 0)}
+                                className="w-full border border-line rounded px-2 py-1 text-xs"
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="block text-[10px] text-ink/40 mb-0.5">Custo</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={v.custosValores[valor] ?? ""}
+                                onChange={(e) => atualizarCustoValor(i, valor, e.target.value)}
+                                placeholder={reais(custoTotal)}
+                                className="w-full border border-line rounded px-2 py-1 text-xs"
+                              />
+                            </label>
+                          </div>
                         </div>
                       );
                     })}
@@ -1079,8 +1057,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           + Adicionar variação
         </button>
       </div>
+      </Secao>
 
-      <div className="border border-line rounded-lg p-4">
+      <Secao title="Estoque" subtitle={controlaEstoque ? "Controle ligado" : "Sem limite de unidades"}>
         <label className="flex items-center gap-2 text-sm mb-1">
           <input
             type="checkbox"
@@ -1146,78 +1125,126 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             </div>
           </div>
         )}
-      </div>
+      </Secao>
 
-      <div className="border-t border-line pt-4">
-        <p className="text-sm font-medium mb-1">Custo de material</p>
-        <p className="text-xs text-ink/50 mb-3">
-          Lance tudo que é gasto pra fazer o produto — assim dá pra ver a margem real, não só o
-          preço de venda. Isso nunca aparece pro cliente, só aqui no admin.
+      <Secao title="Personalização e pedido">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={requerPersonalizacao}
+          onChange={(e) => setRequerPersonalizacao(e.target.checked)}
+        />
+        Requer personalização
+      </label>
+
+      <Campo label="Texto do alerta de personalização (opcional — deixe em branco para usar o texto padrão)">
+        <textarea
+          value={mensagemPersonalizacao}
+          onChange={(e) => setMensagemPersonalizacao(e.target.value)}
+          placeholder="Este produto passa por um fluxo de personalização depois de escolhidas as variações."
+          rows={3}
+          className="w-full border border-line rounded px-3 py-2 text-sm"
+        />
+      </Campo>
+
+      <Campo label="Dias extras de produção (somados ao prazo de frete)">
+        <input
+          type="number"
+          min={0}
+          value={diasProducaoExtra}
+          onChange={(e) => setDiasProducaoExtra(e.target.value)}
+          className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
+        />
+      </Campo>
+
+      <Campo label="Quantidade mínima por pedido">
+        <input
+          type="number"
+          min={1}
+          value={quantidadeMinima}
+          onChange={(e) => setQuantidadeMinima(e.target.value)}
+          className="w-full max-w-[120px] border border-line rounded px-3 py-2 text-sm"
+        />
+      </Campo>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={quantidadePersonalizavel}
+          onChange={(e) => setQuantidadePersonalizavel(e.target.checked)}
+        />
+        Quantidade em campo livre (pedidos grandes, sem stepper +/-)
+      </label>
+      </Secao>
+
+      <Secao title="Envio" subtitle="Peso e dimensões da embalagem">
+      <div>
+        <p className="text-sm font-medium mb-2">Peso e dimensões (embalagem)</p>
+        <p className="text-xs text-ink/50 mb-2">
+          Usados na cotação real de frete pelos Correios. Sem esses dados o cálculo cai
+          na estimativa por região.
         </p>
-        <div className="space-y-2">
-          {materiais.map((m, i) => (
-            <div key={i} className="flex gap-2 items-center">
-              <input
-                value={m.nome}
-                onChange={(e) => atualizarMaterial(i, "nome", e.target.value)}
-                placeholder="Material (ex: Caneca branca)"
-                className="flex-1 border border-line rounded px-3 py-2 text-sm"
-              />
-              <input
-                value={m.quantidade}
-                onChange={(e) => atualizarMaterial(i, "quantidade", e.target.value)}
-                placeholder="Qtd"
-                inputMode="decimal"
-                className="w-16 border border-line rounded px-2 py-2 text-sm"
-              />
-              <input
-                value={m.custoUnitario}
-                onChange={(e) => atualizarMaterial(i, "custoUnitario", e.target.value)}
-                placeholder="Custo un."
-                inputMode="decimal"
-                className="w-24 border border-line rounded px-2 py-2 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => removerMaterial(i)}
-                className="text-berry text-xs px-2"
-              >
-                Remover
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setMateriais((prev) => [...prev, { nome: "", quantidade: "1", custoUnitario: "" }])
-          }
-          className="text-pine text-xs mt-2 hover:underline"
-        >
-          + Adicionar material
-        </button>
-
-        <div className="bg-paper-2 border border-line rounded-lg p-4 mt-4 text-sm space-y-1">
-          <div className="flex justify-between">
-            <span className="text-ink/60">Custo total de material</span>
-            <span className="font-mono">{reais(custoTotal)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-ink/60">Lucro por unidade</span>
-            <span className={`font-mono ${lucro < 0 ? "text-berry" : "text-pine-2"}`}>
-              {reais(lucro)}
-            </span>
-          </div>
-          {margem !== null && (
-            <div className="flex justify-between">
-              <span className="text-ink/60">Margem</span>
-              <span className={`font-mono ${lucro < 0 ? "text-berry" : "text-pine-2"}`}>
-                {margem.toFixed(1)}%
-              </span>
-            </div>
-          )}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Campo label="Peso (g)">
+            <input
+              type="number"
+              min={1}
+              value={pesoGramas}
+              onChange={(e) => setPesoGramas(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Altura (cm)">
+            <input
+              type="number"
+              min={1}
+              value={alturaCm}
+              onChange={(e) => setAlturaCm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Largura (cm)">
+            <input
+              type="number"
+              min={1}
+              value={larguraCm}
+              onChange={(e) => setLarguraCm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Comprimento (cm)">
+            <input
+              type="number"
+              min={1}
+              value={comprimentoCm}
+              onChange={(e) => setComprimentoCm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
         </div>
       </div>
+      </Secao>
+
+      <Secao title="Vitrine">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={destaque}
+          onChange={(e) => setDestaque(e.target.checked)}
+        />
+        Produto em destaque
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={destaqueCategoria}
+          onChange={(e) => setDestaqueCategoria(e.target.checked)}
+        />
+        Destaque na categoria (aparece primeiro na prateleira da home)
+      </label>
+      </Secao>
+
 
       {erro && <p className="text-sm text-berry">{erro}</p>}
 
@@ -1245,6 +1272,40 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
       <span className="block text-xs text-ink/50 mb-1.5">{label}</span>
       {children}
     </label>
+  );
+}
+
+// Seção recolhível do form de produto — bloco grande de campos vira um
+// accordion, então a tela some com rolagem infinita. Cada seção guarda seu
+// próprio estado aberto/fechado; `defaultOpen` decide o que já vem visível
+// ao abrir a página (as mais usadas no dia a dia).
+function Secao({
+  title,
+  subtitle,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [aberto, setAberto] = useState(defaultOpen);
+  return (
+    <div className="border border-line rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-paper-2 hover:bg-paper-2/70 transition-colors"
+      >
+        <div>
+          <p className="text-sm font-medium">{title}</p>
+          {subtitle && <p className="text-xs text-ink/50 mt-0.5">{subtitle}</p>}
+        </div>
+        <span className="text-ink/40 text-xs shrink-0">{aberto ? "▲" : "▼"}</span>
+      </button>
+      {aberto && <div className="p-4 space-y-4">{children}</div>}
+    </div>
   );
 }
 
