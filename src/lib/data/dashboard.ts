@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LABEL_STATUS, STATUS_PEDIDO, type StatusPedido } from "@/lib/status-pedido";
+import { custoEfetivo } from "@/lib/estoque-variacao";
 
 // Janela do painel: hoje e os 29 dias anteriores.
 const DIAS = 30;
@@ -60,6 +61,9 @@ const STATUS_DE_DEVOLUCAO: StatusPedido[] = ["DEVOLUCAO_SOLICITADA", "DEVOLVIDO"
 export type VendaDoDia = { dia: string; total: number };
 export type FatiaDeStatus = { status: StatusPedido; label: string; cor: string; quantidade: number };
 export type ProdutoVendido = { nome: string; quantidade: number };
+export type FreteServico = { servico: string; quantidade: number };
+export type ProdutoEstoqueBaixo = { nome: string; combinacao: string | null; estoque: number };
+export type CanalDeVenda = { canal: "Site" | "Shopee"; total: number };
 
 export type ResumoDoPainel = {
   totalVendas: number;
@@ -67,14 +71,23 @@ export type ResumoDoPainel = {
   ticketMedio: number;
   totalDevolucoes: number;
   taxaDevolucao: number;
+  lucroEstimado: number;
+  margemPct: number;
 };
 
 export type DadosDoPainel = {
   vendasPorDia: VendaDoDia[];
   pedidosPorStatus: FatiaDeStatus[];
   produtosMaisVendidos: ProdutoVendido[];
+  vendasPorFrete: FreteServico[];
+  estoqueBaixo: ProdutoEstoqueBaixo[];
+  vendasPorCanal: CanalDeVenda[];
   resumo: ResumoDoPainel;
 };
+
+// Abaixo disso o admin já deveria ficar de olho — acima, não vale poluir a
+// lista com toda combinação que só tem "bastante" estoque.
+const LIMIAR_ESTOQUE_BAIXO = 5;
 
 // Somar Decimal em ponto flutuante desalinha os centavos (39.9 + 16.9 dá
 // 56.800000000000004): a conta corre em centavos e só volta pra reais no fim.
@@ -86,15 +99,20 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
   const agora = Date.now();
   const inicio = new Date(`${CHAVE_DO_DIA.format(agora - (DIAS - 1) * UM_DIA)}T00:00:00-03:00`);
 
-  const [pedidos, produtosMaisVendidos] = await Promise.all([
-    // Só as três colunas que o painel usa: o gráfico não precisa dos itens nem
-    // do endereço de cada pedido do mês.
-    prisma.pedido.findMany({
-      where: { createdAt: { gte: inicio } },
-      select: { status: true, total: true, createdAt: true },
-    }),
-    getProdutosMaisVendidos(inicio),
-  ]);
+  const [pedidos, produtosMaisVendidos, lucroEstimado, vendasPorFrete, estoqueBaixo, vendasPorCanal] =
+    await Promise.all([
+      // Só as três colunas que o painel usa: o gráfico não precisa dos itens nem
+      // do endereço de cada pedido do mês.
+      prisma.pedido.findMany({
+        where: { createdAt: { gte: inicio } },
+        select: { status: true, total: true, createdAt: true },
+      }),
+      getProdutosMaisVendidos(inicio),
+      getLucroEstimado(inicio),
+      getVendasPorFrete(inicio),
+      getEstoqueBaixo(),
+      getVendasPorCanal(inicio),
+    ]);
 
   // Dia sem venda tem que aparecer como zero, senão a linha do gráfico pula o
   // buraco e finge que o movimento foi contínuo.
@@ -142,18 +160,139 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
     })
   );
 
+  const totalVendas = centavosVendidos / 100;
+
   return {
     vendasPorDia,
     pedidosPorStatus,
     produtosMaisVendidos,
+    vendasPorFrete,
+    estoqueBaixo,
+    vendasPorCanal,
     resumo: {
-      totalVendas: centavosVendidos / 100,
+      totalVendas,
       totalPedidos,
       ticketMedio: totalPedidos > 0 ? Math.round(centavosVendidos / totalPedidos) / 100 : 0,
       totalDevolucoes,
       taxaDevolucao: totalPedidos > 0 ? (totalDevolucoes / totalPedidos) * 100 : 0,
+      lucroEstimado,
+      margemPct: totalVendas > 0 ? (lucroEstimado / totalVendas) * 100 : 0,
     },
   };
+}
+
+// Lucro = faturamento (já contado acima via pedido.total) menos o custo de
+// material de cada item vendido, na variação efetivamente escolhida. Não
+// desconta frete/comissão — é custo de produto puro, igual ao usado no
+// cadastro. Dado sensível: só chega até o painel admin, nunca à API pública.
+async function getLucroEstimado(inicio: Date): Promise<number> {
+  const itens = await prisma.itemPedido.findMany({
+    where: { pedido: { createdAt: { gte: inicio }, status: { in: STATUS_DE_VENDA } } },
+    select: {
+      quantidade: true,
+      precoUnitario: true,
+      variacaoEscolhida: true,
+      produto: { include: { materiais: true, variacoes: true } },
+    },
+  });
+
+  let centavosFaturados = 0;
+  let centavosCusto = 0;
+  for (const item of itens) {
+    const custoTotalProduto = item.produto.materiais.reduce(
+      (soma, m) => soma + Number(m.quantidade) * Number(m.custoUnitario),
+      0
+    );
+    const selecoes = (item.variacaoEscolhida as Record<string, string> | null) ?? {};
+    const custoUnitario = custoEfetivo(
+      { custoTotal: custoTotalProduto, variacoes: item.produto.variacoes.map((v) => ({
+        tipo: v.tipo,
+        custosValores: v.custosValores as Record<string, number> | null,
+      })) },
+      selecoes
+    );
+    centavosFaturados += emCentavos(item.precoUnitario) * item.quantidade;
+    centavosCusto += Math.round(custoUnitario * 100) * item.quantidade;
+  }
+
+  return (centavosFaturados - centavosCusto) / 100;
+}
+
+// Serviço de frete escolhido em cada pedido pago (PAC, SEDEX...). null vira
+// "Grátis / estimado" — frete zerado por cupom/limiar ou sem transportadora
+// configurada.
+async function getVendasPorFrete(inicio: Date): Promise<FreteServico[]> {
+  const pedidos = await prisma.pedido.findMany({
+    where: { createdAt: { gte: inicio }, status: { in: STATUS_DE_VENDA } },
+    select: { freteServico: true },
+  });
+
+  const porServico = new Map<string, number>();
+  for (const p of pedidos) {
+    const chave = p.freteServico ?? "Grátis / estimado";
+    porServico.set(chave, (porServico.get(chave) ?? 0) + 1);
+  }
+
+  return Array.from(porServico.entries())
+    .map(([servico, quantidade]) => ({ servico, quantidade }))
+    .sort((a, b) => b.quantidade - a.quantidade);
+}
+
+// Combinações com controle de estoque ligado e quantidade baixa ou zerada —
+// mesmo critério de "esgotado" usado no checkout (linha com 0). Produto sem
+// controle por variação (estoque simples) entra do mesmo jeito, olhando
+// produto.estoque.
+async function getEstoqueBaixo(): Promise<ProdutoEstoqueBaixo[]> {
+  const [variacoes, produtosSimples] = await Promise.all([
+    prisma.estoqueVariacao.findMany({
+      where: { estoque: { lte: LIMIAR_ESTOQUE_BAIXO } },
+      select: { estoque: true, combinacao: true, produto: { select: { nome: true, emoji: true, ativo: true } } },
+    }),
+    prisma.produto.findMany({
+      where: { ativo: true, estoque: { lte: LIMIAR_ESTOQUE_BAIXO } },
+      select: { nome: true, emoji: true, estoque: true },
+    }),
+  ]);
+
+  const doVariacoes = variacoes
+    .filter((v) => v.produto.ativo)
+    .map((v) => ({
+      nome: `${v.produto.emoji} ${v.produto.nome}`,
+      combinacao: v.combinacao,
+      estoque: v.estoque,
+    }));
+
+  const doSimples = produtosSimples.map((p) => ({
+    nome: `${p.emoji} ${p.nome}`,
+    combinacao: null,
+    estoque: p.estoque!,
+  }));
+
+  return [...doVariacoes, ...doSimples].sort((a, b) => a.estoque - b.estoque);
+}
+
+// Compara o faturamento do site (pedidos pagos) com as vendas lançadas
+// manualmente na Shopee no mesmo período — os dois canais vendem o mesmo
+// catálogo, então o painel só fazia sentido de um lado até agora.
+async function getVendasPorCanal(inicio: Date): Promise<CanalDeVenda[]> {
+  const [pedidos, shopee] = await Promise.all([
+    prisma.pedido.findMany({
+      where: { createdAt: { gte: inicio }, status: { in: STATUS_DE_VENDA } },
+      select: { total: true },
+    }),
+    prisma.vendaShopee.findMany({
+      where: { createdAt: { gte: inicio } },
+      select: { valorVenda: true },
+    }),
+  ]);
+
+  const totalSite = pedidos.reduce((soma, p) => soma + emCentavos(p.total), 0) / 100;
+  const totalShopee = shopee.reduce((soma, v) => soma + emCentavos(v.valorVenda), 0) / 100;
+
+  return [
+    { canal: "Site", total: totalSite },
+    { canal: "Shopee", total: totalShopee },
+  ];
 }
 
 // A soma por produto sai do banco: a lista de itens do período inteiro não

@@ -14,7 +14,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { FatiaDeStatus, ProdutoVendido, VendaDoDia } from "@/lib/data/dashboard";
+import type {
+  CanalDeVenda,
+  FatiaDeStatus,
+  FreteServico,
+  ProdutoVendido,
+  VendaDoDia,
+} from "@/lib/data/dashboard";
 
 // Os gráficos são a única parte do painel que precisa rodar no navegador (o
 // recharts mede o container pra desenhar o SVG); o resto da tela continua
@@ -97,6 +103,43 @@ export function GraficoProdutos({ dados }: { dados: ProdutoVendido[] }) {
           cursor={{ fill: "#f6eef6" }}
         />
         <Bar dataKey="quantidade" fill="#d9a63e" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function GraficoFrete({ dados }: { dados: FreteServico[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <BarChart data={dados} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={GRADE} horizontal={false} />
+        <XAxis type="number" tick={EIXO} allowDecimals={false} tickLine={false} />
+        <YAxis type="category" dataKey="servico" tick={EIXO} width={100} tickLine={false} />
+        <Tooltip
+          contentStyle={CAIXA_TOOLTIP}
+          formatter={(valor) => [String(valor), "Pedidos"]}
+          cursor={{ fill: "#f6eef6" }}
+        />
+        <Bar dataKey="quantidade" fill="#9c1c95" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function GraficoCanal({ dados }: { dados: CanalDeVenda[] }) {
+  const cores: Record<CanalDeVenda["canal"], string> = { Site: "#3f6b4c", Shopee: "#ee4d2d" };
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <BarChart data={dados} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={GRADE} />
+        <XAxis dataKey="canal" tick={EIXO} tickLine={false} />
+        <YAxis tick={EIXO} width={44} tickLine={false} axisLine={false} />
+        <Tooltip contentStyle={CAIXA_TOOLTIP} formatter={(valor) => [reais(Number(valor)), "Vendas"]} />
+        <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+          {dados.map((fatia) => (
+            <Cell key={fatia.canal} fill={cores[fatia.canal]} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

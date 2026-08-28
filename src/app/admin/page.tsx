@@ -1,12 +1,25 @@
 import AdminNav from "@/components/AdminNav";
-import { GraficoProdutos, GraficoStatus, GraficoVendas } from "@/components/AdminDashboardCharts";
+import {
+  GraficoCanal,
+  GraficoFrete,
+  GraficoProdutos,
+  GraficoStatus,
+  GraficoVendas,
+} from "@/components/AdminDashboardCharts";
 import { exigirAdmin } from "@/lib/admin";
 import { getDadosDoPainel } from "@/lib/data/dashboard";
 
 export default async function AdminPainelPage() {
   await exigirAdmin();
-  const { vendasPorDia, pedidosPorStatus, produtosMaisVendidos, resumo } =
-    await getDadosDoPainel();
+  const {
+    vendasPorDia,
+    pedidosPorStatus,
+    produtosMaisVendidos,
+    vendasPorFrete,
+    estoqueBaixo,
+    vendasPorCanal,
+    resumo,
+  } = await getDadosDoPainel();
 
   const semVendas = resumo.totalPedidos === 0;
 
@@ -28,6 +41,11 @@ export default async function AdminPainelPage() {
           valor={`${resumo.totalDevolucoes} (${resumo.taxaDevolucao.toFixed(1).replace(".", ",")}%)`}
           alerta={resumo.taxaDevolucao > 10}
         />
+        <Cartao
+          label="Lucro estimado"
+          valor={`${reais(resumo.lucroEstimado)} (${resumo.margemPct.toFixed(0)}%)`}
+          alerta={resumo.margemPct < 20 && resumo.totalPedidos > 0}
+        />
       </div>
 
       <Bloco titulo="Vendas por dia">
@@ -48,6 +66,42 @@ export default async function AdminPainelPage() {
             <Vazio texto="Nenhuma venda no período." />
           ) : (
             <GraficoProdutos dados={produtosMaisVendidos} />
+          )}
+        </Bloco>
+
+        <Bloco titulo="Frete por serviço">
+          {vendasPorFrete.length === 0 ? (
+            <Vazio texto="Nenhum pedido no período." />
+          ) : (
+            <GraficoFrete dados={vendasPorFrete} />
+          )}
+        </Bloco>
+
+        <Bloco titulo="Site x Shopee">
+          <GraficoCanal dados={vendasPorCanal} />
+        </Bloco>
+      </div>
+
+      <div className="mt-4">
+        <Bloco titulo={`Estoque baixo (≤ 5 un.)`}>
+          {estoqueBaixo.length === 0 ? (
+            <Vazio texto="Nenhum produto com estoque baixo." />
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {estoqueBaixo.map((item, i) => (
+                <li key={i} className="flex items-center justify-between py-2">
+                  <span className="truncate">
+                    {item.nome}
+                    {item.combinacao && (
+                      <span className="text-ink/50"> — {item.combinacao.replaceAll("|", ", ")}</span>
+                    )}
+                  </span>
+                  <span className={`font-mono ml-3 ${item.estoque === 0 ? "text-berry" : ""}`}>
+                    {item.estoque}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </Bloco>
       </div>
