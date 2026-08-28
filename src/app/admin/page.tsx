@@ -54,7 +54,7 @@ export default async function AdminPainelPage() {
         {semVendas ? <Vazio texto="Nenhuma venda no período." /> : <GraficoVendas dados={vendasPorDia} />}
       </Bloco>
 
-      <div className="grid md:grid-cols-2 gap-4 mt-4">
+      <div className="grid md:grid-cols-2 gap-4 mt-4 min-w-0">
         <Bloco titulo="Pedidos por status">
           {pedidosPorStatus.length === 0 ? (
             <Vazio texto="Nenhum pedido no período." />
@@ -149,9 +149,12 @@ function Cartao({ label, valor, alerta }: { label: string; valor: string; alerta
   );
 }
 
+// min-w-0 é o pulo do gato: item de grid tem min-width:auto por padrão, e o
+// recharts dentro força esse conteúdo mínimo — sem isso o card empurra a
+// grid inteira pra fora da tela no celular.
 function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-line rounded-lg p-5">
+    <div className="bg-white border border-line rounded-lg p-5 min-w-0">
       <p className="text-sm font-medium mb-3">{titulo}</p>
       {children}
     </div>

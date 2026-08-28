@@ -244,12 +244,12 @@ export default function AdminVendasShopeePage() {
   }, [vendas]);
 
   return (
-    <div>
-      <AdminNav />
-      <h1 className="text-lg font-bold mb-1">Vendas Shopee</h1>
-      <p className="text-xs text-gray-500 mb-4">
+    <div className="mx-auto max-w-3xl px-5 py-12">
+      <h1 className="font-display text-3xl mb-1">Vendas Shopee</h1>
+      <p className="text-ink/60 mb-2 text-sm">
         Lance vendas feitas fora do site usando o custo já cadastrado no produto.
       </p>
+      <AdminNav />
 
       {erro && <p className="text-sm text-berry mb-3">{erro}</p>}
 

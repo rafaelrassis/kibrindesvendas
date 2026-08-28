@@ -80,12 +80,12 @@ export default function AdminConfiguracoesPage() {
   if (carregando) return <p className="text-sm text-ink/50">Carregando…</p>;
 
   return (
-    <div>
-      <AdminNav />
-      <h1 className="font-display text-2xl mb-1">Configurações</h1>
-      <p className="text-sm text-ink/60 mb-6">
+    <div className="mx-auto max-w-3xl px-5 py-12">
+      <h1 className="font-display text-3xl mb-1">Configurações</h1>
+      <p className="text-ink/60 mb-2 text-sm">
         Dados operacionais da loja, como o frete real pelos Correios.
       </p>
+      <AdminNav />
 
       <form onSubmit={salvar} className="max-w-md space-y-5">
         <div>

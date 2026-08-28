@@ -33,7 +33,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang="pt-BR" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-paper text-ink">
+      <body className="min-h-full flex flex-col bg-paper text-ink overflow-x-hidden">
         <AuthProvider>
           <ContaProvider>
             <CartProvider>
