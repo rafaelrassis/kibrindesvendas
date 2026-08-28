@@ -96,6 +96,10 @@ model Produto {
   shopeeComissaoPct    Decimal?          @db.Decimal(5, 2)
   shopeeFretePct       Decimal?          @db.Decimal(5, 2)
   shopeeAdsPct         Decimal?          @db.Decimal(5, 2)
+  // Taxa fixa em R$ cobrada pela Shopee por venda (não percentual — soma ao
+  // valor, não multiplica pelo valorVenda). Mesmo padrão substitutivo dos
+  // outros campos de margem: override aqui, senão o default global.
+  shopeeTaxaFixa       Decimal?          @db.Decimal(10, 2)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 }
@@ -450,6 +454,8 @@ model ConfiguracaoLoja {
   shopeeComissaoPct Decimal? @db.Decimal(5, 2)
   shopeeFretePct    Decimal? @db.Decimal(5, 2)
   shopeeAdsPct      Decimal? @db.Decimal(5, 2)
+  // Default global da taxa fixa em R$ — ver Produto.shopeeTaxaFixa.
+  shopeeTaxaFixa    Decimal? @db.Decimal(10, 2)
   updatedAt        DateTime @updatedAt
 }
 
@@ -473,6 +479,9 @@ model VendaShopee {
   comissaoPct   Decimal  @db.Decimal(5, 2)
   fretePct      Decimal  @db.Decimal(5, 2)
   adsPct        Decimal  @db.Decimal(5, 2)
+  // Taxa fixa em R$ (snapshot, mesmo padrão dos %) — default 0 pra vendas
+  // lançadas antes deste campo existir.
+  taxaFixa      Decimal  @default(0) @db.Decimal(10, 2)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

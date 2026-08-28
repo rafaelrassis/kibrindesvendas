@@ -16,6 +16,7 @@ type VendaShopee = {
   comissaoPct: number;
   fretePct: number;
   adsPct: number;
+  taxaFixa: number;
   taxasValor: number;
   lucro: number;
   createdAt: string;
@@ -39,6 +40,7 @@ type FormState = {
   comissaoPct: string;
   fretePct: string;
   adsPct: string;
+  taxaFixa: string;
 };
 
 const FORM_VAZIO: FormState = {
@@ -49,6 +51,7 @@ const FORM_VAZIO: FormState = {
   comissaoPct: "",
   fretePct: "",
   adsPct: "",
+  taxaFixa: "",
 };
 
 export default function AdminVendasShopeePage() {
@@ -122,6 +125,7 @@ export default function AdminVendasShopeePage() {
         comissaoPct: String(margens.comissaoPct ?? 0),
         fretePct: String(margens.fretePct ?? 0),
         adsPct: String(margens.adsPct ?? 0),
+        taxaFixa: String(margens.taxaFixa ?? 0),
       }));
     } catch {
       // Sem as margens, o admin ainda consegue digitar na mão.
@@ -150,7 +154,9 @@ export default function AdminVendasShopeePage() {
   const custoTotalPreview = Math.round(previewCusto * qtd * 100) / 100;
   const pctTotal =
     (Number(form.comissaoPct) || 0) + (Number(form.fretePct) || 0) + (Number(form.adsPct) || 0);
-  const taxasPreview = Math.round(valorVenda * (pctTotal / 100) * 100) / 100;
+  const taxaFixaPreview = Number(form.taxaFixa) || 0;
+  const taxasPreview =
+    Math.round(valorVenda * (pctTotal / 100) * 100) / 100 + taxaFixaPreview;
   const lucroPreview = Math.round((valorVenda - custoTotalPreview - taxasPreview) * 100) / 100;
 
   async function salvarVenda() {
@@ -172,6 +178,7 @@ export default function AdminVendasShopeePage() {
           comissaoPct: Number(form.comissaoPct) || 0,
           fretePct: Number(form.fretePct) || 0,
           adsPct: Number(form.adsPct) || 0,
+          taxaFixa: Number(form.taxaFixa) || 0,
         }),
       });
       const dados = await resp.json();
@@ -196,6 +203,7 @@ export default function AdminVendasShopeePage() {
       comissaoPct: String(v.comissaoPct),
       fretePct: String(v.fretePct),
       adsPct: String(v.adsPct),
+      taxaFixa: String(v.taxaFixa),
     });
   }
 
@@ -211,6 +219,7 @@ export default function AdminVendasShopeePage() {
           comissaoPct: Number(formEdicao.comissaoPct) || 0,
           fretePct: Number(formEdicao.fretePct) || 0,
           adsPct: Number(formEdicao.adsPct) || 0,
+          taxaFixa: Number(formEdicao.taxaFixa) || 0,
         }),
       });
       const dados = await resp.json();
@@ -339,7 +348,7 @@ export default function AdminVendasShopeePage() {
             <div className="text-[10px] font-semibold text-gray-500">
               MARGENS (edite se precisar corrigir só nesta venda)
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <div>
                 <label className="text-[10px] block mb-1">Comissão %</label>
                 <input
@@ -367,6 +376,15 @@ export default function AdminVendasShopeePage() {
                   onChange={(e) => setForm((f) => ({ ...f, adsPct: e.target.value }))}
                 />
               </div>
+              <div>
+                <label className="text-[10px] block mb-1">Taxa fixa R$</label>
+                <input
+                  inputMode="decimal"
+                  className="w-full border border-line rounded px-2 py-1.5 text-sm"
+                  value={form.taxaFixa}
+                  onChange={(e) => setForm((f) => ({ ...f, taxaFixa: e.target.value }))}
+                />
+              </div>
             </div>
           </div>
 
@@ -377,7 +395,9 @@ export default function AdminVendasShopeePage() {
                 <span>{reais(custoTotalPreview)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Taxas ({pctTotal}%)</span>
+                <span>
+                  Taxas ({pctTotal}%{taxaFixaPreview ? ` + ${reais(taxaFixaPreview)}` : ""})
+                </span>
                 <span className="text-berry">{reais(taxasPreview)}</span>
               </div>
               <div className="flex justify-between font-bold">
@@ -440,7 +460,7 @@ export default function AdminVendasShopeePage() {
                     placeholder="Valor vendido"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <input
                     inputMode="decimal"
                     className="border border-line rounded px-2 py-1.5 text-sm"
@@ -463,6 +483,13 @@ export default function AdminVendasShopeePage() {
                     value={formEdicao.adsPct}
                     onChange={(e) => setFormEdicao((f) => ({ ...f, adsPct: e.target.value }))}
                     placeholder="Ads %"
+                  />
+                  <input
+                    inputMode="decimal"
+                    className="border border-line rounded px-2 py-1.5 text-sm"
+                    value={formEdicao.taxaFixa}
+                    onChange={(e) => setFormEdicao((f) => ({ ...f, taxaFixa: e.target.value }))}
+                    placeholder="Taxa fixa R$"
                   />
                 </div>
                 <div className="flex gap-2">

@@ -17,6 +17,8 @@ export type VendaShopee = {
   comissaoPct: number;
   fretePct: number;
   adsPct: number;
+  // Valor fixo em R$ cobrado pela Shopee por venda (não percentual).
+  taxaFixa: number;
   // Derivados — não guardados no banco, calculados na leitura a partir do
   // snapshot acima (nunca recalculam custo/margem do produto atual).
   taxasValor: number;
@@ -32,8 +34,9 @@ function toVendaShopee(v: VendaShopeeDb): VendaShopee {
   const comissaoPct = Number(v.comissaoPct);
   const fretePct = Number(v.fretePct);
   const adsPct = Number(v.adsPct);
+  const taxaFixa = Number(v.taxaFixa);
   const taxasValor =
-    Math.round(valorVenda * ((comissaoPct + fretePct + adsPct) / 100) * 100) / 100;
+    Math.round(valorVenda * ((comissaoPct + fretePct + adsPct) / 100) * 100) / 100 + taxaFixa;
   const lucro = Math.round((valorVenda - custoTotal - taxasValor) * 100) / 100;
 
   return {
@@ -47,6 +50,7 @@ function toVendaShopee(v: VendaShopeeDb): VendaShopee {
     comissaoPct,
     fretePct,
     adsPct,
+    taxaFixa,
     taxasValor,
     lucro,
     createdAt: v.createdAt.toISOString(),
@@ -75,6 +79,7 @@ export async function margensShopeeDoProduto(produtoId: string) {
     comissaoPct: Number(produto.shopeeComissaoPct ?? config.shopeeComissaoPct ?? 0),
     fretePct: Number(produto.shopeeFretePct ?? config.shopeeFretePct ?? 0),
     adsPct: Number(produto.shopeeAdsPct ?? config.shopeeAdsPct ?? 0),
+    taxaFixa: Number(produto.shopeeTaxaFixa ?? config.shopeeTaxaFixa ?? 0),
   };
 }
 
@@ -88,6 +93,7 @@ export type DadosVendaShopee = {
   comissaoPct?: number;
   fretePct?: number;
   adsPct?: number;
+  taxaFixa?: number;
 };
 
 function validar(dados: Partial<DadosVendaShopee>) {
@@ -105,6 +111,9 @@ function validar(dados: Partial<DadosVendaShopee>) {
     if (valor !== undefined && (valor < 0 || valor > 100)) {
       throw new ErroDeNegocio(`${campo} precisa estar entre 0 e 100.`);
     }
+  }
+  if (dados.taxaFixa !== undefined && dados.taxaFixa < 0) {
+    throw new ErroDeNegocio("A taxa fixa não pode ser negativa.");
   }
 }
 
@@ -163,6 +172,7 @@ export async function criarVendaShopee(dados: DadosVendaShopee): Promise<VendaSh
       comissaoPct: dados.comissaoPct ?? margensPadrao.comissaoPct,
       fretePct: dados.fretePct ?? margensPadrao.fretePct,
       adsPct: dados.adsPct ?? margensPadrao.adsPct,
+      taxaFixa: dados.taxaFixa ?? margensPadrao.taxaFixa,
     },
     include: { produto: true },
   });
@@ -194,6 +204,7 @@ export async function atualizarVendaShopee(
       comissaoPct: dados.comissaoPct,
       fretePct: dados.fretePct,
       adsPct: dados.adsPct,
+      taxaFixa: dados.taxaFixa,
     },
     include: { produto: true },
   });

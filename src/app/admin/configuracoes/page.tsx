@@ -14,6 +14,7 @@ export default function AdminConfiguracoesPage() {
   const [shopeeComissaoPct, setShopeeComissaoPct] = useState("");
   const [shopeeFretePct, setShopeeFretePct] = useState("");
   const [shopeeAdsPct, setShopeeAdsPct] = useState("");
+  const [shopeeTaxaFixa, setShopeeTaxaFixa] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -29,6 +30,7 @@ export default function AdminConfiguracoesPage() {
         setShopeeComissaoPct(c.shopeeComissaoPct?.toString() ?? "");
         setShopeeFretePct(c.shopeeFretePct?.toString() ?? "");
         setShopeeAdsPct(c.shopeeAdsPct?.toString() ?? "");
+        setShopeeTaxaFixa(c.shopeeTaxaFixa?.toString() ?? "");
       })
       .finally(() => setCarregando(false));
   }, []);
@@ -47,12 +49,14 @@ export default function AdminConfiguracoesPage() {
       shopeeComissaoPct: number | null;
       shopeeFretePct: number | null;
       shopeeAdsPct: number | null;
+      shopeeTaxaFixa: number | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
       shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
       shopeeFretePct: shopeeFretePct.trim() ? Number(shopeeFretePct) : null,
       shopeeAdsPct: shopeeAdsPct.trim() ? Number(shopeeAdsPct) : null,
+      shopeeTaxaFixa: shopeeTaxaFixa.trim() ? Number(shopeeTaxaFixa) : null,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -172,7 +176,7 @@ export default function AdminConfiguracoesPage() {
             Usadas ao lançar uma venda em Vendas Shopee, quando o produto não tem margem
             própria definida no cadastro. Em branco = 0%.
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-sm text-ink/70">Comissão %</span>
               <input
@@ -200,6 +204,16 @@ export default function AdminConfiguracoesPage() {
                 step="0.01"
                 value={shopeeAdsPct}
                 onChange={(e) => setShopeeAdsPct(e.target.value)}
+                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-ink/70">Taxa fixa R$</span>
+              <input
+                type="number"
+                step="0.01"
+                value={shopeeTaxaFixa}
+                onChange={(e) => setShopeeTaxaFixa(e.target.value)}
                 className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
               />
             </label>

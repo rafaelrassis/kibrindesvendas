@@ -121,6 +121,7 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     shopeeComissaoPct: p.shopeeComissaoPct != null ? Number(p.shopeeComissaoPct) : null,
     shopeeFretePct: p.shopeeFretePct != null ? Number(p.shopeeFretePct) : null,
     shopeeAdsPct: p.shopeeAdsPct != null ? Number(p.shopeeAdsPct) : null,
+    shopeeTaxaFixa: p.shopeeTaxaFixa != null ? Number(p.shopeeTaxaFixa) : null,
   };
 }
 
@@ -283,6 +284,7 @@ export type DadosProduto = {
   shopeeComissaoPct?: number | null;
   shopeeFretePct?: number | null;
   shopeeAdsPct?: number | null;
+  shopeeTaxaFixa?: number | null;
 };
 
 const EMOJI_PADRAO = "🎁";
@@ -378,6 +380,9 @@ function validar(dados: Partial<DadosProduto>) {
       throw new ErroDeNegocio(`${campo} precisa estar entre 0 e 100.`);
     }
   }
+  if (dados.shopeeTaxaFixa != null && dados.shopeeTaxaFixa < 0) {
+    throw new ErroDeNegocio("A taxa fixa da Shopee não pode ser negativa.");
+  }
   if (dados.estoqueVariacoes) {
     for (const linha of dados.estoqueVariacoes) {
       if (!linha.combinacao.trim()) {
@@ -434,6 +439,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       shopeeComissaoPct: dados.shopeeComissaoPct ?? null,
       shopeeFretePct: dados.shopeeFretePct ?? null,
       shopeeAdsPct: dados.shopeeAdsPct ?? null,
+      shopeeTaxaFixa: dados.shopeeTaxaFixa ?? null,
       variacoes: {
         create: (dados.variacoes ?? []).map((v) => ({
           tipo: v.tipo,
@@ -526,6 +532,7 @@ export async function atualizarProduto(
         shopeeComissaoPct: dados.shopeeComissaoPct !== undefined ? dados.shopeeComissaoPct : undefined,
         shopeeFretePct: dados.shopeeFretePct !== undefined ? dados.shopeeFretePct : undefined,
         shopeeAdsPct: dados.shopeeAdsPct !== undefined ? dados.shopeeAdsPct : undefined,
+        shopeeTaxaFixa: dados.shopeeTaxaFixa !== undefined ? dados.shopeeTaxaFixa : undefined,
         ...(dados.variacoes && {
           variacoes: {
             create: dados.variacoes.map((v) => ({

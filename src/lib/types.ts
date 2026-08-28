@@ -96,6 +96,7 @@ export type ProdutoAdmin = Produto & {
   shopeeComissaoPct: number | null;
   shopeeFretePct: number | null;
   shopeeAdsPct: number | null;
+  shopeeTaxaFixa: number | null;
 };
 
 export type Cupom = {

@@ -28,6 +28,8 @@ export type ConfiguracaoLoja = {
   shopeeComissaoPct: number | null;
   shopeeFretePct: number | null;
   shopeeAdsPct: number | null;
+  // Taxa fixa em R$ por venda (não percentual, soma direto — ver Produto.shopeeTaxaFixa).
+  shopeeTaxaFixa: number | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -47,6 +49,8 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
       config?.shopeeComissaoPct != null ? Number(config.shopeeComissaoPct) : null,
     shopeeFretePct: config?.shopeeFretePct != null ? Number(config.shopeeFretePct) : null,
     shopeeAdsPct: config?.shopeeAdsPct != null ? Number(config.shopeeAdsPct) : null,
+    shopeeTaxaFixa:
+      config?.shopeeTaxaFixa != null ? Number(config.shopeeTaxaFixa) : null,
   };
 }
 
@@ -62,6 +66,7 @@ export async function atualizarConfiguracaoLoja(dados: {
   shopeeComissaoPct?: number | null;
   shopeeFretePct?: number | null;
   shopeeAdsPct?: number | null;
+  shopeeTaxaFixa?: number | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -72,6 +77,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     shopeeComissaoPct?: number | null;
     shopeeFretePct?: number | null;
     shopeeAdsPct?: number | null;
+    shopeeTaxaFixa?: number | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -111,6 +117,13 @@ export async function atualizarConfiguracaoLoja(dados: {
     data[campo] = valor;
   }
 
+  if (dados.shopeeTaxaFixa !== undefined) {
+    if (dados.shopeeTaxaFixa !== null && dados.shopeeTaxaFixa < 0) {
+      throw new ErroDeNegocio("A taxa fixa da Shopee não pode ser negativa.");
+    }
+    data.shopeeTaxaFixa = dados.shopeeTaxaFixa;
+  }
+
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
     create: {
@@ -123,6 +136,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       shopeeComissaoPct: data.shopeeComissaoPct,
       shopeeFretePct: data.shopeeFretePct,
       shopeeAdsPct: data.shopeeAdsPct,
+      shopeeTaxaFixa: data.shopeeTaxaFixa,
     },
     update: data,
   });
