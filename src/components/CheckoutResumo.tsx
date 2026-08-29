@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
@@ -391,32 +392,45 @@ export default function CheckoutResumo({
             {enderecos.map((e) => (
               <label
                 key={e.id}
-                className="flex items-start gap-2.5 border border-line rounded-md px-3 py-2.5 cursor-pointer has-[:checked]:border-pine has-[:checked]:bg-pine/5"
+                className="flex items-start justify-between gap-3 border border-line rounded-md px-3 py-2.5 cursor-pointer has-[:checked]:border-pine has-[:checked]:bg-pine/5"
               >
-                <input
-                  type="radio"
-                  name="enderecoEntrega"
-                  checked={enderecoIdSelecionado === e.id}
-                  onChange={() => setEnderecoIdSelecionado(e.id)}
-                  className="accent-pine mt-1"
-                />
-                <span className="text-sm">
-                  <span className="font-medium">
-                    {e.rotulo}
-                    {e.padrao && (
-                      <span className="ml-1.5 text-[10px] bg-pine/10 text-pine-2 px-1.5 py-0.5 rounded-full">
-                        Padrão
-                      </span>
-                    )}
+                <span className="flex items-start gap-2.5">
+                  <input
+                    type="radio"
+                    name="enderecoEntrega"
+                    checked={enderecoIdSelecionado === e.id}
+                    onChange={() => setEnderecoIdSelecionado(e.id)}
+                    className="accent-pine mt-1"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">
+                      {e.rotulo}
+                      {e.padrao && (
+                        <span className="ml-1.5 text-[10px] bg-pine/10 text-pine-2 px-1.5 py-0.5 rounded-full">
+                          Padrão
+                        </span>
+                      )}
+                    </span>
+                    <p className="text-ink/60 text-xs mt-0.5">
+                      {e.destinatario} — {e.rua}, {e.numero}
+                      {e.complemento ? `, ${e.complemento}` : ""}
+                    </p>
+                    <p className="text-ink/60 text-xs">
+                      {e.bairro} — {e.cidade}/{e.uf} — {formatarCep(e.cep)}
+                    </p>
                   </span>
-                  <p className="text-ink/60 text-xs mt-0.5">
-                    {e.destinatario} — {e.rua}, {e.numero}
-                    {e.complemento ? `, ${e.complemento}` : ""}
-                  </p>
-                  <p className="text-ink/60 text-xs">
-                    {e.bairro} — {e.cidade}/{e.uf} — {formatarCep(e.cep)}
-                  </p>
                 </span>
+                {/* Corrigir um endereço já salvo (número errado, complemento
+                    faltando) sem precisar excluir e recadastrar do zero — a
+                    única forma de editar até aqui era via /conta/enderecos,
+                    perdendo o checkout em andamento. `next` traz de volta. */}
+                <Link
+                  href={`/conta/enderecos/${e.id}?next=/checkout`}
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="text-xs text-pine font-medium shrink-0"
+                >
+                  Editar
+                </Link>
               </label>
             ))}
 
