@@ -81,6 +81,7 @@ export default function DadosPage() {
             value={form.telefone}
             onChange={(e) => campo("telefone", e.target.value)}
             className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
+            required
           />
         </Campo>
 
@@ -92,6 +93,7 @@ export default function DadosPage() {
             placeholder="000.000.000-00"
             maxLength={14}
             className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
+            required
           />
           <span className="block text-[11px] text-ink/40 mt-1">
             Necessário pra pagar por Pix no Mercado Pago.

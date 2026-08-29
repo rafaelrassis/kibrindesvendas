@@ -23,7 +23,8 @@ export async function registrarUsuario(
   nome: string,
   email: string,
   senha: string,
-  cpf: string
+  cpf: string,
+  telefone: string
 ) {
   const existenteEmail = await prisma.usuario.findUnique({ where: { email } });
   if (existenteEmail) throw new Error("Já existe uma conta com este e-mail.");
@@ -33,7 +34,7 @@ export async function registrarUsuario(
 
   const senhaHash = await bcrypt.hash(senha, 10);
   const usuario = await prisma.usuario.create({
-    data: { nome, email, cpf, senhaHash },
+    data: { nome, email, cpf, telefone, senhaHash },
   });
   return paraPublico(usuario);
 }

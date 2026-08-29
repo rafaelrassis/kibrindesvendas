@@ -30,8 +30,12 @@ export async function atualizarPerfil(
   const nome = dados.nome?.trim();
   if (!nome) throw new ErroDeNegocio("Informe o nome.");
 
+  const telefone = dados.telefone?.trim();
+  if (!telefone) throw new ErroDeNegocio("Informe o telefone.");
+
   const cpfBruto = dados.cpf?.trim();
-  if (cpfBruto && !cpfValido(cpfBruto)) {
+  if (!cpfBruto) throw new ErroDeNegocio("Informe o CPF.");
+  if (!cpfValido(cpfBruto)) {
     throw new ErroDeNegocio("CPF inválido.");
   }
 
@@ -39,10 +43,10 @@ export async function atualizarPerfil(
     where: { id: usuarioId },
     data: {
       nome,
-      telefone: dados.telefone?.trim() || null,
+      telefone,
       // Mesmo formato usado no cadastro (só dígitos) — é o que vai direto pro
       // Mercado Pago na hora de gerar o Pix.
-      cpf: cpfBruto ? apenasDigitos(cpfBruto) : null,
+      cpf: apenasDigitos(cpfBruto),
       aniversario: dados.aniversario?.trim() || null,
     },
     select: { nome: true, email: true, telefone: true, cpf: true, aniversario: true },

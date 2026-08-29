@@ -26,7 +26,8 @@ type AuthContextType = {
     nome: string,
     email: string,
     senha: string,
-    cpf: string
+    cpf: string,
+    telefone: string
   ) => Promise<{ ok: boolean; erro?: string }>;
   sair: () => Promise<void>;
 };
@@ -71,11 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const registrar = useCallback(
-    async (nome: string, email: string, senha: string, cpf: string) => {
+    async (nome: string, email: string, senha: string, cpf: string, telefone: string) => {
       const r = await fetch("/api/auth/registro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, email, senha, cpf }),
+        body: JSON.stringify({ nome, email, senha, cpf, telefone }),
       });
       const data = await r.json();
       if (!r.ok) return { ok: false, erro: data.error as string };

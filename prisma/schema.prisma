@@ -200,7 +200,7 @@ model Usuario {
   admin        Boolean       @default(false) // libera /admin e /api/admin (ver npm run db:admin)
   // Dados de perfil vindos da tela "Meus dados". E-mail continua sendo trocado
   // só pelo fluxo de segurança (com senha) — não entra aqui.
-  telefone     String?
+  telefone     String? // nullable p/ não quebrar contas antigas; obrigatório na API de registro
   aniversario  String? // "YYYY-MM-DD"; opcional, sem uso em regra de negócio
   // Preferências de notificação da tela "Notificações".
   prefEmail     Boolean      @default(true)

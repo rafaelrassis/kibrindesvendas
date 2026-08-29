@@ -11,6 +11,7 @@ export default function CadastroPage() {
   const { registrar } = useAuth();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
   const [cpf, setCpf] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
@@ -26,7 +27,7 @@ export default function CadastroPage() {
     }
 
     setEnviando(true);
-    const r = await registrar(nome.trim(), email.trim(), senha, cpf);
+    const r = await registrar(nome.trim(), email.trim(), senha, cpf, telefone.trim());
     setEnviando(false);
     if (!r.ok) {
       setErro(r.erro ?? "Não foi possível criar a conta.");
@@ -56,6 +57,17 @@ export default function CadastroPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
+            required
+          />
+        </label>
+        <label className="block">
+          <span className="block text-xs text-ink/50 mb-1.5">Telefone / WhatsApp</span>
+          <input
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+            inputMode="tel"
+            placeholder="(11) 99999-0000"
             className="w-full bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
             required
           />

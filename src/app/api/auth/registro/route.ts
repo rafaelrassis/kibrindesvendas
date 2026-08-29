@@ -9,20 +9,22 @@ export async function POST(req: NextRequest) {
   let email: string | undefined;
   let senha: string | undefined;
   let cpf: string | undefined;
+  let telefone: string | undefined;
   try {
-    ({ nome, email, senha, cpf } = await corpoJson<{
+    ({ nome, email, senha, cpf, telefone } = await corpoJson<{
       nome?: string;
       email?: string;
       senha?: string;
       cpf?: string;
+      telefone?: string;
     }>(req));
   } catch (e) {
     return respostaDeErro(e);
   }
 
-  if (!nome?.trim() || !email?.trim() || !senha || !cpf?.trim()) {
+  if (!nome?.trim() || !email?.trim() || !senha || !cpf?.trim() || !telefone?.trim()) {
     return NextResponse.json(
-      { error: "Preencha nome, e-mail, CPF e senha." },
+      { error: "Preencha nome, e-mail, telefone, CPF e senha." },
       { status: 400 }
     );
   }
@@ -41,7 +43,8 @@ export async function POST(req: NextRequest) {
       nome.trim(),
       email.trim().toLowerCase(),
       senha,
-      apenasDigitos(cpf)
+      apenasDigitos(cpf),
+      telefone.trim()
     );
     await criarSessao(usuario.id);
     return NextResponse.json(usuario);
