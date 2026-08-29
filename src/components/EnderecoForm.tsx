@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Endereco } from "@/lib/conta-data";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 
@@ -47,6 +47,18 @@ export default function EnderecoForm({ inicial, onSalvar, onExcluir }: Props) {
       .catch(() => setErroCep("Não foi possível consultar o CEP agora."))
       .finally(() => setBuscandoCep(false));
   }
+
+  // Form abre com CEP já preenchido (veio da busca na página do produto) mas
+  // sem rua/bairro/cidade/UF: busca automaticamente, já que o preenchimento
+  // do input normalmente só dispara no onChange do próprio campo CEP.
+  useEffect(() => {
+    if (inicial.cep && !inicial.rua) {
+      // Empurra pro próximo tick: setState síncrono direto no corpo do
+      // efeito dispara o lint react-hooks/set-state-in-effect.
+      queueMicrotask(() => preencherPeloCep(inicial.cep));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <form
