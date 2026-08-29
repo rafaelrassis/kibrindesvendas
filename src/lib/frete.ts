@@ -128,19 +128,30 @@ export async function cotarFreteMelhorEnvio(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });
-  } catch {
+  } catch (e) {
+    console.error("[frete] Melhor Envio: falha de rede", e);
     return null;
   }
 
-  if (!resposta.ok) return null;
+  if (!resposta.ok) {
+    const corpo = typeof resposta.text === "function" ? await resposta.text().catch(() => "") : "";
+    console.error("[frete] Melhor Envio: resposta não-ok", resposta.status, corpo);
+    return null;
+  }
 
   const servicos = (await resposta.json().catch(() => null)) as ServicoMelhorEnvio[] | null;
-  if (!Array.isArray(servicos)) return null;
+  if (!Array.isArray(servicos)) {
+    console.error("[frete] Melhor Envio: resposta não é um array", servicos);
+    return null;
+  }
 
   // Descarta opções com erro (ex: transportadora não atende a rota) e fica
   // com a mais barata entre as que sobraram — normalmente o PAC.
   const validos = servicos.filter((s) => !s.error && s.price);
-  if (validos.length === 0) return null;
+  if (validos.length === 0) {
+    console.error("[frete] Melhor Envio: nenhuma opção válida", servicos);
+    return null;
+  }
 
   const maisBarato = validos.reduce((menor, s) =>
     Number(s.price) < Number(menor.price) ? s : menor
@@ -202,17 +213,28 @@ export async function cotarFreteSuperFrete(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });
-  } catch {
+  } catch (e) {
+    console.error("[frete] SuperFrete: falha de rede", e);
     return null;
   }
 
-  if (!resposta.ok) return null;
+  if (!resposta.ok) {
+    const corpo = typeof resposta.text === "function" ? await resposta.text().catch(() => "") : "";
+    console.error("[frete] SuperFrete: resposta não-ok", resposta.status, corpo);
+    return null;
+  }
 
   const servicos = (await resposta.json().catch(() => null)) as ServicoMelhorEnvio[] | null;
-  if (!Array.isArray(servicos)) return null;
+  if (!Array.isArray(servicos)) {
+    console.error("[frete] SuperFrete: resposta não é um array", servicos);
+    return null;
+  }
 
   const validos = servicos.filter((s) => !s.error && s.price);
-  if (validos.length === 0) return null;
+  if (validos.length === 0) {
+    console.error("[frete] SuperFrete: nenhuma opção válida", servicos);
+    return null;
+  }
 
   // Ordenado do mais barato pro mais caro — o checkout usa a primeira posição
   // como pré-selecionada e lista o resto como alternativa.
