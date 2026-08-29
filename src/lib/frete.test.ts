@@ -242,4 +242,18 @@ describe("cotarFreteSuperFrete", () => {
     );
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
   });
+
+  it("multiplica o peso pela quantidade e manda quantity fixo em 1 (a API do SuperFrete não multiplica sozinha)", async () => {
+    let enviado: { products: { weight: number; quantity: number }[] } | null = null;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      enviado = JSON.parse(init.body);
+      return respostaCom([
+        { id: 1, name: "PAC", price: "20.00", delivery_time: 5, company: { name: "Correios" } },
+      ]);
+    });
+
+    await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
+
+    expect(enviado!.products[0]).toMatchObject({ weight: 0.9, quantity: 1 });
+  });
 });

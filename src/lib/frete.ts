@@ -168,6 +168,7 @@ export async function cotarFreteSuperFrete(
   pacote: PacoteFrete,
   quantidade = 1
 ): Promise<OpcaoFrete[] | null> {
+  const unidades = Math.max(1, Math.round(quantidade) || 1);
   const body = {
     from: { postal_code: cepOrigem },
     to: { postal_code: cepDestino },
@@ -177,9 +178,13 @@ export async function cotarFreteSuperFrete(
         width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
         height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
-        weight: Math.max(pacote.pesoGramas, 1) / 1000,
+        // Ao contrário do Melhor Envio, a API do SuperFrete não multiplica o
+        // preço pelo `quantity` do produto — então multiplicamos o peso na
+        // mão aqui e mandamos quantity fixo em 1, senão pedidos com mais de
+        // 1 unidade saem cotados com o frete de 1 unidade só.
+        weight: (Math.max(pacote.pesoGramas, 1) * unidades) / 1000,
         insurance_value: 0,
-        quantity: Math.max(1, Math.round(quantidade) || 1),
+        quantity: 1,
       },
     ],
   };
