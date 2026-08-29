@@ -19,15 +19,19 @@ vi.mock("@/lib/mercadopago", () => ({
 }));
 
 vi.mock("./entrega", () => ({
-  consultarCep: async () => ({
+  consultarEnderecoSalvo: async () => ({
     cep: "01310100",
     logradouro: "Av. Paulista",
     bairro: "Bela Vista",
     cidade: "São Paulo",
     uf: "SP",
     frete: { valor: 9.9, prazoDias: 2 },
+    destinatario: "Cliente de teste",
+    numero: "1000",
+    complemento: "",
+    rua: "Av. Paulista",
   }),
-  resumoDoEndereco: () => "Av. Paulista, Bela Vista — São Paulo/SP",
+  resumoDoEnderecoSalvo: () => "Av. Paulista, 1000, Bela Vista — São Paulo/SP",
 }));
 
 const { prisma } = await import("@/lib/prisma");
@@ -95,7 +99,7 @@ afterAll(async () => {
 describe("carrinho gravado x confirmação de pagamento", () => {
   it("pagamento aprovado esvazia a sacola do banco", async () => {
     await salvarCarrinho(USUARIO_ID, item);
-    const { pedido } = await criarPedido(USUARIO_ID, item, "01310100");
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
 
     gateway.getPagamento.mockResolvedValue({
       id: "pagamento-aprovado",
@@ -111,7 +115,7 @@ describe("carrinho gravado x confirmação de pagamento", () => {
 
   it("pagamento recusado mantém a sacola intacta pra tentar de novo", async () => {
     await salvarCarrinho(USUARIO_ID, item);
-    const { pedido } = await criarPedido(USUARIO_ID, item, "01310100");
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
 
     gateway.getPagamento.mockResolvedValue({
       id: "pagamento-recusado",

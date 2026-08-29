@@ -21,15 +21,19 @@ vi.mock("@/lib/mercadopago", () => ({
 }));
 
 vi.mock("./entrega", () => ({
-  consultarCep: async () => ({
+  consultarEnderecoSalvo: async () => ({
     cep: "01310100",
     logradouro: "Av. Paulista",
     bairro: "Bela Vista",
     cidade: "São Paulo",
     uf: "SP",
     frete: { valor: 9.9, prazoDias: 2 },
+    destinatario: "Cliente de teste",
+    numero: "1000",
+    complemento: "",
+    rua: "Av. Paulista",
   }),
-  resumoDoEndereco: () => "Av. Paulista, Bela Vista — São Paulo/SP",
+  resumoDoEnderecoSalvo: () => "Av. Paulista, 1000, Bela Vista — São Paulo/SP",
 }));
 
 const { prisma } = await import("@/lib/prisma");
@@ -135,8 +139,8 @@ describe("limite de usos sob concorrência", () => {
     await criarCupom({ codigo: "TESTELIMITE", tipo: "PERCENTUAL", valor: 10, usoMaximo: 1 });
 
     const resultados = await Promise.allSettled([
-      criarPedido(USUARIO_ID, item, "01310100", "TESTELIMITE"),
-      criarPedido(USUARIO_ID, item, "01310100", "TESTELIMITE"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTELIMITE"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTELIMITE"),
     ]);
 
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -153,8 +157,8 @@ describe("limite de usos sob concorrência", () => {
     await criarCupom({ codigo: "TESTESEMLIMITE", tipo: "PERCENTUAL", valor: 10 });
 
     await Promise.all([
-      criarPedido(USUARIO_ID, item, "01310100", "TESTESEMLIMITE"),
-      criarPedido(USUARIO_ID, item, "01310100", "TESTESEMLIMITE"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTESEMLIMITE"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTESEMLIMITE"),
     ]);
 
     const cupom = await prisma.cupom.findUnique({ where: { codigo: "TESTESEMLIMITE" } });
@@ -237,7 +241,7 @@ describe("reversão do uso quando o pedido não vinga", () => {
     gateway.criarPreferencia.mockRejectedValue(new Error("Mercado Pago fora do ar"));
     await criarCupom({ codigo: "TESTEMP", tipo: "PERCENTUAL", valor: 10, usoMaximo: 2 });
 
-    await expect(criarPedido(USUARIO_ID, item, "01310100", "TESTEMP")).rejects.toMatchObject({
+    await expect(criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTEMP")).rejects.toMatchObject({
       status: 502,
     });
 
@@ -252,10 +256,10 @@ describe("reversão do uso quando o pedido não vinga", () => {
     gateway.criarPreferencia.mockResolvedValue({ init_point: "https://mp.exemplo/checkout" });
     await criarCupom({ codigo: "TESTEVAGA", tipo: "FIXO", valor: 5, usoMaximo: 1 });
 
-    await expect(criarPedido(USUARIO_ID, item, "01310100", "TESTEVAGA")).rejects.toMatchObject({
+    await expect(criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTEVAGA")).rejects.toMatchObject({
       status: 502,
     });
-    const { checkoutUrl } = await criarPedido(USUARIO_ID, item, "01310100", "TESTEVAGA");
+    const { checkoutUrl } = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTEVAGA");
     expect(checkoutUrl).toBe("https://mp.exemplo/checkout");
 
     const cupom = await prisma.cupom.findUnique({ where: { codigo: "TESTEVAGA" } });

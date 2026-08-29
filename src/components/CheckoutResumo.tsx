@@ -10,10 +10,26 @@ import { useCep } from "@/lib/use-cep";
 import { compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 import { precoEfetivo } from "@/lib/estoque-variacao";
+import EnderecoForm from "@/components/EnderecoForm";
+import { novoIdEndereco, type Endereco } from "@/lib/conta-data";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
 }
+
+const enderecoVazio: Endereco = {
+  id: "",
+  rotulo: "",
+  destinatario: "",
+  cep: "",
+  rua: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  cidade: "",
+  uf: "",
+  padrao: false,
+};
 
 export default function CheckoutResumo({
   pagamentoReal,
@@ -27,29 +43,57 @@ export default function CheckoutResumo({
   const router = useRouter();
   const { item, definirQuantidade } = useCart();
   const { logado, carregando: carregandoAuth } = useAuth();
-  const { enderecos } = useConta();
+  const { enderecos, salvarEndereco, carregando: carregandoConta } = useConta();
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState(erroInicial);
 
   const { produto, carregando } = useProduto(item?.produtoId);
 
-  // Quem já tem endereço padrão salvo começa com ele preenchido; digitar por
-  // cima assume o controle do campo (`null` = ainda não mexeu). O CEP
-  // informado na própria página do produto tem prioridade sobre o endereço
-  // salvo — é a escolha mais recente do cliente.
-  const enderecoPadrao = enderecos.find((e) => e.padrao) ?? enderecos[0];
-  const cepPadrao = enderecoPadrao ? normalizarCep(enderecoPadrao.cep) : null;
-  const cepInicial = item?.cepInformado ? normalizarCep(item.cepInformado) : cepPadrao;
-  const [cepDigitado, setCepDigitado] = useState<string | null>(null);
-  const cep = cepDigitado ?? (cepInicial ? formatarCep(cepInicial) : "");
+  // Endereço escolhido pra entrega — obrigatório pra fechar o pedido. `null`
+  // até o cliente escolher; a pré-seleção abaixo roda uma vez, assim que a
+  // lista carrega (padrão, ou o que casa com o CEP digitado na página do
+  // produto), mas nunca decide por conta própria depois disso. Ajuste de
+  // estado durante o render (não efeito) — mesmo padrão do `logadoAnterior`
+  // em conta-context.tsx.
+  const [enderecoIdSelecionado, setEnderecoIdSelecionado] = useState<string | null>(null);
+  const [enderecoJaPreSelecionado, setEnderecoJaPreSelecionado] = useState(false);
+  // Formulário de novo endereço aberto inline, embutido no checkout — sem
+  // isso, quem não tem endereço nenhum ficaria travado sem forma de
+  // continuar (ver EnderecoForm).
+  const [mostrandoFormNovo, setMostrandoFormNovo] = useState(false);
+  if (!enderecoJaPreSelecionado && enderecos.length > 0) {
+    setEnderecoJaPreSelecionado(true);
+    const cepDoProduto = item?.cepInformado ? normalizarCep(item.cepInformado) : null;
+    const porCep = cepDoProduto
+      ? enderecos.find((e) => normalizarCep(e.cep) === cepDoProduto)
+      : undefined;
+    const padrao = enderecos.find((e) => e.padrao);
+    setEnderecoIdSelecionado((porCep ?? padrao ?? enderecos[0])?.id ?? null);
+  }
+
+  const enderecoSelecionado = enderecos.find((e) => e.id === enderecoIdSelecionado) ?? null;
+  // Sem endereço nenhum cadastrado (e já sabemos disso, não só ainda
+  // carregando), o formulário de cadastro abre sozinho — senão o cliente
+  // fica sem nenhuma forma de continuar o checkout.
+  const formularioAberto =
+    mostrandoFormNovo || (!carregandoConta && enderecos.length === 0);
+  const cepSelecionado = enderecoSelecionado ? normalizarCep(enderecoSelecionado.cep) : null;
 
   const quantidade = item?.quantidade ?? 1;
   const quantidadeMinima = Math.max(1, produto?.quantidadeMinima || 1);
   const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(
-    cep,
+    cepSelecionado ? formatarCep(cepSelecionado) : "",
     item?.produtoId,
     quantidade
   );
+
+  // EnderecoForm já trata o erro (mostra a própria mensagem) se `onSalvar`
+  // rejeitar — aqui só reage ao sucesso, selecionando o endereço recém-criado.
+  async function salvarNovoEndereco(dados: Endereco) {
+    await salvarEndereco(dados);
+    setEnderecoIdSelecionado(dados.id);
+    setMostrandoFormNovo(false);
+  }
 
   const [codigoCupom, setCodigoCupom] = useState("");
   // Serviço de frete escolhido no checkout (ex: "PAC", "SEDEX") — só existe
@@ -220,9 +264,9 @@ export default function CheckoutResumo({
   }
 
   function pagar() {
-    // O botão já fica travado sem item e sem frete; a checagem sobra só pra
-    // estreitar os tipos.
-    if (!item || !endereco) return;
+    // O botão já fica travado sem item, endereço e frete; a checagem sobra
+    // só pra estreitar os tipos.
+    if (!item || !endereco || !enderecoIdSelecionado) return;
     setErro("");
     setProcessando(true);
 
@@ -230,10 +274,10 @@ export default function CheckoutResumo({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Frete e desconto não vão fixos no corpo, de propósito: o servidor
-      // recalcula os dois a partir do CEP e do código do cupom.
+      // recalcula os dois a partir do endereço e do código do cupom.
       body: JSON.stringify({
         item,
-        cep: normalizarCep(cep),
+        enderecoId: enderecoIdSelecionado,
         cupomCodigo: cupomAplicado?.codigo,
         servicoFrete: freteCalculado?.servico,
       }),
@@ -341,32 +385,76 @@ export default function CheckoutResumo({
 
       <div className="bg-white border border-line rounded-lg p-5 mb-5">
         <p className="text-sm font-medium mb-3">Entrega</p>
-        <label className="block">
-          <span className="block text-xs text-ink/50 mb-1.5">CEP de entrega</span>
-          <input
-            value={cep}
-            inputMode="numeric"
-            maxLength={9}
-            placeholder="00000-000"
-            // `formatarCep` devolve o texto intacto enquanto não há 8 dígitos,
-            // então o traço só aparece quando o CEP fica completo.
-            onChange={(e) => setCepDigitado(formatarCep(e.target.value))}
-            className="w-full max-w-[180px] bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
-          />
-        </label>
+
+        {enderecos.length > 0 && !formularioAberto && (
+          <div className="space-y-1.5 mb-1">
+            {enderecos.map((e) => (
+              <label
+                key={e.id}
+                className="flex items-start gap-2.5 border border-line rounded-md px-3 py-2.5 cursor-pointer has-[:checked]:border-pine has-[:checked]:bg-pine/5"
+              >
+                <input
+                  type="radio"
+                  name="enderecoEntrega"
+                  checked={enderecoIdSelecionado === e.id}
+                  onChange={() => setEnderecoIdSelecionado(e.id)}
+                  className="accent-pine mt-1"
+                />
+                <span className="text-sm">
+                  <span className="font-medium">
+                    {e.rotulo}
+                    {e.padrao && (
+                      <span className="ml-1.5 text-[10px] bg-pine/10 text-pine-2 px-1.5 py-0.5 rounded-full">
+                        Padrão
+                      </span>
+                    )}
+                  </span>
+                  <p className="text-ink/60 text-xs mt-0.5">
+                    {e.destinatario} — {e.rua}, {e.numero}
+                    {e.complemento ? `, ${e.complemento}` : ""}
+                  </p>
+                  <p className="text-ink/60 text-xs">
+                    {e.bairro} — {e.cidade}/{e.uf} — {formatarCep(e.cep)}
+                  </p>
+                </span>
+              </label>
+            ))}
+
+            <button
+              onClick={() => setMostrandoFormNovo(true)}
+              className="w-full text-left border border-dashed border-line rounded-md px-3 py-2.5 text-sm text-pine-2"
+            >
+              + Adicionar novo endereço
+            </button>
+          </div>
+        )}
+
+        {formularioAberto && (
+          <div className={enderecos.length > 0 ? "border-t border-line mt-3 pt-4" : ""}>
+            <EnderecoForm
+              inicial={{
+                ...enderecoVazio,
+                id: novoIdEndereco(),
+                cep: item?.cepInformado ? formatarCep(item.cepInformado) : "",
+              }}
+              onSalvar={salvarNovoEndereco}
+            />
+            {enderecos.length > 0 && (
+              <button
+                onClick={() => setMostrandoFormNovo(false)}
+                className="w-full text-center text-xs text-ink/50 py-2"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        )}
 
         {consultandoCep && <p className="text-xs text-ink/50 mt-2">Calculando frete...</p>}
         {erroCep && <p className="text-xs text-berry mt-2">{erroCep}</p>}
 
-        {endereco && (
+        {endereco && !formularioAberto && (
           <div className="mt-3 text-sm">
-            <p className="text-ink/70">
-              {[endereco.logradouro, endereco.bairro].filter(Boolean).join(", ")}
-            </p>
-            <p className="text-ink/70">
-              {endereco.cidade}/{endereco.uf}
-            </p>
-
             {opcoesFrete.length > 1 ? (
               // Mais de uma opção (SuperFrete com PAC/SEDEX, por exemplo): o
               // cliente escolhe qual serviço usar, em vez de já vir travado
@@ -526,14 +614,22 @@ export default function CheckoutResumo({
           ainda não mostra — o botão espera a conta fechar. */}
       <button
         onClick={pagar}
-        disabled={precisaArte || processando || !freteCalculado || recalculandoCupom}
+        disabled={
+          precisaArte ||
+          processando ||
+          !enderecoIdSelecionado ||
+          !freteCalculado ||
+          recalculandoCupom
+        }
         className="w-full bg-berry text-paper font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-95 transition"
       >
         {processando
           ? "Processando pagamento..."
           : recalculandoCupom
             ? "Recalculando o desconto..."
-            : `Pagar ${reais(total)}`}
+            : !enderecoIdSelecionado
+              ? "Escolha um endereço pra continuar"
+              : `Pagar ${reais(total)}`}
       </button>
     </div>
   );

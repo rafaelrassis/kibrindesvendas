@@ -72,6 +72,19 @@ test.describe("compra de ponta a ponta", () => {
     await expect(page).toHaveURL(/\/checkout$/);
 
     await expect(page.getByText("Camiseta Básica Algodão")).toBeVisible();
+
+    // Primeira compra: sem endereço salvo, o checkout abre o formulário de
+    // cadastro sozinho — endereço virou obrigatório pra fechar o pedido.
+    await page.getByLabel("Identificação (ex: Casa, Trabalho)").fill("Casa");
+    await page.getByLabel("Destinatário").fill("Cliente E2E");
+    await page.getByLabel("CEP", { exact: true }).fill("01310-100");
+    await page.getByLabel("Número").fill("1000");
+    await page.getByLabel("Rua").fill("Av. Paulista");
+    await page.getByLabel("Bairro").fill("Bela Vista");
+    await page.getByLabel("Cidade").fill("São Paulo");
+    await page.getByLabel("UF").fill("SP");
+    await page.getByRole("button", { name: "Salvar endereço" }).click();
+
     const botaoPagar = page.getByRole("button", { name: /^Pagar R\$/ });
     await expect(botaoPagar).toBeEnabled({ timeout: 15_000 });
     await botaoPagar.click();

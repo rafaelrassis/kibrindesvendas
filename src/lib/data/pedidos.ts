@@ -10,7 +10,7 @@ import {
   paymentClient,
   preferenceClient,
 } from "@/lib/mercadopago";
-import { consultarCep, resumoDoEndereco } from "./entrega";
+import { consultarEnderecoSalvo, resumoDoEnderecoSalvo } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
 import { enviarEmailStatusPedido } from "@/lib/email";
@@ -37,7 +37,7 @@ function emReais(valor: number) {
 export async function criarPedido(
   usuarioId: string,
   item: ItemCarrinho,
-  cep: unknown,
+  enderecoId: unknown,
   cupomCodigo?: unknown,
   servicoFrete?: unknown
 ) {
@@ -56,7 +56,7 @@ export async function criarPedido(
       where: { id: item.produtoId },
       include: { estoqueVariacoes: true, variacoes: true },
     }),
-    consultarCep(cep, item.produtoId, quantidade, servicoFrete),
+    consultarEnderecoSalvo(usuarioId, enderecoId, item.produtoId, quantidade, servicoFrete),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
@@ -169,7 +169,10 @@ export async function criarPedido(
         desconto,
         cupomCodigo: cupom ? normalizarCodigo(cupom.codigo) : null,
         enderecoCep: endereco.cep,
-        enderecoResumo: resumoDoEndereco(endereco),
+        enderecoResumo: resumoDoEnderecoSalvo(endereco),
+        enderecoDestinatario: endereco.destinatario,
+        enderecoNumero: endereco.numero,
+        enderecoComplemento: endereco.complemento || null,
         pagamentoMock: !pagamentoReal,
         itens: {
           create: [

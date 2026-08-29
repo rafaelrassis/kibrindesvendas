@@ -21,15 +21,19 @@ vi.mock("@/lib/mercadopago", () => ({
 const FRETE = 9.9;
 
 vi.mock("./entrega", () => ({
-  consultarCep: async () => ({
+  consultarEnderecoSalvo: async () => ({
     cep: "01310100",
     logradouro: "Av. Paulista",
     bairro: "Bela Vista",
     cidade: "São Paulo",
     uf: "SP",
     frete: { valor: 9.9, prazoDias: 2 },
+    destinatario: "Cliente de teste",
+    numero: "1000",
+    complemento: "",
+    rua: "Av. Paulista",
   }),
-  resumoDoEndereco: () => "Av. Paulista, Bela Vista — São Paulo/SP",
+  resumoDoEnderecoSalvo: () => "Av. Paulista, 1000, Bela Vista — São Paulo/SP",
 }));
 
 const { prisma } = await import("@/lib/prisma");
@@ -117,8 +121,8 @@ describe("estoque sob concorrência", () => {
     await definirEstoque(1);
 
     const resultados = await Promise.allSettled([
-      criarPedido(USUARIO_ID, item, "01310100"),
-      criarPedido(USUARIO_ID, item, "01310100"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id"),
     ]);
 
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -136,8 +140,8 @@ describe("estoque sob concorrência", () => {
     await definirEstoque(null);
 
     await Promise.all([
-      criarPedido(USUARIO_ID, item, "01310100"),
-      criarPedido(USUARIO_ID, item, "01310100"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id"),
     ]);
 
     expect(await estoqueAtual()).toBeNull();
@@ -148,7 +152,7 @@ describe("estoque sob concorrência", () => {
     await definirEstoque(2);
 
     await expect(
-      criarPedido(USUARIO_ID, { ...item, quantidade: 3 }, "01310100")
+      criarPedido(USUARIO_ID, { ...item, quantidade: 3 }, "teste-endereco-id")
     ).rejects.toMatchObject({ message: expect.stringMatching(/Só restam 2/) });
 
     expect(await estoqueAtual()).toBe(2);
@@ -158,7 +162,7 @@ describe("estoque sob concorrência", () => {
   it("desconta a quantidade inteira, não uma unidade por pedido", async () => {
     await definirEstoque(5);
 
-    await criarPedido(USUARIO_ID, { ...item, quantidade: 3 }, "01310100");
+    await criarPedido(USUARIO_ID, { ...item, quantidade: 3 }, "teste-endereco-id");
 
     expect(await estoqueAtual()).toBe(2);
   });
@@ -170,7 +174,7 @@ describe("devolução do estoque quando o pedido não vinga", () => {
     gateway.criarPreferencia.mockRejectedValue(new Error("Mercado Pago fora do ar"));
     await definirEstoque(1);
 
-    await expect(criarPedido(USUARIO_ID, item, "01310100")).rejects.toMatchObject({
+    await expect(criarPedido(USUARIO_ID, item, "teste-endereco-id")).rejects.toMatchObject({
       status: 502,
     });
 
@@ -184,10 +188,10 @@ describe("devolução do estoque quando o pedido não vinga", () => {
     gateway.criarPreferencia.mockResolvedValue({ init_point: "https://mp.exemplo/checkout" });
     await definirEstoque(1);
 
-    await expect(criarPedido(USUARIO_ID, item, "01310100")).rejects.toMatchObject({
+    await expect(criarPedido(USUARIO_ID, item, "teste-endereco-id")).rejects.toMatchObject({
       status: 502,
     });
-    const { checkoutUrl } = await criarPedido(USUARIO_ID, item, "01310100");
+    const { checkoutUrl } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
     expect(checkoutUrl).toBe("https://mp.exemplo/checkout");
 
     expect(await estoqueAtual()).toBe(0);
@@ -198,7 +202,7 @@ describe("frete grátis", () => {
   it("cupom de frete grátis zera o frete sem descontar do produto", async () => {
     await criarCupom({ codigo: "TESTEESTOQUEFRETE", tipo: "FRETE_GRATIS", valor: 0 });
 
-    const { pedido } = await criarPedido(USUARIO_ID, item, "01310100", "TESTEESTOQUEFRETE");
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTEESTOQUEFRETE");
 
     expect(Number(pedido.frete)).toBe(0);
     expect(pedido.freteGratis).toBe(true);
@@ -209,7 +213,7 @@ describe("frete grátis", () => {
   it("valor mínimo da loja zera o frete sem cupom nenhum", async () => {
     await atualizarConfiguracaoLoja({ freteGratisAcimaDe: PRECO });
 
-    const { pedido } = await criarPedido(USUARIO_ID, item, "01310100");
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
 
     expect(Number(pedido.frete)).toBe(0);
     expect(pedido.freteGratis).toBe(true);
@@ -219,7 +223,7 @@ describe("frete grátis", () => {
   it("abaixo do valor mínimo o frete continua sendo cobrado", async () => {
     await atualizarConfiguracaoLoja({ freteGratisAcimaDe: PRECO + 1 });
 
-    const { pedido } = await criarPedido(USUARIO_ID, item, "01310100");
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
 
     expect(Number(pedido.frete)).toBe(FRETE);
     expect(pedido.freteGratis).toBe(false);
@@ -230,7 +234,7 @@ describe("frete grátis", () => {
     await atualizarConfiguracaoLoja({ freteGratisAcimaDe: PRECO });
     await criarCupom({ codigo: "TESTEESTOQUE10", tipo: "PERCENTUAL", valor: 10 });
 
-    const { pedido } = await criarPedido(USUARIO_ID, item, "01310100", "TESTEESTOQUE10");
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTEESTOQUE10");
 
     expect(Number(pedido.desconto)).toBe(10);
     expect(Number(pedido.frete)).toBe(0);
@@ -333,8 +337,8 @@ describe("estoque por combinação de variação", () => {
     const item = itemVariacao({ Cor: "Preta", Tamanho: "G" });
 
     const resultados = await Promise.allSettled([
-      criarPedido(USUARIO_ID, item, "01310100"),
-      criarPedido(USUARIO_ID, item, "01310100"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id"),
     ]);
 
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -352,10 +356,10 @@ describe("estoque por combinação de variação", () => {
     ]);
 
     await expect(
-      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "01310100")
+      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "teste-endereco-id")
     ).rejects.toMatchObject({ message: expect.stringMatching(/sem estoque/i) });
 
-    await criarPedido(USUARIO_ID, itemVariacao({ Cor: "Branca", Tamanho: "G" }), "01310100");
+    await criarPedido(USUARIO_ID, itemVariacao({ Cor: "Branca", Tamanho: "G" }), "teste-endereco-id");
     expect(await estoqueDaGrade(COR_BRANCA_G)).toBe(4);
   });
 
@@ -363,14 +367,14 @@ describe("estoque por combinação de variação", () => {
     await definirGrade([{ combinacao: COR_PRETA_G, estoque: 5 }]);
 
     await expect(
-      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Branca", Tamanho: "P" }), "01310100")
+      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Branca", Tamanho: "P" }), "teste-endereco-id")
     ).rejects.toMatchObject({ message: expect.stringMatching(/sem estoque/i) });
   });
 
   it("produto com variações mas sem nenhuma linha de grade vende sem controle (controle desligado)", async () => {
     await definirGrade([]);
 
-    await criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "01310100");
+    await criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "teste-endereco-id");
     // Sem erro nenhum — nenhuma linha existe pra decrementar, o produto
     // passa direto, igual a `estoque: null` no caminho sem variação.
   });
@@ -381,7 +385,7 @@ describe("estoque por combinação de variação", () => {
     await definirGrade([{ combinacao: COR_PRETA_G, estoque: 1 }]);
 
     await expect(
-      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "01310100")
+      criarPedido(USUARIO_ID, itemVariacao({ Cor: "Preta", Tamanho: "G" }), "teste-endereco-id")
     ).rejects.toMatchObject({ status: 502 });
 
     expect(await estoqueDaGrade(COR_PRETA_G)).toBe(1);

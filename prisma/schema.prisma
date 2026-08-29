@@ -306,6 +306,13 @@ model Pedido {
   // depois, mas o pedido tem que continuar mostrando pra onde foi.
   enderecoCep     String?
   enderecoResumo  String?
+  // Número, complemento e destinatário do endereço congelado — sem eles o
+  // pedido não tem como ser entregue de fato (rua/bairro/cidade sozinhos não
+  // bastam pros Correios). Vêm do Endereco escolhido no checkout, não do
+  // ViaCEP, que não sabe número nem quem recebe.
+  enderecoDestinatario String?
+  enderecoNumero        String?
+  enderecoComplemento   String?
   // Preenchido quando o cliente pede devolução, pra loja saber o que houve.
   motivoDevolucao String?
   // Cupom aplicado neste pedido, se houver. O código fica congelado aqui

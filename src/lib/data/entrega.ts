@@ -153,3 +153,55 @@ export function resumoDoEndereco(endereco: EnderecoDeEntrega) {
   const rua = [endereco.logradouro, endereco.bairro].filter(Boolean).join(", ");
   return [rua, `${endereco.cidade}/${endereco.uf}`].filter(Boolean).join(" — ");
 }
+
+// Endereço salvo (ver model Endereco) + cotação de frete a partir dele — é o
+// que o checkout usa depois que o cliente escolhe (ou cadastra) um endereço,
+// em vez de digitar um CEP solto sem número nem destinatário.
+export type EnderecoDeEntregaSalvo = EnderecoDeEntrega & {
+  destinatario: string;
+  numero: string;
+  complemento: string;
+  rua: string;
+};
+
+// Confia só no `enderecoId` + dono da sessão: nunca no CEP/número que o
+// navegador tenha mandado solto, senão qualquer usuário logado poderia
+// cotar (ou pior, gravar num pedido) o endereço de outra pessoa.
+export async function consultarEnderecoSalvo(
+  usuarioId: string,
+  enderecoIdBruto: unknown,
+  produtoIdBruto?: unknown,
+  quantidadeBruta?: unknown,
+  servicoEscolhidoBruto?: unknown
+): Promise<EnderecoDeEntregaSalvo> {
+  const enderecoId = typeof enderecoIdBruto === "string" ? enderecoIdBruto : null;
+  if (!enderecoId) throw new ErroDeNegocio("Escolha um endereço de entrega.");
+
+  const salvo = await prisma.endereco.findFirst({ where: { id: enderecoId, usuarioId } });
+  if (!salvo) throw new ErroDeNegocio("Endereço não encontrado.", 404);
+
+  const cotacao = await consultarCep(
+    salvo.cep,
+    produtoIdBruto,
+    quantidadeBruta,
+    servicoEscolhidoBruto
+  );
+
+  return {
+    ...cotacao,
+    destinatario: salvo.destinatario,
+    numero: salvo.numero,
+    complemento: salvo.complemento ?? "",
+    rua: salvo.rua,
+  };
+}
+
+// Resumo completo pro pedido — a diferença do `resumoDoEndereco` de cima é
+// que este vem do Endereco salvo (tem número e destinatário), não só do
+// ViaCEP.
+export function resumoDoEnderecoSalvo(endereco: EnderecoDeEntregaSalvo) {
+  const rua = [`${endereco.rua}, ${endereco.numero}`, endereco.complemento, endereco.bairro]
+    .filter(Boolean)
+    .join(", ");
+  return [rua, `${endereco.cidade}/${endereco.uf}`].filter(Boolean).join(" — ");
+}
