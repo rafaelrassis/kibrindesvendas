@@ -16,6 +16,12 @@ export type EnderecoDeEntrega = {
   bairro: string;
   cidade: string;
   uf: string;
+  // Só preenchidos quando o endereço vem de um cadastro salvo (ver
+  // consultarEnderecoSalvo) — a consulta só por CEP não tem como saber número,
+  // complemento ou pra quem entregar.
+  numero?: string;
+  complemento?: string;
+  destinatario?: string;
   // Todas as opções cotadas (mais de uma só quando a transportadora ativa
   // devolve várias, ex: SuperFrete com PAC e SEDEX). Ordenado do mais barato
   // pro mais caro.
@@ -148,8 +154,58 @@ export async function consultarCep(
   };
 }
 
+// Fonte da verdade do endereço na hora de fechar o pedido: ao contrário de
+// consultarCep (que aceita qualquer CEP digitado, sem número/complemento/
+// destinatário — serve só pra prévia de preço no produto), esta função exige
+// um endereço já cadastrado do próprio cliente, com tudo que a transportadora
+// precisa pra entregar de verdade.
+export async function consultarEnderecoSalvo(
+  usuarioId: string,
+  enderecoIdBruto: unknown,
+  produtoIdBruto?: unknown,
+  quantidadeBruta?: unknown,
+  servicoEscolhidoBruto?: unknown
+): Promise<EnderecoDeEntrega> {
+  const enderecoId = typeof enderecoIdBruto === "string" ? enderecoIdBruto : "";
+  if (!enderecoId) {
+    throw new ErroDeNegocio("Selecione um endereço de entrega antes de finalizar a compra.");
+  }
+
+  const salvo = await prisma.endereco.findFirst({ where: { id: enderecoId, usuarioId } });
+  if (!salvo) throw new ErroDeNegocio("Endereço não encontrado.", 404);
+
+  const produtoId = typeof produtoIdBruto === "string" ? produtoIdBruto : undefined;
+  const quantidadeNum = Number(quantidadeBruta);
+  const quantidade =
+    Number.isFinite(quantidadeNum) && quantidadeNum > 0 ? Math.round(quantidadeNum) : 1;
+  const servicoEscolhido =
+    typeof servicoEscolhidoBruto === "string" ? servicoEscolhidoBruto : undefined;
+
+  const cep = normalizarCep(salvo.cep) ?? salvo.cep;
+  const opcoesFrete = await cotarOpcoesFrete(salvo.uf, cep, produtoId, quantidade);
+  const frete = opcoesFrete.find((o) => o.servico === servicoEscolhido) ?? opcoesFrete[0];
+
+  return {
+    cep,
+    logradouro: salvo.rua,
+    bairro: salvo.bairro,
+    cidade: salvo.cidade,
+    uf: salvo.uf,
+    numero: salvo.numero,
+    complemento: salvo.complemento ?? undefined,
+    destinatario: salvo.destinatario,
+    opcoesFrete,
+    frete,
+  };
+}
+
 // Uma linha só, do jeito que o cliente e a loja leem depois no pedido.
+// Número/complemento/destinatário só aparecem quando vieram de um endereço
+// salvo (ver consultarEnderecoSalvo) — sem eles a transportadora não entrega.
 export function resumoDoEndereco(endereco: EnderecoDeEntrega) {
-  const rua = [endereco.logradouro, endereco.bairro].filter(Boolean).join(", ");
-  return [rua, `${endereco.cidade}/${endereco.uf}`].filter(Boolean).join(" — ");
+  const ruaComNumero = [endereco.logradouro, endereco.numero].filter(Boolean).join(", ");
+  const complemento = endereco.complemento ? `, ${endereco.complemento}` : "";
+  const rua = [ruaComNumero + complemento, endereco.bairro].filter(Boolean).join(", ");
+  const linha = [rua, `${endereco.cidade}/${endereco.uf}`].filter(Boolean).join(" — ");
+  return endereco.destinatario ? `${endereco.destinatario} — ${linha}` : linha;
 }

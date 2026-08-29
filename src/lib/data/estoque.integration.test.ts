@@ -21,7 +21,7 @@ vi.mock("@/lib/mercadopago", () => ({
 const FRETE = 9.9;
 
 vi.mock("./entrega", () => ({
-  consultarCep: async () => ({
+  consultarEnderecoSalvo: async () => ({
     cep: "01310100",
     logradouro: "Av. Paulista",
     bairro: "Bela Vista",

@@ -51,7 +51,9 @@ test.describe("compra de ponta a ponta", () => {
     await prisma.$disconnect();
   });
 
-  test("cadastro → produto → checkout → pagamento simulado → confirmação", async ({ page }) => {
+  test("cadastro → produto → checkout → endereço obrigatório → pagamento simulado → confirmação", async ({
+    page,
+  }) => {
     await page.goto("/cadastro");
     await page.getByLabel("Nome").fill("Cliente E2E");
     await page.getByLabel("E-mail").fill(email);
@@ -64,14 +66,37 @@ test.describe("compra de ponta a ponta", () => {
     await page.getByRole("button", { name: "M", exact: true }).click();
     await page.getByRole("button", { name: "Branca", exact: true }).click();
     await page.getByPlaceholder("00000-000").fill("01310-100");
-    // Confirma que o frete calculou antes de seguir — sem isso o botão de
-    // pagar no checkout continua desabilitado esperando o mesmo cálculo.
+    // O CEP solto aqui é só pra prévia do frete na própria página do produto
+    // — continua funcionando sem endereço nenhum cadastrado.
     await expect(page.getByText("Receba em até")).toBeVisible({ timeout: 15_000 });
 
     await page.locator('button:has-text("⚡ Comprar agora")').last().click();
     await expect(page).toHaveURL(/\/checkout$/);
 
     await expect(page.getByText("Camiseta Básica Algodão")).toBeVisible();
+
+    // Conta nova, sem endereço salvo: finalizar a compra tem que cair no
+    // cadastro de endereço em vez de deixar seguir só com o CEP da prévia.
+    const botaoPagarAntes = page.getByRole("button", { name: /^Pagar R\$/ });
+    await expect(botaoPagarAntes).toBeDisabled();
+    await expect(page.getByText("Você ainda não tem um endereço cadastrado.")).toBeVisible();
+    await page.getByRole("button", { name: "Cadastrar endereço" }).click();
+    await expect(page).toHaveURL(/\/conta\/enderecos\/novo\?next=\/checkout$/);
+
+    await page.getByLabel("Identificação (ex: Casa, Trabalho)").fill("Casa");
+    await page.getByLabel("Destinatário").fill("Cliente E2E");
+    await page.getByLabel("CEP", { exact: true }).fill("01310-100");
+    await page.getByLabel("Número").fill("1000");
+    // Rua/Bairro/Cidade/UF vêm preenchidos pelo ViaCEP a partir do CEP acima;
+    // só confere que o preenchimento aconteceu antes de salvar.
+    await expect(page.getByLabel("Rua")).not.toHaveValue("");
+    await page.getByRole("button", { name: "Salvar endereço" }).click();
+
+    // `next=/checkout` traz de volta pro checkout, com o endereço recém
+    // criado já selecionado (é o único, vira padrão automaticamente).
+    await expect(page).toHaveURL(/\/checkout$/);
+    await expect(page.getByText("Cliente E2E")).toBeVisible();
+
     const botaoPagar = page.getByRole("button", { name: /^Pagar R\$/ });
     await expect(botaoPagar).toBeEnabled({ timeout: 15_000 });
     await botaoPagar.click();

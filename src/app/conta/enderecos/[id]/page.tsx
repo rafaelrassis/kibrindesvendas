@@ -1,12 +1,17 @@
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
+import { Suspense } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useConta } from "@/lib/conta-context";
 import EnderecoForm from "@/components/EnderecoForm";
 
-export default function EditarEnderecoPage() {
+function EditarEnderecoConteudo() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  // `next` volta pro checkout quando a edição foi aberta de lá — sem ele, cai
+  // na lista de sempre.
+  const proxima = searchParams.get("next") || "/conta/enderecos";
   const { enderecos, salvarEndereco, removerEndereco } = useConta();
 
   const endereco = enderecos.find((e) => e.id === params.id);
@@ -27,10 +32,7 @@ export default function EditarEnderecoPage() {
 
   return (
     <div className="mx-auto max-w-md px-5 py-8">
-      <button
-        onClick={() => router.push("/conta/enderecos")}
-        className="text-sm text-ink/50 mb-4"
-      >
+      <button onClick={() => router.push(proxima)} className="text-sm text-ink/50 mb-4">
         ← Voltar
       </button>
       <h1 className="font-display text-2xl mb-6">Editar endereço</h1>
@@ -39,7 +41,7 @@ export default function EditarEnderecoPage() {
         inicial={endereco}
         onSalvar={async (dados) => {
           await salvarEndereco(dados);
-          router.push("/conta/enderecos");
+          router.push(proxima);
         }}
         onExcluir={async () => {
           await removerEndereco(endereco.id);
@@ -47,5 +49,13 @@ export default function EditarEnderecoPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function EditarEnderecoPage() {
+  return (
+    <Suspense>
+      <EditarEnderecoConteudo />
+    </Suspense>
   );
 }

@@ -10,7 +10,7 @@ import {
   paymentClient,
   preferenceClient,
 } from "@/lib/mercadopago";
-import { consultarCep, resumoDoEndereco } from "./entrega";
+import { consultarEnderecoSalvo, resumoDoEndereco } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
 import { enviarEmailStatusPedido } from "@/lib/email";
@@ -37,7 +37,7 @@ function emReais(valor: number) {
 export async function criarPedido(
   usuarioId: string,
   item: ItemCarrinho,
-  cep: unknown,
+  enderecoId: unknown,
   cupomCodigo?: unknown,
   servicoFrete?: unknown
 ) {
@@ -50,13 +50,15 @@ export async function criarPedido(
 
   // O frete é recalculado aqui de propósito: o valor que o navegador mostrou
   // é só pra visualização, quem define o que vai ser cobrado é o servidor.
+  // O endereço também: exige um cadastro do próprio cliente (consultarEnderecoSalvo
+  // recusa id de outro usuário ou inexistente) — pedido não sai só com CEP solto.
   const [usuario, produto, endereco] = await Promise.all([
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
     prisma.produto.findUnique({
       where: { id: item.produtoId },
       include: { estoqueVariacoes: true, variacoes: true },
     }),
-    consultarCep(cep, item.produtoId, quantidade, servicoFrete),
+    consultarEnderecoSalvo(usuarioId, enderecoId, item.produtoId, quantidade, servicoFrete),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);

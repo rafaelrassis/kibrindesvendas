@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useProduto } from "@/lib/use-produto";
 import { useCart } from "@/lib/cart-context";
@@ -27,21 +28,30 @@ export default function CheckoutResumo({
   const router = useRouter();
   const { item, definirQuantidade } = useCart();
   const { logado, carregando: carregandoAuth } = useAuth();
-  const { enderecos } = useConta();
+  const { enderecos, carregando: carregandoEnderecos } = useConta();
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState(erroInicial);
 
   const { produto, carregando } = useProduto(item?.produtoId);
 
-  // Quem já tem endereço padrão salvo começa com ele preenchido; digitar por
-  // cima assume o controle do campo (`null` = ainda não mexeu). O CEP
-  // informado na própria página do produto tem prioridade sobre o endereço
-  // salvo — é a escolha mais recente do cliente.
+  // Finalizar a compra exige um endereço cadastrado — o CEP solto que dá pra
+  // calcular frete na página do produto não tem número/complemento/pra quem
+  // entregar. Quem já tem um endereço com o mesmo CEP digitado lá começa com
+  // ele selecionado (é a escolha mais recente do cliente); senão cai no
+  // padrão. Selecionar outro na lista abaixo assume o controle (`null` =
+  // ainda não mexeu).
   const enderecoPadrao = enderecos.find((e) => e.padrao) ?? enderecos[0];
-  const cepPadrao = enderecoPadrao ? normalizarCep(enderecoPadrao.cep) : null;
-  const cepInicial = item?.cepInformado ? normalizarCep(item.cepInformado) : cepPadrao;
-  const [cepDigitado, setCepDigitado] = useState<string | null>(null);
-  const cep = cepDigitado ?? (cepInicial ? formatarCep(cepInicial) : "");
+  const cepInformado = item?.cepInformado ? normalizarCep(item.cepInformado) : null;
+  const enderecoSugeridoPeloCep = cepInformado
+    ? enderecos.find((e) => normalizarCep(e.cep) === cepInformado)
+    : undefined;
+  const [enderecoSelecionadoId, setEnderecoSelecionadoId] = useState<string | null>(null);
+  const enderecoAtivo =
+    enderecos.find((e) => e.id === enderecoSelecionadoId) ??
+    enderecoSugeridoPeloCep ??
+    enderecoPadrao ??
+    null;
+  const cep = enderecoAtivo ? formatarCep(enderecoAtivo.cep) : "";
 
   const quantidade = item?.quantidade ?? 1;
   const quantidadeMinima = Math.max(1, produto?.quantidadeMinima || 1);
@@ -220,9 +230,9 @@ export default function CheckoutResumo({
   }
 
   function pagar() {
-    // O botão já fica travado sem item e sem frete; a checagem sobra só pra
-    // estreitar os tipos.
-    if (!item || !endereco) return;
+    // O botão já fica travado sem item, sem frete e sem endereço selecionado;
+    // a checagem sobra só pra estreitar os tipos.
+    if (!item || !endereco || !enderecoAtivo) return;
     setErro("");
     setProcessando(true);
 
@@ -230,10 +240,10 @@ export default function CheckoutResumo({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Frete e desconto não vão fixos no corpo, de propósito: o servidor
-      // recalcula os dois a partir do CEP e do código do cupom.
+      // recalcula os dois a partir do endereço e do código do cupom.
       body: JSON.stringify({
         item,
-        cep: normalizarCep(cep),
+        enderecoId: enderecoAtivo.id,
         cupomCodigo: cupomAplicado?.codigo,
         servicoFrete: freteCalculado?.servico,
       }),
@@ -340,33 +350,83 @@ export default function CheckoutResumo({
       )}
 
       <div className="bg-white border border-line rounded-lg p-5 mb-5">
-        <p className="text-sm font-medium mb-3">Entrega</p>
-        <label className="block">
-          <span className="block text-xs text-ink/50 mb-1.5">CEP de entrega</span>
-          <input
-            value={cep}
-            inputMode="numeric"
-            maxLength={9}
-            placeholder="00000-000"
-            // `formatarCep` devolve o texto intacto enquanto não há 8 dígitos,
-            // então o traço só aparece quando o CEP fica completo.
-            onChange={(e) => setCepDigitado(formatarCep(e.target.value))}
-            className="w-full max-w-[180px] bg-white border border-line rounded-lg px-4 py-3 text-sm outline-none focus:border-pine"
-          />
-        </label>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium">Entrega</p>
+          {enderecos.length > 0 && (
+            <Link href="/conta/enderecos/novo?next=/checkout" className="text-xs text-pine font-medium">
+              + Novo endereço
+            </Link>
+          )}
+        </div>
 
-        {consultandoCep && <p className="text-xs text-ink/50 mt-2">Calculando frete...</p>}
-        {erroCep && <p className="text-xs text-berry mt-2">{erroCep}</p>}
+        {carregandoEnderecos ? (
+          <p className="text-xs text-ink/50">Carregando endereços...</p>
+        ) : enderecos.length === 0 ? (
+          // Sem endereço cadastrado não dá pra finalizar — CEP solto não tem
+          // número/complemento/destinatário pra transportadora entregar.
+          <div className="text-center py-4">
+            <p className="text-sm text-ink/60 mb-4">
+              Você ainda não tem um endereço cadastrado. Cadastre um pra receber seu pedido.
+            </p>
+            <button
+              onClick={() => router.push("/conta/enderecos/novo?next=/checkout")}
+              className="bg-pine text-paper px-6 py-2.5 rounded-full text-sm"
+            >
+              Cadastrar endereço
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {enderecos.map((e) => (
+              <label
+                key={e.id}
+                className="flex items-start justify-between gap-3 border border-line rounded-md px-3 py-2.5 cursor-pointer has-[:checked]:border-pine has-[:checked]:bg-pine/5"
+              >
+                <span className="flex items-start gap-2.5">
+                  <input
+                    type="radio"
+                    name="enderecoEntrega"
+                    checked={enderecoAtivo?.id === e.id}
+                    onChange={() => setEnderecoSelecionadoId(e.id)}
+                    className="accent-pine mt-1"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">{e.rotulo}</span>
+                    {e.padrao && (
+                      <span className="text-[10px] uppercase tracking-wide text-mustard ml-1.5">
+                        padrão
+                      </span>
+                    )}
+                    <br />
+                    <span className="text-xs text-ink/60">Entregar para {e.destinatario}</span>
+                    <br />
+                    <span className="text-xs text-ink/60">
+                      {e.rua}, {e.numero}
+                      {e.complemento && ` — ${e.complemento}`}
+                    </span>
+                    <br />
+                    <span className="text-xs text-ink/60">
+                      {e.bairro}, {e.cidade}/{e.uf} — {formatarCep(e.cep)}
+                    </span>
+                  </span>
+                </span>
+                <Link
+                  href={`/conta/enderecos/${e.id}?next=/checkout`}
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="text-xs text-pine font-medium shrink-0"
+                >
+                  Editar
+                </Link>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {consultandoCep && <p className="text-xs text-ink/50 mt-3">Calculando frete...</p>}
+        {erroCep && <p className="text-xs text-berry mt-3">{erroCep}</p>}
 
         {endereco && (
           <div className="mt-3 text-sm">
-            <p className="text-ink/70">
-              {[endereco.logradouro, endereco.bairro].filter(Boolean).join(", ")}
-            </p>
-            <p className="text-ink/70">
-              {endereco.cidade}/{endereco.uf}
-            </p>
-
             {opcoesFrete.length > 1 ? (
               // Mais de uma opção (SuperFrete com PAC/SEDEX, por exemplo): o
               // cliente escolhe qual serviço usar, em vez de já vir travado
@@ -494,7 +554,7 @@ export default function CheckoutResumo({
           <span className="text-ink/60">Frete</span>
           <span className="font-mono">
             {!freteCalculado ? (
-              <span className="text-ink/40">informe o CEP</span>
+              <span className="text-ink/40">selecione um endereço</span>
             ) : freteGratis ? (
               <span className="text-pine-2">
                 <span className="line-through text-ink/30 mr-1.5">{reais(freteCalculado.valor)}</span>
@@ -526,7 +586,7 @@ export default function CheckoutResumo({
           ainda não mostra — o botão espera a conta fechar. */}
       <button
         onClick={pagar}
-        disabled={precisaArte || processando || !freteCalculado || recalculandoCupom}
+        disabled={precisaArte || processando || !enderecoAtivo || !freteCalculado || recalculandoCupom}
         className="w-full bg-berry text-paper font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-95 transition"
       >
         {processando
