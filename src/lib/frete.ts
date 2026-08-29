@@ -174,11 +174,24 @@ export async function cotarFreteMelhorEnvio(
 
 // --- Cotação real via SuperFrete (agregador dos Correios, alternativa ao
 // Melhor Envio) ------------------------------------------------------------
-// A API v2 do SuperFrete segue o mesmo formato de request/response do
-// Melhor Envio (mesmo modelo de negócio: agregador de transportadoras).
-// ATENÇÃO: confirme o endpoint e o formato exato na doc do SuperFrete ao
-// gerar o token — se divergir do Melhor Envio, só este trecho muda.
+// Endpoint e formato conferidos na doc oficial (superfrete.readme.io/reference/
+// cotacao-de-frete) — a API v0 do SuperFrete NÃO segue o mesmo contrato do
+// Melhor Envio: endpoint próprio, `insurance_value` no nível de `options` (não
+// dentro de cada produto), exige `services` (ids separados por vírgula) e cada
+// opção reporta erro em `has_error`, não em `error`.
 //
+// "1" e "2" são PAC e SEDEX — os únicos dois a loja despacha por Correios.
+const SERVICOS_CORREIOS = "1,2";
+
+type ServicoSuperFrete = {
+  id: number;
+  name: string;
+  price: number;
+  delivery_time: number;
+  company: { name: string };
+  has_error?: boolean;
+};
+
 // Ao contrário do cotarFreteMelhorEnvio (que fica só com a mais barata), esta
 // função devolve todas as opções válidas, pra o cliente escolher no checkout.
 export async function cotarFreteSuperFrete(
@@ -192,26 +205,22 @@ export async function cotarFreteSuperFrete(
   const body = {
     from: { postal_code: cepOrigem },
     to: { postal_code: cepDestino },
+    services: SERVICOS_CORREIOS,
+    options: { insurance_value: 0, use_insurance_value: false, own_hand: false, receipt: false },
     products: [
       {
-        id: "1",
         width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
         height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
-        // Ao contrário do Melhor Envio, a API do SuperFrete não multiplica o
-        // preço pelo `quantity` do produto — então multiplicamos o peso na
-        // mão aqui e mandamos quantity fixo em 1, senão pedidos com mais de
-        // 1 unidade saem cotados com o frete de 1 unidade só.
-        weight: (Math.max(pacote.pesoGramas, 1) * unidades) / 1000,
-        insurance_value: 0,
-        quantity: 1,
+        weight: Math.max(pacote.pesoGramas, 1) / 1000,
+        quantity: unidades,
       },
     ],
   };
 
   let resposta: Response;
   try {
-    resposta = await fetch("https://api.superfrete.com/api/v2/me/shipment/calculate", {
+    resposta = await fetch("https://api.superfrete.com/api/v0/calculator", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -242,13 +251,13 @@ export async function cotarFreteSuperFrete(
     return null;
   }
 
-  const servicos = corpo as ServicoMelhorEnvio[] | null;
+  const servicos = corpo as ServicoSuperFrete[] | null;
   if (!Array.isArray(servicos)) {
     console.error("[frete] SuperFrete: resposta não é um array", corpo);
     return null;
   }
 
-  const validos = servicos.filter((s) => !s.error && s.price);
+  const validos = servicos.filter((s) => !s.has_error && s.price);
   if (validos.length === 0) {
     console.error("[frete] SuperFrete: nenhuma opção válida", servicos);
     return null;

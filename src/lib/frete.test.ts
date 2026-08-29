@@ -202,8 +202,8 @@ describe("cotarFreteSuperFrete", () => {
       "fetch",
       vi.fn(async () =>
         respostaCom([
-          { id: 2, name: "SEDEX", price: "42.10", delivery_time: 2, company: { name: "Correios" } },
-          { id: 1, name: "PAC", price: "23.50", delivery_time: 7, company: { name: "Correios" } },
+          { id: 2, name: "SEDEX", price: 42.1, delivery_time: 2, company: { name: "Correios" } },
+          { id: 1, name: "PAC", price: 23.5, delivery_time: 7, company: { name: "Correios" } },
         ])
       )
     );
@@ -219,8 +219,8 @@ describe("cotarFreteSuperFrete", () => {
       "fetch",
       vi.fn(async () =>
         respostaCom([
-          { id: 1, name: "PAC", price: "9.90", delivery_time: 5, company: { name: "X" }, error: "Rota não atendida" },
-          { id: 2, name: "SEDEX", price: "42.10", delivery_time: 2, company: { name: "Correios" } },
+          { id: 1, name: "PAC", price: 9.9, delivery_time: 5, company: { name: "X" }, has_error: true },
+          { id: 2, name: "SEDEX", price: 42.1, delivery_time: 2, company: { name: "Correios" } },
         ])
       )
     );
@@ -245,17 +245,18 @@ describe("cotarFreteSuperFrete", () => {
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
   });
 
-  it("multiplica o peso pela quantidade e manda quantity fixo em 1 (a API do SuperFrete não multiplica sozinha)", async () => {
-    let enviado: { products: { weight: number; quantity: number }[] } | null = null;
+  it("manda o peso do produto e a quantidade de unidades pra API calcular", async () => {
+    let enviado: { services: string; products: { weight: number; quantity: number }[] } | null = null;
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       enviado = JSON.parse(init.body);
       return respostaCom([
-        { id: 1, name: "PAC", price: "20.00", delivery_time: 5, company: { name: "Correios" } },
+        { id: 1, name: "PAC", price: 20.0, delivery_time: 5, company: { name: "Correios" } },
       ]);
     });
 
     await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
 
-    expect(enviado!.products[0]).toMatchObject({ weight: 0.9, quantity: 1 });
+    expect(enviado!.services).toBe("1,2");
+    expect(enviado!.products[0]).toMatchObject({ weight: 0.3, quantity: 3 });
   });
 });
