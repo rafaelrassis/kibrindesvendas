@@ -67,6 +67,7 @@ describe("cotarFreteMelhorEnvio", () => {
     return {
       ok: true,
       json: async () => servicos,
+      text: async () => JSON.stringify(servicos),
     } as unknown as Response;
   }
 
@@ -188,6 +189,7 @@ describe("cotarFreteSuperFrete", () => {
     return {
       ok: true,
       json: async () => servicos,
+      text: async () => JSON.stringify(servicos),
     } as unknown as Response;
   }
 

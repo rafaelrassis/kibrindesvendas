@@ -133,15 +133,24 @@ export async function cotarFreteMelhorEnvio(
     return null;
   }
 
+  const corpoBruto = typeof resposta.text === "function" ? await resposta.text().catch(() => "") : "";
+
   if (!resposta.ok) {
-    const corpo = typeof resposta.text === "function" ? await resposta.text().catch(() => "") : "";
-    console.error("[frete] Melhor Envio: resposta não-ok", resposta.status, corpo);
+    console.error("[frete] Melhor Envio: resposta não-ok", resposta.status, corpoBruto);
     return null;
   }
 
-  const servicos = (await resposta.json().catch(() => null)) as ServicoMelhorEnvio[] | null;
+  let corpo: unknown;
+  try {
+    corpo = JSON.parse(corpoBruto);
+  } catch {
+    console.error("[frete] Melhor Envio: resposta não é JSON válido", corpoBruto);
+    return null;
+  }
+
+  const servicos = corpo as ServicoMelhorEnvio[] | null;
   if (!Array.isArray(servicos)) {
-    console.error("[frete] Melhor Envio: resposta não é um array", servicos);
+    console.error("[frete] Melhor Envio: resposta não é um array", corpo);
     return null;
   }
 
@@ -218,15 +227,24 @@ export async function cotarFreteSuperFrete(
     return null;
   }
 
+  const corpoBruto = typeof resposta.text === "function" ? await resposta.text().catch(() => "") : "";
+
   if (!resposta.ok) {
-    const corpo = typeof resposta.text === "function" ? await resposta.text().catch(() => "") : "";
-    console.error("[frete] SuperFrete: resposta não-ok", resposta.status, corpo);
+    console.error("[frete] SuperFrete: resposta não-ok", resposta.status, corpoBruto);
     return null;
   }
 
-  const servicos = (await resposta.json().catch(() => null)) as ServicoMelhorEnvio[] | null;
+  let corpo: unknown;
+  try {
+    corpo = JSON.parse(corpoBruto);
+  } catch {
+    console.error("[frete] SuperFrete: resposta não é JSON válido", corpoBruto);
+    return null;
+  }
+
+  const servicos = corpo as ServicoMelhorEnvio[] | null;
   if (!Array.isArray(servicos)) {
-    console.error("[frete] SuperFrete: resposta não é um array", servicos);
+    console.error("[frete] SuperFrete: resposta não é um array", corpo);
     return null;
   }
 
