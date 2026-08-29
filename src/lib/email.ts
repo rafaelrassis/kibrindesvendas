@@ -29,7 +29,13 @@ async function enviar(destinatario: string, assunto: string, html: string) {
     return;
   }
   try {
-    await resend.emails.send({ from: remetente(), to: destinatario, subject: assunto, html });
+    const { error } = await resend.emails.send({
+      from: remetente(),
+      to: destinatario,
+      subject: assunto,
+      html,
+    });
+    if (error) console.error("Falha ao enviar e-mail (Resend)", error);
   } catch (e) {
     console.error("Falha ao enviar e-mail", e);
   }
