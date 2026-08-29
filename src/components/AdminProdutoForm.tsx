@@ -147,7 +147,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   });
   const [enviandoImagemCor, setEnviandoImagemCor] = useState<string | null>(null);
   const [erroImagemCor, setErroImagemCor] = useState("");
-  const [pesoGramas, setPesoGramas] = useState(String(produto?.pesoGramas ?? 300));
+  const [pesoMiligramas, setPesoMiligramas] = useState(String(produto?.pesoMiligramas ?? 300000));
   const [alturaCm, setAlturaCm] = useState(String(produto?.alturaCm ?? 4));
   const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
   const [comprimentoCm, setComprimentoCm] = useState(String(produto?.comprimentoCm ?? 16));
@@ -497,7 +497,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
               return { combinacao: chave, estoque: Math.round(Number(gradeEstoque[chave] ?? 0)) };
             })
           : null,
-      pesoGramas: Number(pesoGramas) || 300,
+      pesoMiligramas: Number(pesoMiligramas) || 300000,
       alturaCm: Number(alturaCm) || 4,
       larguraCm: Number(larguraCm) || 11,
       comprimentoCm: Number(comprimentoCm) || 16,
@@ -1242,12 +1242,12 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           na estimativa por região.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Campo label="Peso (g)">
+          <Campo label="Peso (mg)">
             <input
               type="number"
               min={1}
-              value={pesoGramas}
-              onChange={(e) => setPesoGramas(e.target.value)}
+              value={pesoMiligramas}
+              onChange={(e) => setPesoMiligramas(e.target.value)}
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>

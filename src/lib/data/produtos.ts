@@ -86,7 +86,7 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
       combinacao: e.combinacao,
       estoque: e.estoque,
     })),
-    pesoGramas: p.pesoGramas,
+    pesoMiligramas: p.pesoMiligramas,
     alturaCm: p.alturaCm,
     larguraCm: p.larguraCm,
     comprimentoCm: p.comprimentoCm,
@@ -274,7 +274,7 @@ export type DadosProduto = {
   // null explícito desliga o controle por variação (apaga todas as linhas);
   // undefined deixa como está; array substitui a grade inteira.
   estoqueVariacoes?: { combinacao: string; estoque: number }[] | null;
-  pesoGramas?: number;
+  pesoMiligramas?: number;
   alturaCm?: number;
   larguraCm?: number;
   comprimentoCm?: number;
@@ -289,7 +289,7 @@ const EMOJI_PADRAO = "🎁";
 const COR_PADRAO = "#3F6B4C";
 // Caixa pequena — mesmo padrão do `@default` no schema, usado quando o
 // admin cria o produto sem preencher peso/dimensões.
-const PESO_PADRAO_G = 300;
+const PESO_PADRAO_MG = 300000;
 const ALTURA_PADRAO_CM = 4;
 const LARGURA_PADRAO_CM = 11;
 const COMPRIMENTO_PADRAO_CM = 16;
@@ -427,7 +427,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       destaque: !!dados.destaque,
       destaqueCategoria: !!dados.destaqueCategoria,
       estoque: dados.estoque ?? null,
-      pesoGramas: dados.pesoGramas ?? PESO_PADRAO_G,
+      pesoMiligramas: dados.pesoMiligramas ?? PESO_PADRAO_MG,
       alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
       larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
       comprimentoCm: dados.comprimentoCm ?? COMPRIMENTO_PADRAO_CM,
@@ -519,7 +519,7 @@ export async function atualizarProduto(
         destaqueCategoria: dados.destaqueCategoria,
         ativo: dados.ativo,
         estoque: dados.estoque !== undefined ? dados.estoque : undefined,
-        pesoGramas: dados.pesoGramas,
+        pesoMiligramas: dados.pesoMiligramas,
         alturaCm: dados.alturaCm,
         larguraCm: dados.larguraCm,
         comprimentoCm: dados.comprimentoCm,

@@ -61,7 +61,7 @@ describe("formatarCep", () => {
 });
 
 describe("cotarFreteMelhorEnvio", () => {
-  const pacote = { pesoGramas: 300, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
+  const pacote = { pesoMiligramas: 300000, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
 
   function respostaCom(servicos: unknown) {
     return {
@@ -120,7 +120,7 @@ describe("cotarFreteMelhorEnvio", () => {
     });
 
     await cotarFreteMelhorEnvio("token", "01310100", "60000000", {
-      pesoGramas: 250,
+      pesoMiligramas: 250000,
       alturaCm: 1,
       larguraCm: 5,
       comprimentoCm: 8,
@@ -183,7 +183,7 @@ describe("cotarFreteMelhorEnvio", () => {
 });
 
 describe("cotarFreteSuperFrete", () => {
-  const pacote = { pesoGramas: 300, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
+  const pacote = { pesoMiligramas: 300000, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
 
   function respostaCom(servicos: unknown) {
     return {

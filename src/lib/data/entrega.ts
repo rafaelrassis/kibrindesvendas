@@ -54,7 +54,7 @@ async function cotarOpcoesFrete(
     prisma.configuracaoLoja.findUnique({ where: { id: "singleton" } }),
     prisma.produto.findUnique({
       where: { id: produtoId },
-      select: { pesoGramas: true, alturaCm: true, larguraCm: true, comprimentoCm: true },
+      select: { pesoMiligramas: true, alturaCm: true, larguraCm: true, comprimentoCm: true },
     }),
   ]);
 

@@ -72,7 +72,7 @@ model Produto {
   // Usados no cálculo de frete real (Correios via Melhor Envio). Valores
   // padrão são de uma caixa pequena — produto sem cadastro específico ainda
   // recebe uma cotação plausível em vez de falhar.
-  pesoGramas           Int               @default(300)
+  pesoMiligramas       Int               @default(300000)
   alturaCm             Int               @default(4)
   larguraCm            Int               @default(11)
   comprimentoCm        Int               @default(16)

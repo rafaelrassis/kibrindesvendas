@@ -61,7 +61,7 @@ export function calcularFrete(uf: string): Frete {
 // sem contrato prévio, e que já devolve PAC/SEDEX com prazo e preço reais.
 
 export type PacoteFrete = {
-  pesoGramas: number;
+  pesoMiligramas: number;
   alturaCm: number;
   larguraCm: number;
   comprimentoCm: number;
@@ -107,7 +107,7 @@ export async function cotarFreteMelhorEnvio(
         width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
         height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
-        weight: Math.max(pacote.pesoGramas, 1) / 1000,
+        weight: Math.max(pacote.pesoMiligramas, 1) / 1_000_000,
         insurance_value: 0,
         quantity: Math.max(1, Math.round(quantidade) || 1),
       },
@@ -213,7 +213,7 @@ export async function cotarFreteSuperFrete(
         width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
         height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
-        weight: Math.max(pacote.pesoGramas, 1) / 1000,
+        weight: Math.max(pacote.pesoMiligramas, 1) / 1_000_000,
         quantity: unidades,
       },
     ],

@@ -71,7 +71,7 @@ export type Produto = {
   // controle de estoque ligado) — ver estoque-variacao.ts.
   estoqueVariacoes: EstoqueVariacaoItem[];
   // Usados na cotação de frete real (Correios via Melhor Envio).
-  pesoGramas: number;
+  pesoMiligramas: number;
   alturaCm: number;
   larguraCm: number;
   comprimentoCm: number;
