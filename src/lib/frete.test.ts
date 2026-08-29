@@ -256,7 +256,7 @@ describe("cotarFreteSuperFrete", () => {
 
     await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
 
-    expect(enviado!.services).toBe("1,2");
+    expect(enviado!.services).toBe("1,2,31");
     expect(enviado!.products[0]).toMatchObject({ weight: 0.3, quantity: 3 });
   });
 });

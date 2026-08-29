@@ -172,16 +172,17 @@ export async function cotarFreteMelhorEnvio(
   };
 }
 
-// --- Cotação real via SuperFrete (agregador dos Correios, alternativa ao
-// Melhor Envio) ------------------------------------------------------------
+// --- Cotação real via SuperFrete (agregador de transportadoras, alternativa
+// ao Melhor Envio) ----------------------------------------------------------
 // Endpoint e formato conferidos na doc oficial (superfrete.readme.io/reference/
 // cotacao-de-frete) — a API v0 do SuperFrete NÃO segue o mesmo contrato do
 // Melhor Envio: endpoint próprio, `insurance_value` no nível de `options` (não
 // dentro de cada produto), exige `services` (ids separados por vírgula) e cada
 // opção reporta erro em `has_error`, não em `error`.
 //
-// "1" e "2" são PAC e SEDEX — os únicos dois a loja despacha por Correios.
-const SERVICOS_CORREIOS = "1,2";
+// "1"/"2" são PAC/SEDEX (Correios) e "31" é a Loggi — as transportadoras que
+// a loja despacha de fato.
+const SERVICOS_DESPACHADOS = "1,2,31";
 
 type ServicoSuperFrete = {
   id: number;
@@ -205,7 +206,7 @@ export async function cotarFreteSuperFrete(
   const body = {
     from: { postal_code: cepOrigem },
     to: { postal_code: cepDestino },
-    services: SERVICOS_CORREIOS,
+    services: SERVICOS_DESPACHADOS,
     options: { insurance_value: 0, use_insurance_value: false, own_hand: false, receipt: false },
     products: [
       {
