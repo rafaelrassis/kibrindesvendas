@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Categoria, ProdutoAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
+import { formatarCep, normalizarCep } from "@/lib/frete";
 import { buildCombinacaoKey, gerarCombinacoes, tipoTemFotoPorValor } from "@/lib/estoque-variacao";
 
 type VariacaoForm = {
@@ -151,6 +152,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [alturaCm, setAlturaCm] = useState(String(produto?.alturaCm ?? 4));
   const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
   const [comprimentoCm, setComprimentoCm] = useState(String(produto?.comprimentoCm ?? 16));
+  const [cepOrigemOverride, setCepOrigemOverride] = useState(
+    produto?.cepOrigemOverride ? formatarCep(produto.cepOrigemOverride) : ""
+  );
   const [materiais, setMateriais] = useState<MaterialForm[]>(paraMaterialForm(produto?.materiais));
   // Overrides de margem Shopee — vazio = usa o default global (Configurações).
   const [shopeeComissaoPct, setShopeeComissaoPct] = useState(
@@ -501,6 +505,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       alturaCm: Number(alturaCm) || 4,
       larguraCm: Number(larguraCm) || 11,
       comprimentoCm: Number(comprimentoCm) || 16,
+      cepOrigemOverride: normalizarCep(cepOrigemOverride),
       // Vazio = null = volta a usar o default global (Configurações).
       shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
       shopeeFretePct: shopeeFretePct.trim() ? Number(shopeeFretePct) : null,
@@ -1278,6 +1283,22 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>
+        </div>
+        <div className="mt-3">
+          <Campo label="CEP de origem (fornecedor terceirizado)">
+            <input
+              type="text"
+              value={cepOrigemOverride}
+              onChange={(e) => setCepOrigemOverride(formatarCep(e.target.value))}
+              placeholder="Deixe em branco para usar o CEP padrão da loja"
+              maxLength={9}
+              className="w-full sm:w-64 border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <p className="text-xs text-ink/50 mt-1">
+            Preencha só se este produto for despachado de outro endereço (ex: fornecedor
+            que envia direto pro cliente).
+          </p>
         </div>
       </div>
       </Secao>
