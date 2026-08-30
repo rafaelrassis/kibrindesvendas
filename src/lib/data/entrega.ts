@@ -54,13 +54,22 @@ async function cotarOpcoesFrete(
     prisma.configuracaoLoja.findUnique({ where: { id: "singleton" } }),
     prisma.produto.findUnique({
       where: { id: produtoId },
-      select: { pesoMiligramas: true, alturaCm: true, larguraCm: true, comprimentoCm: true },
+      select: {
+        pesoMiligramas: true,
+        alturaCm: true,
+        larguraCm: true,
+        comprimentoCm: true,
+        cepOrigemOverride: true,
+      },
     }),
   ]);
 
   if (!config || !produto) return estimativa;
 
-  const cepOrigem = normalizarCep(config.cepOrigem) ?? config.cepOrigem;
+  // Produto com fornecedor próprio (ex: camiseta despachada de Franca-SP)
+  // cota a partir do CEP dele; os demais caem no CEP padrão da loja.
+  const cepOrigemBruto = produto.cepOrigemOverride ?? config.cepOrigem;
+  const cepOrigem = normalizarCep(cepOrigemBruto) ?? cepOrigemBruto;
 
   if (config.transportadoraAtiva === TransportadoraFrete.SUPER_FRETE) {
     if (!config.superFreteToken) return estimativa;

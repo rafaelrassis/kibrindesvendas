@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slug";
 import { ehUrlDeImagem } from "@/lib/imagens";
 import { ehUrlDeVideo } from "@/lib/video";
+import { normalizarCep } from "@/lib/frete";
 import type { Produto, ProdutoAdmin } from "@/lib/types";
 import type {
   Produto as ProdutoDb,
@@ -121,6 +122,7 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     shopeeComissaoPct: p.shopeeComissaoPct != null ? Number(p.shopeeComissaoPct) : null,
     shopeeFretePct: p.shopeeFretePct != null ? Number(p.shopeeFretePct) : null,
     shopeeAdsPct: p.shopeeAdsPct != null ? Number(p.shopeeAdsPct) : null,
+    cepOrigemOverride: p.cepOrigemOverride,
   };
 }
 
@@ -283,6 +285,9 @@ export type DadosProduto = {
   shopeeComissaoPct?: number | null;
   shopeeFretePct?: number | null;
   shopeeAdsPct?: number | null;
+  // CEP de despacho do fornecedor deste produto. null explícito volta a
+  // usar o CEP padrão da loja; undefined deixa como está.
+  cepOrigemOverride?: string | null;
 };
 
 const EMOJI_PADRAO = "🎁";
@@ -390,6 +395,9 @@ function validar(dados: Partial<DadosProduto>) {
       }
     }
   }
+  if (dados.cepOrigemOverride != null && !normalizarCep(dados.cepOrigemOverride)) {
+    throw new ErroDeNegocio("CEP de origem inválido: informe os 8 dígitos ou deixe em branco.");
+  }
 }
 
 export async function criarProduto(dados: DadosProduto): Promise<Produto> {
@@ -431,6 +439,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
       larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
       comprimentoCm: dados.comprimentoCm ?? COMPRIMENTO_PADRAO_CM,
+      cepOrigemOverride: dados.cepOrigemOverride ? normalizarCep(dados.cepOrigemOverride) : null,
       shopeeComissaoPct: dados.shopeeComissaoPct ?? null,
       shopeeFretePct: dados.shopeeFretePct ?? null,
       shopeeAdsPct: dados.shopeeAdsPct ?? null,
@@ -523,6 +532,12 @@ export async function atualizarProduto(
         alturaCm: dados.alturaCm,
         larguraCm: dados.larguraCm,
         comprimentoCm: dados.comprimentoCm,
+        cepOrigemOverride:
+          dados.cepOrigemOverride !== undefined
+            ? dados.cepOrigemOverride
+              ? normalizarCep(dados.cepOrigemOverride)
+              : null
+            : undefined,
         shopeeComissaoPct: dados.shopeeComissaoPct !== undefined ? dados.shopeeComissaoPct : undefined,
         shopeeFretePct: dados.shopeeFretePct !== undefined ? dados.shopeeFretePct : undefined,
         shopeeAdsPct: dados.shopeeAdsPct !== undefined ? dados.shopeeAdsPct : undefined,

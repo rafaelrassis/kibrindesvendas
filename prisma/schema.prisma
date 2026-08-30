@@ -76,6 +76,10 @@ model Produto {
   alturaCm             Int               @default(4)
   larguraCm            Int               @default(11)
   comprimentoCm        Int               @default(16)
+  // CEP de onde este produto é despachado, quando difere do CEP padrão da
+  // loja (config.cepOrigem) — ex: fornecedor terceirizado que despacha
+  // direto pro cliente. null = usa o CEP padrão da loja.
+  cepOrigemOverride    String?
   variacoes            Variacao[]
   // Custo de material é dado interno (usado pra calcular lucro no admin) —
   // nunca sai pela API pública, só pela rota /api/admin.

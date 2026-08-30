@@ -96,6 +96,9 @@ export type ProdutoAdmin = Produto & {
   shopeeComissaoPct: number | null;
   shopeeFretePct: number | null;
   shopeeAdsPct: number | null;
+  // CEP de despacho deste produto, quando difere do CEP padrão da loja
+  // (fornecedor terceirizado). null = usa o CEP padrão.
+  cepOrigemOverride: string | null;
 };
 
 export type Cupom = {
