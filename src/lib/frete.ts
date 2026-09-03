@@ -195,6 +195,13 @@ type ServicoSuperFrete = {
 
 // Ao contrário do cotarFreteMelhorEnvio (que fica só com a mais barata), esta
 // função devolve todas as opções válidas, pra o cliente escolher no checkout.
+//
+// Diferente do Melhor Envio, o `quantity` da calculadora v0 do SuperFrete não
+// serve só pra somar peso: pra alguns serviços (ex: Mini Envios) ele entra na
+// cubagem, e a partir de um certo `quantity` o pacote é reclassificado pra um
+// serviço mais caro mesmo com a mesma altura declarada (confirmado com o
+// suporte do SuperFrete). Por isso sempre mandamos `quantity: 1` e
+// multiplicamos o peso total na mão, mantendo as dimensões da caixa real.
 export async function cotarFreteSuperFrete(
   token: string,
   cepOrigem: string,
@@ -213,8 +220,8 @@ export async function cotarFreteSuperFrete(
         width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
         height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
-        weight: Math.max(pacote.pesoMiligramas, 1) / 1_000_000,
-        quantity: unidades,
+        weight: (Math.max(pacote.pesoMiligramas, 1) * unidades) / 1_000_000,
+        quantity: 1,
       },
     ],
   };

@@ -245,7 +245,7 @@ describe("cotarFreteSuperFrete", () => {
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
   });
 
-  it("manda o peso do produto e a quantidade de unidades pra API calcular", async () => {
+  it("multiplica o peso pela quantidade e manda quantity fixo em 1, pra não sofrer reclassificação de serviço por cubagem", async () => {
     let enviado: { services: string; products: { weight: number; quantity: number }[] } | null = null;
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       enviado = JSON.parse(init.body);
@@ -257,6 +257,6 @@ describe("cotarFreteSuperFrete", () => {
     await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
 
     expect(enviado!.services).toBe("1,2,31");
-    expect(enviado!.products[0]).toMatchObject({ weight: 0.3, quantity: 3 });
+    expect(enviado!.products[0]).toMatchObject({ weight: 0.9, quantity: 1 });
   });
 });
