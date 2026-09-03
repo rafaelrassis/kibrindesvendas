@@ -270,4 +270,40 @@ describe("cotarFreteSuperFrete", () => {
       quantity: 1,
     });
   });
+
+  it("divide em várias caixas quando a pilha passaria de 150cm, e soma o preço de cada caixa", async () => {
+    // altura 40mm (4cm) por unidade -> cabem 37 por caixa (floor(150/4)); 80
+    // unidades viram 3 caixas (27+27+26) em vez de uma pilha de 320cm.
+    const chamadas: { height: number }[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const corpo = JSON.parse(init.body);
+      chamadas.push({ height: corpo.products[0].height });
+      return respostaCom([
+        { id: 1, name: "PAC", price: 10, delivery_time: 3 + chamadas.length, company: { name: "Correios" } },
+      ]);
+    });
+
+    const opcoes = await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 80);
+
+    expect(chamadas).toHaveLength(3);
+    for (const c of chamadas) expect(c.height).toBeLessThanOrEqual(150);
+    // 3 caixas de R$10 cada = R$30; prazo é o maior entre as caixas (3+3=6).
+    expect(opcoes).toEqual([{ valor: 30, prazoDias: 6, servico: "PAC" }]);
+  });
+
+  it("não cota nenhum serviço se ele não deu conta de todas as caixas", async () => {
+    let chamada = 0;
+    vi.stubGlobal("fetch", async () => {
+      chamada += 1;
+      // cada caixa só consegue um serviço diferente — nenhum serviço cobre as
+      // duas, então não faz sentido despachar metade do pedido em cada um.
+      return respostaCom(
+        chamada === 1
+          ? [{ id: 1, name: "PAC", price: 10, delivery_time: 5, company: { name: "Correios" } }]
+          : [{ id: 2, name: "SEDEX", price: 15, delivery_time: 2, company: { name: "Correios" } }]
+      );
+    });
+
+    expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 80)).toBeNull();
+  });
 });

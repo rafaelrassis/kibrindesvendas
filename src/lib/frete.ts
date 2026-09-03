@@ -196,25 +196,38 @@ type ServicoSuperFrete = {
   has_error?: boolean;
 };
 
-// Ao contrário do cotarFreteMelhorEnvio (que fica só com a mais barata), esta
-// função devolve todas as opções válidas, pra o cliente escolher no checkout.
-//
-// Diferente do Melhor Envio, o `quantity` da calculadora v0 do SuperFrete não
-// serve só pra somar peso: pra alguns serviços (ex: Mini Envios) ele entra na
-// cubagem só quando "sobra" acima de um certo limite, aí o SuperFrete decide
-// sozinho um novo formato de caixa (confirmado com o suporte: viramos um
-// cubo de 27x27x27cm do nada com `quantity: 25`, em vez de simplesmente
-// empilhar). Por isso sempre mandamos `quantity: 1` e fazemos a cubagem nós
-// mesmos: a pilha de `unidades` cresce em altura (a base largura x comprimento
-// do produto não muda), e o peso é o total embarcado.
-export async function cotarFreteSuperFrete(
+// Altura máxima aceita pelos Correios pra qualquer serviço (confirmado pela
+// própria API: "correios.height não pode ser maior que 150 cm"). Acima disso
+// a pilha de unidades não cabe numa caixa só e precisa virar mais de um
+// volume — ver dividirEmCaixas.
+const MAX_ALTURA_CM = 150;
+
+// Quantas unidades cabem empilhadas numa caixa (altura máxima / altura de 1
+// unidade) e em quantas caixas o pedido inteiro precisa ser dividido. As
+// caixas saem de tamanho parecido (em vez de lotar as primeiras e deixar uma
+// pequena sobra na última) só por ficar mais previsível — o preço total é o
+// mesmo de qualquer jeito, já que cada caixa é cotada e somada separadamente.
+function dividirEmCaixas(alturaCmUnidade: number, unidades: number): number[] {
+  if (alturaCmUnidade <= 0) return [unidades];
+  const unidadesPorCaixa = Math.max(1, Math.floor(MAX_ALTURA_CM / alturaCmUnidade));
+  if (unidades <= unidadesPorCaixa) return [unidades];
+
+  const numCaixas = Math.ceil(unidades / unidadesPorCaixa);
+  const base = Math.floor(unidades / numCaixas);
+  const resto = unidades % numCaixas;
+  return Array.from({ length: numCaixas }, (_, i) => base + (i < resto ? 1 : 0));
+}
+
+// Cota uma única caixa com `unidadesNaCaixa` empilhadas. Devolve as opções
+// cruas da API (sem converter pra OpcaoFrete) porque cotarFreteSuperFrete
+// ainda precisa somar os preços das várias caixas de um mesmo pedido.
+async function cotarCaixaSuperFrete(
   token: string,
   cepOrigem: string,
   cepDestino: string,
   pacote: PacoteFrete,
-  quantidade = 1
-): Promise<OpcaoFrete[] | null> {
-  const unidades = Math.max(1, Math.round(quantidade) || 1);
+  unidadesNaCaixa: number
+): Promise<ServicoSuperFrete[] | null> {
   const body = {
     from: { postal_code: cepOrigem },
     to: { postal_code: cepDestino },
@@ -223,9 +236,9 @@ export async function cotarFreteSuperFrete(
     products: [
       {
         width: Math.max(pacote.larguraMm / 10, MIN_LARGURA_CM),
-        height: Math.max((pacote.alturaMm * unidades) / 10, MIN_ALTURA_CM),
+        height: Math.max((pacote.alturaMm * unidadesNaCaixa) / 10, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoMm / 10, MIN_COMPRIMENTO_CM),
-        weight: (Math.max(pacote.pesoMiligramas, 1) * unidades) / 1_000_000,
+        weight: (Math.max(pacote.pesoMiligramas, 1) * unidadesNaCaixa) / 1_000_000,
         quantity: 1,
       },
     ],
@@ -276,11 +289,72 @@ export async function cotarFreteSuperFrete(
     return null;
   }
 
+  return validos;
+}
+
+// Ao contrário do cotarFreteMelhorEnvio (que fica só com a mais barata), esta
+// função devolve todas as opções válidas, pra o cliente escolher no checkout.
+//
+// Diferente do Melhor Envio, o `quantity` da calculadora v0 do SuperFrete não
+// serve só pra somar peso: pra alguns serviços (ex: Mini Envios) ele entra na
+// cubagem só quando "sobra" acima de um certo limite, aí o SuperFrete decide
+// sozinho um novo formato de caixa (confirmado com o suporte: viramos um
+// cubo de 27x27x27cm do nada com `quantity: 25`, em vez de simplesmente
+// empilhar). Por isso sempre mandamos `quantity: 1` e fazemos a cubagem nós
+// mesmos: a pilha de `unidades` cresce em altura (a base largura x comprimento
+// do produto não muda), e o peso é o total embarcado.
+//
+// Quando a pilha inteira passaria de 150cm (o teto dos Correios — testado
+// direto na API, que rejeita a caixa nesse caso), o pedido é dividido em
+// várias caixas (dividirEmCaixas) e cotado uma a uma; o preço final é a soma
+// das caixas pro mesmo serviço. Um serviço só entra no resultado se TODAS as
+// caixas conseguiram cotar nele — não faz sentido despachar metade do pedido
+// por um serviço e a outra metade por outro.
+export async function cotarFreteSuperFrete(
+  token: string,
+  cepOrigem: string,
+  cepDestino: string,
+  pacote: PacoteFrete,
+  quantidade = 1
+): Promise<OpcaoFrete[] | null> {
+  const unidades = Math.max(1, Math.round(quantidade) || 1);
+  const caixas = dividirEmCaixas(pacote.alturaMm / 10, unidades);
+
+  const resultados = await Promise.all(
+    caixas.map((unidadesNaCaixa) =>
+      cotarCaixaSuperFrete(token, cepOrigem, cepDestino, pacote, unidadesNaCaixa)
+    )
+  );
+  if (resultados.some((r) => r === null)) return null;
+
+  const porServico = new Map<string, { valor: number; prazoDias: number; caixasCotadas: number }>();
+  for (const caixa of resultados as ServicoSuperFrete[][]) {
+    for (const s of caixa) {
+      const atual = porServico.get(s.name);
+      if (atual) {
+        atual.valor += Number(s.price);
+        atual.prazoDias = Math.max(atual.prazoDias, s.delivery_time);
+        atual.caixasCotadas += 1;
+      } else {
+        porServico.set(s.name, { valor: Number(s.price), prazoDias: s.delivery_time, caixasCotadas: 1 });
+      }
+    }
+  }
+
   // Ordenado do mais barato pro mais caro — o checkout usa a primeira posição
   // como pré-selecionada e lista o resto como alternativa.
-  return validos
-    .map((s) => ({ valor: Number(s.price), prazoDias: s.delivery_time, servico: s.name }))
-    .sort((a, b) => a.valor - b.valor);
+  const opcoes: OpcaoFrete[] = [];
+  for (const [servico, dado] of porServico) {
+    if (dado.caixasCotadas === caixas.length) {
+      opcoes.push({ valor: dado.valor, prazoDias: dado.prazoDias, servico });
+    }
+  }
+  if (opcoes.length === 0) {
+    console.error("[frete] SuperFrete: nenhum serviço cotou em todas as caixas", caixas.length);
+    return null;
+  }
+
+  return opcoes.sort((a, b) => a.valor - b.valor);
 }
 
 // Aceita "01310-100" ou "01310100"; devolve null quando não são 8 dígitos.
