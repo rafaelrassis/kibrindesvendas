@@ -149,8 +149,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [enviandoImagemCor, setEnviandoImagemCor] = useState<string | null>(null);
   const [erroImagemCor, setErroImagemCor] = useState("");
   const [pesoMiligramas, setPesoMiligramas] = useState(String(produto?.pesoMiligramas ?? 300000));
-  const [espessuraMm, setEspessuraMm] = useState(String(produto?.espessuraMm ?? 40));
-  const [alturaMm, setAlturaMm] = useState(String(produto?.alturaMm ?? 110));
+  const [alturaMm, setAlturaMm] = useState(String(produto?.alturaMm ?? 40));
+  const [larguraMm, setLarguraMm] = useState(String(produto?.larguraMm ?? 110));
   const [comprimentoMm, setComprimentoMm] = useState(String(produto?.comprimentoMm ?? 160));
   const [cepOrigemOverride, setCepOrigemOverride] = useState(
     produto?.cepOrigemOverride ? formatarCep(produto.cepOrigemOverride) : ""
@@ -502,8 +502,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             })
           : null,
       pesoMiligramas: Number(pesoMiligramas) || 300000,
-      espessuraMm: Number(espessuraMm) || 40,
-      alturaMm: Number(alturaMm) || 110,
+      alturaMm: Number(alturaMm) || 40,
+      larguraMm: Number(larguraMm) || 110,
       comprimentoMm: Number(comprimentoMm) || 160,
       cepOrigemOverride: normalizarCep(cepOrigemOverride),
       // Vazio = null = volta a usar o default global (Configurações).
@@ -1244,8 +1244,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         <p className="text-sm font-medium mb-2">Peso e dimensões (1 unidade)</p>
         <p className="text-xs text-ink/50 mb-2">
           Usados na cotação real de frete pelos Correios. Sem esses dados o cálculo cai
-          na estimativa por região. Espessura é a medida que empilha quando o pedido tem
-          várias unidades — as outras duas são a base do produto e não mudam com a quantidade.
+          na estimativa por região. Altura é a medida que empilha quando o pedido tem
+          várias unidades — largura e comprimento são a base do produto e não mudam com
+          a quantidade.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Campo label="Peso (mg)">
@@ -1257,21 +1258,21 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>
-          <Campo label="Espessura (mm)">
-            <input
-              type="number"
-              min={1}
-              value={espessuraMm}
-              onChange={(e) => setEspessuraMm(e.target.value)}
-              className="w-full border border-line rounded px-3 py-2 text-sm"
-            />
-          </Campo>
           <Campo label="Altura (mm)">
             <input
               type="number"
               min={1}
               value={alturaMm}
               onChange={(e) => setAlturaMm(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </Campo>
+          <Campo label="Largura (mm)">
+            <input
+              type="number"
+              min={1}
+              value={larguraMm}
+              onChange={(e) => setLarguraMm(e.target.value)}
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>

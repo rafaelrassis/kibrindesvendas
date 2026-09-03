@@ -56,8 +56,8 @@ async function cotarOpcoesFrete(
       where: { id: produtoId },
       select: {
         pesoMiligramas: true,
-        espessuraMm: true,
         alturaMm: true,
+        larguraMm: true,
         comprimentoMm: true,
         cepOrigemOverride: true,
       },

@@ -61,7 +61,7 @@ describe("formatarCep", () => {
 });
 
 describe("cotarFreteMelhorEnvio", () => {
-  const pacote = { pesoMiligramas: 300000, espessuraMm: 40, alturaMm: 110, comprimentoMm: 160 };
+  const pacote = { pesoMiligramas: 300000, alturaMm: 40, larguraMm: 110, comprimentoMm: 160 };
 
   function respostaCom(servicos: unknown) {
     return {
@@ -121,8 +121,8 @@ describe("cotarFreteMelhorEnvio", () => {
 
     await cotarFreteMelhorEnvio("token", "01310100", "60000000", {
       pesoMiligramas: 250000,
-      espessuraMm: 10,
-      alturaMm: 50,
+      alturaMm: 10,
+      larguraMm: 50,
       comprimentoMm: 80,
     });
 
@@ -183,7 +183,7 @@ describe("cotarFreteMelhorEnvio", () => {
 });
 
 describe("cotarFreteSuperFrete", () => {
-  const pacote = { pesoMiligramas: 300000, espessuraMm: 40, alturaMm: 110, comprimentoMm: 160 };
+  const pacote = { pesoMiligramas: 300000, alturaMm: 40, larguraMm: 110, comprimentoMm: 160 };
 
   function respostaCom(servicos: unknown) {
     return {
@@ -245,7 +245,7 @@ describe("cotarFreteSuperFrete", () => {
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
   });
 
-  it("empilha a espessura e multiplica o peso pela quantidade, mandando quantity fixo em 1 pra não sofrer reclassificação de serviço por cubagem", async () => {
+  it("empilha a altura e multiplica o peso pela quantidade, mandando quantity fixo em 1 pra não sofrer reclassificação de serviço por cubagem", async () => {
     let enviado: {
       services: string;
       products: { height: number; width: number; length: number; weight: number; quantity: number }[];
@@ -260,8 +260,8 @@ describe("cotarFreteSuperFrete", () => {
     await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
 
     expect(enviado!.services).toBe("1,2,31");
-    // espessura 40mm (4cm) x 3 unidades = 12cm de altura; largura e comprimento
-    // (base do produto) não mudam com a quantidade.
+    // altura 40mm (4cm) x 3 unidades = 12cm de altura empilhada; largura e
+    // comprimento (base do produto) não mudam com a quantidade.
     expect(enviado!.products[0]).toMatchObject({
       height: 12,
       width: 11,

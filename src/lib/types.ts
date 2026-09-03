@@ -73,8 +73,8 @@ export type Produto = {
   // Usados na cotação de frete real (Correios via Melhor Envio/SuperFrete).
   // Dimensões de 1 unidade, em milímetros.
   pesoMiligramas: number;
-  espessuraMm: number;
   alturaMm: number;
+  larguraMm: number;
   comprimentoMm: number;
 };
 

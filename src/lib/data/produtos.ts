@@ -88,8 +88,8 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
       estoque: e.estoque,
     })),
     pesoMiligramas: p.pesoMiligramas,
-    espessuraMm: p.espessuraMm,
     alturaMm: p.alturaMm,
+    larguraMm: p.larguraMm,
     comprimentoMm: p.comprimentoMm,
   };
 }
@@ -277,8 +277,8 @@ export type DadosProduto = {
   // undefined deixa como está; array substitui a grade inteira.
   estoqueVariacoes?: { combinacao: string; estoque: number }[] | null;
   pesoMiligramas?: number;
-  espessuraMm?: number;
   alturaMm?: number;
+  larguraMm?: number;
   comprimentoMm?: number;
   // Override de margem pra venda manual na Shopee (/admin/vendas-shopee).
   // null explícito volta a usar o default global; undefined deixa como está.
@@ -295,8 +295,8 @@ const COR_PADRAO = "#3F6B4C";
 // Caixa pequena — mesmo padrão do `@default` no schema, usado quando o
 // admin cria o produto sem preencher peso/dimensões.
 const PESO_PADRAO_MG = 300000;
-const ESPESSURA_PADRAO_MM = 40;
-const ALTURA_PADRAO_MM = 110;
+const ALTURA_PADRAO_MM = 40;
+const LARGURA_PADRAO_MM = 110;
 const COMPRIMENTO_PADRAO_MM = 160;
 
 async function categoriaIdPorSlug(slug: string) {
@@ -436,8 +436,8 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       destaqueCategoria: !!dados.destaqueCategoria,
       estoque: dados.estoque ?? null,
       pesoMiligramas: dados.pesoMiligramas ?? PESO_PADRAO_MG,
-      espessuraMm: dados.espessuraMm ?? ESPESSURA_PADRAO_MM,
       alturaMm: dados.alturaMm ?? ALTURA_PADRAO_MM,
+      larguraMm: dados.larguraMm ?? LARGURA_PADRAO_MM,
       comprimentoMm: dados.comprimentoMm ?? COMPRIMENTO_PADRAO_MM,
       cepOrigemOverride: dados.cepOrigemOverride ? normalizarCep(dados.cepOrigemOverride) : null,
       shopeeComissaoPct: dados.shopeeComissaoPct ?? null,
@@ -529,8 +529,8 @@ export async function atualizarProduto(
         ativo: dados.ativo,
         estoque: dados.estoque !== undefined ? dados.estoque : undefined,
         pesoMiligramas: dados.pesoMiligramas,
-        espessuraMm: dados.espessuraMm,
         alturaMm: dados.alturaMm,
+        larguraMm: dados.larguraMm,
         comprimentoMm: dados.comprimentoMm,
         cepOrigemOverride:
           dados.cepOrigemOverride !== undefined
