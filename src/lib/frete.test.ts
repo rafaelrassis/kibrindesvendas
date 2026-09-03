@@ -271,13 +271,20 @@ describe("cotarFreteSuperFrete", () => {
     });
   });
 
-  it("divide em várias caixas quando a pilha passaria de 150cm, e soma o preço de cada caixa", async () => {
-    // altura 40mm (4cm) por unidade -> cabem 37 por caixa (floor(150/4)); 80
-    // unidades viram 3 caixas (27+27+26) em vez de uma pilha de 320cm.
-    const chamadas: { height: number }[] = [];
+  it("divide a caixa ao meio quando a rota rejeita, até cada metade caber, e soma o preço", async () => {
+    // Não existe um teto fixo — cada rota rejeita num tamanho diferente (visto
+    // na prática: uma rota barrou uma caixa de 104cm enquanto outra aceitou
+    // 150cm). Aqui simulamos uma rota que só aceita altura <= 200cm: com
+    // altura 40mm (4cm) por unidade, 80 unidades (320cm) não cabem de
+    // primeira, mas 40+40 unidades (160cm cada) cabem.
+    const chamadas: number[] = [];
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       const corpo = JSON.parse(init.body);
-      chamadas.push({ height: corpo.products[0].height });
+      const height = corpo.products[0].height;
+      chamadas.push(height);
+      if (height > 200) {
+        return { ok: false, text: async () => "rejeitado" } as unknown as Response;
+      }
       return respostaCom([
         { id: 1, name: "PAC", price: 10, delivery_time: 3 + chamadas.length, company: { name: "Correios" } },
       ]);
@@ -285,25 +292,42 @@ describe("cotarFreteSuperFrete", () => {
 
     const opcoes = await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 80);
 
-    expect(chamadas).toHaveLength(3);
-    for (const c of chamadas) expect(c.height).toBeLessThanOrEqual(150);
-    // 3 caixas de R$10 cada = R$30; prazo é o maior entre as caixas (3+3=6).
-    expect(opcoes).toEqual([{ valor: 30, prazoDias: 6, servico: "PAC" }]);
+    // 1ª tentativa com as 80 inteiras (320cm, rejeitada) + 2 tentativas de 40
+    // (160cm cada, aceitas).
+    expect(chamadas).toEqual([320, 160, 160]);
+    // 2 caixas de R$10 cada = R$20; prazo é o maior entre as caixas.
+    expect(opcoes).toEqual([{ valor: 20, prazoDias: 6, servico: "PAC" }]);
   });
 
-  it("não cota nenhum serviço se ele não deu conta de todas as caixas", async () => {
+  it("não cota nenhum serviço se, depois de dividir, nenhum serviço cobriu todas as caixas", async () => {
     let chamada = 0;
-    vi.stubGlobal("fetch", async () => {
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       chamada += 1;
-      // cada caixa só consegue um serviço diferente — nenhum serviço cobre as
-      // duas, então não faz sentido despachar metade do pedido em cada um.
+      const corpo = JSON.parse(init.body);
+      // a caixa inteira (80 unidades) é rejeitada; ao dividir, cada metade só
+      // consegue cotar um serviço diferente — nenhum serviço cobre as duas.
+      if (corpo.products[0].height > 200) {
+        return { ok: false, text: async () => "rejeitado" } as unknown as Response;
+      }
       return respostaCom(
-        chamada === 1
+        chamada === 2
           ? [{ id: 1, name: "PAC", price: 10, delivery_time: 5, company: { name: "Correios" } }]
           : [{ id: 2, name: "SEDEX", price: 15, delivery_time: 2, company: { name: "Correios" } }]
       );
     });
 
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 80)).toBeNull();
+  });
+
+  it("desiste depois de um teto de tentativas, numa rota que rejeita até a menor caixa", async () => {
+    let chamadas = 0;
+    vi.stubGlobal("fetch", async () => {
+      chamadas += 1;
+      return { ok: false, text: async () => "rejeitado" } as unknown as Response;
+    });
+
+    expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 1000)).toBeNull();
+    // nunca deveria chegar perto de tentar unidade por unidade num pedido de 1000
+    expect(chamadas).toBeLessThan(30);
   });
 });

@@ -196,26 +196,45 @@ type ServicoSuperFrete = {
   has_error?: boolean;
 };
 
-// Altura máxima aceita pelos Correios pra qualquer serviço (confirmado pela
-// própria API: "correios.height não pode ser maior que 150 cm"). Acima disso
-// a pilha de unidades não cabe numa caixa só e precisa virar mais de um
-// volume — ver dividirEmCaixas.
-const MAX_ALTURA_CM = 150;
+// Não existe um limite fixo confiável: os Correios rejeitam qualquer caixa
+// acima de 150cm de altura, mas na prática algumas rotas (o CEP de coleta,
+// não o produto) rejeitam bem antes disso — testado direto na API, uma
+// caixa de ~104cm já esbarra no limite de "peso ou medidas" de uma rota
+// específica, enquanto a mesma caixa sai de outra rota numa boa. Por isso,
+// em vez de adivinhar um teto, cotarComRecuo tenta a caixa inteira e, se a
+// API rejeitar (por altura, peso ou qualquer combinação), divide ao meio e
+// tenta de novo recursivamente — cada rota encontra seu próprio limite.
+//
+// `chamadasRestantes` é um teto de segurança (mutável, compartilhado entre
+// as chamadas recursivas) pra nunca fazer mais que um punhado de tentativas
+// numa rota totalmente inviável (CEP que não recebe entrega nenhuma, por
+// exemplo) — sem isso, um pedido de milhares de unidades poderia dividir até
+// 1 em 1 e estourar o tempo da função.
+const MAX_TENTATIVAS_SUPERFRETE = 24;
 
-// Quantas unidades cabem empilhadas numa caixa (altura máxima / altura de 1
-// unidade) e em quantas caixas o pedido inteiro precisa ser dividido. As
-// caixas saem de tamanho parecido (em vez de lotar as primeiras e deixar uma
-// pequena sobra na última) só por ficar mais previsível — o preço total é o
-// mesmo de qualquer jeito, já que cada caixa é cotada e somada separadamente.
-function dividirEmCaixas(alturaCmUnidade: number, unidades: number): number[] {
-  if (alturaCmUnidade <= 0) return [unidades];
-  const unidadesPorCaixa = Math.max(1, Math.floor(MAX_ALTURA_CM / alturaCmUnidade));
-  if (unidades <= unidadesPorCaixa) return [unidades];
+async function cotarComRecuo(
+  token: string,
+  cepOrigem: string,
+  cepDestino: string,
+  pacote: PacoteFrete,
+  unidadesNaCaixa: number,
+  chamadasRestantes: { valor: number }
+): Promise<{ tamanho: number; servicos: ServicoSuperFrete[] }[] | null> {
+  if (chamadasRestantes.valor <= 0) return null;
+  chamadasRestantes.valor -= 1;
 
-  const numCaixas = Math.ceil(unidades / unidadesPorCaixa);
-  const base = Math.floor(unidades / numCaixas);
-  const resto = unidades % numCaixas;
-  return Array.from({ length: numCaixas }, (_, i) => base + (i < resto ? 1 : 0));
+  const servicos = await cotarCaixaSuperFrete(token, cepOrigem, cepDestino, pacote, unidadesNaCaixa);
+  if (servicos) return [{ tamanho: unidadesNaCaixa, servicos }];
+  if (unidadesNaCaixa <= 1) return null;
+
+  const metade1 = Math.ceil(unidadesNaCaixa / 2);
+  const metade2 = unidadesNaCaixa - metade1;
+  const [r1, r2] = await Promise.all([
+    cotarComRecuo(token, cepOrigem, cepDestino, pacote, metade1, chamadasRestantes),
+    cotarComRecuo(token, cepOrigem, cepDestino, pacote, metade2, chamadasRestantes),
+  ]);
+  if (!r1 || !r2) return null;
+  return [...r1, ...r2];
 }
 
 // Cota uma única caixa com `unidadesNaCaixa` empilhadas. Devolve as opções
@@ -304,12 +323,12 @@ async function cotarCaixaSuperFrete(
 // mesmos: a pilha de `unidades` cresce em altura (a base largura x comprimento
 // do produto não muda), e o peso é o total embarcado.
 //
-// Quando a pilha inteira passaria de 150cm (o teto dos Correios — testado
-// direto na API, que rejeita a caixa nesse caso), o pedido é dividido em
-// várias caixas (dividirEmCaixas) e cotado uma a uma; o preço final é a soma
-// das caixas pro mesmo serviço. Um serviço só entra no resultado se TODAS as
-// caixas conseguiram cotar nele — não faz sentido despachar metade do pedido
-// por um serviço e a outra metade por outro.
+// Quando a caixa inteira é rejeitada pela rota (altura, peso, ou qualquer
+// combinação — o limite real varia por CEP de coleta, não só pelo tamanho do
+// produto), cotarComRecuo divide o pedido em caixas menores até cada uma
+// caber; o preço final é a soma das caixas pro mesmo serviço. Um serviço só
+// entra no resultado se TODAS as caixas conseguiram cotar nele — não faz
+// sentido despachar metade do pedido por um serviço e a outra metade por outro.
 export async function cotarFreteSuperFrete(
   token: string,
   cepOrigem: string,
@@ -318,18 +337,14 @@ export async function cotarFreteSuperFrete(
   quantidade = 1
 ): Promise<OpcaoFrete[] | null> {
   const unidades = Math.max(1, Math.round(quantidade) || 1);
-  const caixas = dividirEmCaixas(pacote.alturaMm / 10, unidades);
-
-  const resultados = await Promise.all(
-    caixas.map((unidadesNaCaixa) =>
-      cotarCaixaSuperFrete(token, cepOrigem, cepDestino, pacote, unidadesNaCaixa)
-    )
-  );
-  if (resultados.some((r) => r === null)) return null;
+  const caixas = await cotarComRecuo(token, cepOrigem, cepDestino, pacote, unidades, {
+    valor: MAX_TENTATIVAS_SUPERFRETE,
+  });
+  if (!caixas) return null;
 
   const porServico = new Map<string, { valor: number; prazoDias: number; caixasCotadas: number }>();
-  for (const caixa of resultados as ServicoSuperFrete[][]) {
-    for (const s of caixa) {
+  for (const { servicos } of caixas) {
+    for (const s of servicos) {
       const atual = porServico.get(s.name);
       if (atual) {
         atual.valor += Number(s.price);
