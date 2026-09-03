@@ -1261,7 +1261,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           <Campo label="Altura (mm)">
             <input
               type="number"
-              min={1}
+              min={0.1}
+              step={0.1}
               value={alturaMm}
               onChange={(e) => setAlturaMm(e.target.value)}
               className="w-full border border-line rounded px-3 py-2 text-sm"

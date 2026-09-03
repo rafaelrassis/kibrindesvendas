@@ -71,12 +71,15 @@ model Produto {
   estoque              Int?
   // Usados no cálculo de frete real (Correios via Melhor Envio/SuperFrete).
   // Dimensões são de 1 unidade, em milímetros. `alturaMm` é a única que
-  // empilha com a quantidade do pedido (ex: cartão, adesivo — cresce em pilha);
-  // `larguraMm`/`comprimentoMm` são a base do produto e não mudam com a
-  // quantidade. Valores padrão são de uma caixa pequena — produto sem
-  // cadastro específico ainda recebe uma cotação plausível em vez de falhar.
+  // empilha com a quantidade do pedido (ex: cartão, adesivo — cresce em pilha)
+  // e por isso aceita casas decimais (Float) — produtos finos de verdade
+  // (ex: ímã de 0.4mm) truncariam pra 0 num Int, e 0 x quantidade nunca
+  // empilha nada. `larguraMm`/`comprimentoMm` são a base do produto, não
+  // mudam com a quantidade e não precisam dessa precisão. Valores padrão são
+  // de uma caixa pequena — produto sem cadastro específico ainda recebe uma
+  // cotação plausível em vez de falhar.
   pesoMiligramas       Int               @default(300000)
-  alturaMm             Int               @default(40)
+  alturaMm             Float             @default(40)
   larguraMm            Int               @default(110)
   comprimentoMm        Int               @default(160)
   // CEP de onde este produto é despachado, quando difere do CEP padrão da
