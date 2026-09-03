@@ -149,9 +149,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   const [enviandoImagemCor, setEnviandoImagemCor] = useState<string | null>(null);
   const [erroImagemCor, setErroImagemCor] = useState("");
   const [pesoMiligramas, setPesoMiligramas] = useState(String(produto?.pesoMiligramas ?? 300000));
-  const [alturaCm, setAlturaCm] = useState(String(produto?.alturaCm ?? 4));
-  const [larguraCm, setLarguraCm] = useState(String(produto?.larguraCm ?? 11));
-  const [comprimentoCm, setComprimentoCm] = useState(String(produto?.comprimentoCm ?? 16));
+  const [espessuraMm, setEspessuraMm] = useState(String(produto?.espessuraMm ?? 40));
+  const [alturaMm, setAlturaMm] = useState(String(produto?.alturaMm ?? 110));
+  const [comprimentoMm, setComprimentoMm] = useState(String(produto?.comprimentoMm ?? 160));
   const [cepOrigemOverride, setCepOrigemOverride] = useState(
     produto?.cepOrigemOverride ? formatarCep(produto.cepOrigemOverride) : ""
   );
@@ -502,9 +502,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
             })
           : null,
       pesoMiligramas: Number(pesoMiligramas) || 300000,
-      alturaCm: Number(alturaCm) || 4,
-      larguraCm: Number(larguraCm) || 11,
-      comprimentoCm: Number(comprimentoCm) || 16,
+      espessuraMm: Number(espessuraMm) || 40,
+      alturaMm: Number(alturaMm) || 110,
+      comprimentoMm: Number(comprimentoMm) || 160,
       cepOrigemOverride: normalizarCep(cepOrigemOverride),
       // Vazio = null = volta a usar o default global (Configurações).
       shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
@@ -1241,10 +1241,11 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
       <Secao title="Envio" subtitle="Peso e dimensões da embalagem">
       <div>
-        <p className="text-sm font-medium mb-2">Peso e dimensões (embalagem)</p>
+        <p className="text-sm font-medium mb-2">Peso e dimensões (1 unidade)</p>
         <p className="text-xs text-ink/50 mb-2">
           Usados na cotação real de frete pelos Correios. Sem esses dados o cálculo cai
-          na estimativa por região.
+          na estimativa por região. Espessura é a medida que empilha quando o pedido tem
+          várias unidades — as outras duas são a base do produto e não mudam com a quantidade.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Campo label="Peso (mg)">
@@ -1256,30 +1257,30 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>
-          <Campo label="Altura (cm)">
+          <Campo label="Espessura (mm)">
             <input
               type="number"
               min={1}
-              value={alturaCm}
-              onChange={(e) => setAlturaCm(e.target.value)}
+              value={espessuraMm}
+              onChange={(e) => setEspessuraMm(e.target.value)}
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>
-          <Campo label="Largura (cm)">
+          <Campo label="Altura (mm)">
             <input
               type="number"
               min={1}
-              value={larguraCm}
-              onChange={(e) => setLarguraCm(e.target.value)}
+              value={alturaMm}
+              onChange={(e) => setAlturaMm(e.target.value)}
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>
-          <Campo label="Comprimento (cm)">
+          <Campo label="Comprimento (mm)">
             <input
               type="number"
               min={1}
-              value={comprimentoCm}
-              onChange={(e) => setComprimentoCm(e.target.value)}
+              value={comprimentoMm}
+              onChange={(e) => setComprimentoMm(e.target.value)}
               className="w-full border border-line rounded px-3 py-2 text-sm"
             />
           </Campo>

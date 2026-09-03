@@ -60,11 +60,14 @@ export function calcularFrete(uf: string): Frete {
 // (exige contrato e é SOAP/XML), cotamos pelo Melhor Envio: API REST simples,
 // sem contrato prévio, e que já devolve PAC/SEDEX com prazo e preço reais.
 
+// Dimensões de 1 unidade, em milímetros. `espessuraMm` é a única que empilha
+// com a quantidade (ver cotarFreteSuperFrete); as APIs de frete trabalham em
+// cm, então convertemos (mm / 10) na hora de montar o payload.
 export type PacoteFrete = {
   pesoMiligramas: number;
-  alturaCm: number;
-  larguraCm: number;
-  comprimentoCm: number;
+  espessuraMm: number;
+  alturaMm: number;
+  comprimentoMm: number;
 };
 
 // Uma opção cotada de um serviço específico (ex: PAC, SEDEX). O Melhor
@@ -104,9 +107,9 @@ export async function cotarFreteMelhorEnvio(
     products: [
       {
         id: "1",
-        width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
-        height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
-        length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
+        width: Math.max(pacote.alturaMm / 10, MIN_LARGURA_CM),
+        height: Math.max(pacote.espessuraMm / 10, MIN_ALTURA_CM),
+        length: Math.max(pacote.comprimentoMm / 10, MIN_COMPRIMENTO_CM),
         weight: Math.max(pacote.pesoMiligramas, 1) / 1_000_000,
         insurance_value: 0,
         quantity: Math.max(1, Math.round(quantidade) || 1),
@@ -198,10 +201,12 @@ type ServicoSuperFrete = {
 //
 // Diferente do Melhor Envio, o `quantity` da calculadora v0 do SuperFrete não
 // serve só pra somar peso: pra alguns serviços (ex: Mini Envios) ele entra na
-// cubagem, e a partir de um certo `quantity` o pacote é reclassificado pra um
-// serviço mais caro mesmo com a mesma altura declarada (confirmado com o
-// suporte do SuperFrete). Por isso sempre mandamos `quantity: 1` e
-// multiplicamos o peso total na mão, mantendo as dimensões da caixa real.
+// cubagem só quando "sobra" acima de um certo limite, aí o SuperFrete decide
+// sozinho um novo formato de caixa (confirmado com o suporte: viramos um
+// cubo de 27x27x27cm do nada com `quantity: 25`, em vez de simplesmente
+// empilhar). Por isso sempre mandamos `quantity: 1` e fazemos a cubagem nós
+// mesmos: a pilha de `unidades` cresce em espessura (a base
+// altura x comprimento do produto não muda), e o peso é o total embarcado.
 export async function cotarFreteSuperFrete(
   token: string,
   cepOrigem: string,
@@ -217,9 +222,9 @@ export async function cotarFreteSuperFrete(
     options: { insurance_value: 0, use_insurance_value: false, own_hand: false, receipt: false },
     products: [
       {
-        width: Math.max(pacote.larguraCm, MIN_LARGURA_CM),
-        height: Math.max(pacote.alturaCm, MIN_ALTURA_CM),
-        length: Math.max(pacote.comprimentoCm, MIN_COMPRIMENTO_CM),
+        width: Math.max(pacote.alturaMm / 10, MIN_LARGURA_CM),
+        height: Math.max((pacote.espessuraMm * unidades) / 10, MIN_ALTURA_CM),
+        length: Math.max(pacote.comprimentoMm / 10, MIN_COMPRIMENTO_CM),
         weight: (Math.max(pacote.pesoMiligramas, 1) * unidades) / 1_000_000,
         quantity: 1,
       },

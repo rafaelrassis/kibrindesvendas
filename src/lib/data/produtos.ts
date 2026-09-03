@@ -88,9 +88,9 @@ export function toProduto(p: ProdutoComRelacoes): Produto {
       estoque: e.estoque,
     })),
     pesoMiligramas: p.pesoMiligramas,
-    alturaCm: p.alturaCm,
-    larguraCm: p.larguraCm,
-    comprimentoCm: p.comprimentoCm,
+    espessuraMm: p.espessuraMm,
+    alturaMm: p.alturaMm,
+    comprimentoMm: p.comprimentoMm,
   };
 }
 
@@ -277,9 +277,9 @@ export type DadosProduto = {
   // undefined deixa como está; array substitui a grade inteira.
   estoqueVariacoes?: { combinacao: string; estoque: number }[] | null;
   pesoMiligramas?: number;
-  alturaCm?: number;
-  larguraCm?: number;
-  comprimentoCm?: number;
+  espessuraMm?: number;
+  alturaMm?: number;
+  comprimentoMm?: number;
   // Override de margem pra venda manual na Shopee (/admin/vendas-shopee).
   // null explícito volta a usar o default global; undefined deixa como está.
   shopeeComissaoPct?: number | null;
@@ -295,9 +295,9 @@ const COR_PADRAO = "#3F6B4C";
 // Caixa pequena — mesmo padrão do `@default` no schema, usado quando o
 // admin cria o produto sem preencher peso/dimensões.
 const PESO_PADRAO_MG = 300000;
-const ALTURA_PADRAO_CM = 4;
-const LARGURA_PADRAO_CM = 11;
-const COMPRIMENTO_PADRAO_CM = 16;
+const ESPESSURA_PADRAO_MM = 40;
+const ALTURA_PADRAO_MM = 110;
+const COMPRIMENTO_PADRAO_MM = 160;
 
 async function categoriaIdPorSlug(slug: string) {
   const categoria = await prisma.categoria.findUnique({ where: { slug } });
@@ -436,9 +436,9 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       destaqueCategoria: !!dados.destaqueCategoria,
       estoque: dados.estoque ?? null,
       pesoMiligramas: dados.pesoMiligramas ?? PESO_PADRAO_MG,
-      alturaCm: dados.alturaCm ?? ALTURA_PADRAO_CM,
-      larguraCm: dados.larguraCm ?? LARGURA_PADRAO_CM,
-      comprimentoCm: dados.comprimentoCm ?? COMPRIMENTO_PADRAO_CM,
+      espessuraMm: dados.espessuraMm ?? ESPESSURA_PADRAO_MM,
+      alturaMm: dados.alturaMm ?? ALTURA_PADRAO_MM,
+      comprimentoMm: dados.comprimentoMm ?? COMPRIMENTO_PADRAO_MM,
       cepOrigemOverride: dados.cepOrigemOverride ? normalizarCep(dados.cepOrigemOverride) : null,
       shopeeComissaoPct: dados.shopeeComissaoPct ?? null,
       shopeeFretePct: dados.shopeeFretePct ?? null,
@@ -529,9 +529,9 @@ export async function atualizarProduto(
         ativo: dados.ativo,
         estoque: dados.estoque !== undefined ? dados.estoque : undefined,
         pesoMiligramas: dados.pesoMiligramas,
-        alturaCm: dados.alturaCm,
-        larguraCm: dados.larguraCm,
-        comprimentoCm: dados.comprimentoCm,
+        espessuraMm: dados.espessuraMm,
+        alturaMm: dados.alturaMm,
+        comprimentoMm: dados.comprimentoMm,
         cepOrigemOverride:
           dados.cepOrigemOverride !== undefined
             ? dados.cepOrigemOverride

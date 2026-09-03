@@ -69,13 +69,16 @@ model Produto {
   // UPDATE condicional pra duas compras simultâneas não venderem a mesma
   // última unidade duas vezes.
   estoque              Int?
-  // Usados no cálculo de frete real (Correios via Melhor Envio). Valores
-  // padrão são de uma caixa pequena — produto sem cadastro específico ainda
-  // recebe uma cotação plausível em vez de falhar.
+  // Usados no cálculo de frete real (Correios via Melhor Envio/SuperFrete).
+  // Dimensões são de 1 unidade, em milímetros. `espessuraMm` é a única que
+  // empilha com a quantidade do pedido (ex: cartão, adesivo — cresce em pilha);
+  // `alturaMm`/`comprimentoMm` são a base do produto e não mudam com a
+  // quantidade. Valores padrão são de uma caixa pequena — produto sem
+  // cadastro específico ainda recebe uma cotação plausível em vez de falhar.
   pesoMiligramas       Int               @default(300000)
-  alturaCm             Int               @default(4)
-  larguraCm            Int               @default(11)
-  comprimentoCm        Int               @default(16)
+  espessuraMm          Int               @default(40)
+  alturaMm             Int               @default(110)
+  comprimentoMm        Int               @default(160)
   // CEP de onde este produto é despachado, quando difere do CEP padrão da
   // loja (config.cepOrigem) — ex: fornecedor terceirizado que despacha
   // direto pro cliente. null = usa o CEP padrão da loja.

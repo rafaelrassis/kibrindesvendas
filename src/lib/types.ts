@@ -70,11 +70,12 @@ export type Produto = {
   // controle por variação (produto sem variações, ou variações sem
   // controle de estoque ligado) — ver estoque-variacao.ts.
   estoqueVariacoes: EstoqueVariacaoItem[];
-  // Usados na cotação de frete real (Correios via Melhor Envio).
+  // Usados na cotação de frete real (Correios via Melhor Envio/SuperFrete).
+  // Dimensões de 1 unidade, em milímetros.
   pesoMiligramas: number;
-  alturaCm: number;
-  larguraCm: number;
-  comprimentoCm: number;
+  espessuraMm: number;
+  alturaMm: number;
+  comprimentoMm: number;
 };
 
 export type MaterialProduto = {

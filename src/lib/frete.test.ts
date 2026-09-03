@@ -61,7 +61,7 @@ describe("formatarCep", () => {
 });
 
 describe("cotarFreteMelhorEnvio", () => {
-  const pacote = { pesoMiligramas: 300000, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
+  const pacote = { pesoMiligramas: 300000, espessuraMm: 40, alturaMm: 110, comprimentoMm: 160 };
 
   function respostaCom(servicos: unknown) {
     return {
@@ -109,7 +109,7 @@ describe("cotarFreteMelhorEnvio", () => {
     });
   });
 
-  it("manda o pacote em centímetros e quilos e respeita a dimensão mínima dos Correios", async () => {
+  it("converte de milímetros pra centímetros e respeita a dimensão mínima dos Correios", async () => {
     let enviado: { products: { width: number; height: number; length: number; weight: number }[] } | null =
       null;
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
@@ -121,9 +121,9 @@ describe("cotarFreteMelhorEnvio", () => {
 
     await cotarFreteMelhorEnvio("token", "01310100", "60000000", {
       pesoMiligramas: 250000,
-      alturaCm: 1,
-      larguraCm: 5,
-      comprimentoCm: 8,
+      espessuraMm: 10,
+      alturaMm: 50,
+      comprimentoMm: 80,
     });
 
     expect(enviado!.products[0]).toMatchObject({
@@ -183,7 +183,7 @@ describe("cotarFreteMelhorEnvio", () => {
 });
 
 describe("cotarFreteSuperFrete", () => {
-  const pacote = { pesoMiligramas: 300000, alturaCm: 4, larguraCm: 11, comprimentoCm: 16 };
+  const pacote = { pesoMiligramas: 300000, espessuraMm: 40, alturaMm: 110, comprimentoMm: 160 };
 
   function respostaCom(servicos: unknown) {
     return {
@@ -245,8 +245,11 @@ describe("cotarFreteSuperFrete", () => {
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote)).toBeNull();
   });
 
-  it("multiplica o peso pela quantidade e manda quantity fixo em 1, pra não sofrer reclassificação de serviço por cubagem", async () => {
-    let enviado: { services: string; products: { weight: number; quantity: number }[] } | null = null;
+  it("empilha a espessura e multiplica o peso pela quantidade, mandando quantity fixo em 1 pra não sofrer reclassificação de serviço por cubagem", async () => {
+    let enviado: {
+      services: string;
+      products: { height: number; width: number; length: number; weight: number; quantity: number }[];
+    } | null = null;
     vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
       enviado = JSON.parse(init.body);
       return respostaCom([
@@ -257,6 +260,14 @@ describe("cotarFreteSuperFrete", () => {
     await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
 
     expect(enviado!.services).toBe("1,2,31");
-    expect(enviado!.products[0]).toMatchObject({ weight: 0.9, quantity: 1 });
+    // espessura 40mm (4cm) x 3 unidades = 12cm de altura; largura e comprimento
+    // (base do produto) não mudam com a quantidade.
+    expect(enviado!.products[0]).toMatchObject({
+      height: 12,
+      width: 11,
+      length: 16,
+      weight: 0.9,
+      quantity: 1,
+    });
   });
 });
