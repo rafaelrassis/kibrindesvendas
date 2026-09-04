@@ -237,6 +237,19 @@ async function cotarComRecuo(
   return [...r1, ...r2];
 }
 
+// Os Correios cobram por faixa de peso na etiqueta de verdade (até 300g e
+// depois de 1 em 1kg — é o que aparece no seletor "Digitar peso" do site da
+// SuperFrete). A API de cotação, porém, devolve preço contínuo. Pra nunca
+// cobrar do cliente menos do que a transportadora vai cobrar da loja,
+// arredondamos o peso da caixa pro teto da própria faixa antes de cotar —
+// isso também acha a mesma cotação pra qualquer quantidade dentro da faixa
+// (66, 90, 200 ou 222 unidades pesando entre 300g e 1kg cotam igual).
+function tetoDaFaixaMg(pesoMg: number): number {
+  const pesoG = pesoMg / 1000;
+  const tetoG = pesoG <= 300 ? 300 : Math.ceil(pesoG / 1000) * 1000;
+  return tetoG * 1000;
+}
+
 // Cota uma única caixa com `unidadesNaCaixa` empilhadas. Devolve as opções
 // cruas da API (sem converter pra OpcaoFrete) porque cotarFreteSuperFrete
 // ainda precisa somar os preços das várias caixas de um mesmo pedido.
@@ -247,6 +260,13 @@ async function cotarCaixaSuperFrete(
   pacote: PacoteFrete,
   unidadesNaCaixa: number
 ): Promise<ServicoSuperFrete[] | null> {
+  const pesoRealMg = Math.max(pacote.pesoMiligramas, 1) * unidadesNaCaixa;
+  const pesoCobradoMg = tetoDaFaixaMg(pesoRealMg);
+  // A altura sobe na mesma proporção que o peso: senão a cubagem (calculada
+  // a partir da altura real, que continua variando unidade a unidade)
+  // furaria o achatamento por faixa que acabamos de fazer no peso.
+  const fatorFaixa = pesoCobradoMg / pesoRealMg;
+
   const body = {
     from: { postal_code: cepOrigem },
     to: { postal_code: cepDestino },
@@ -255,9 +275,9 @@ async function cotarCaixaSuperFrete(
     products: [
       {
         width: Math.max(pacote.larguraMm / 10, MIN_LARGURA_CM),
-        height: Math.max((pacote.alturaMm * unidadesNaCaixa) / 10, MIN_ALTURA_CM),
+        height: Math.max((pacote.alturaMm * unidadesNaCaixa * fatorFaixa) / 10, MIN_ALTURA_CM),
         length: Math.max(pacote.comprimentoMm / 10, MIN_COMPRIMENTO_CM),
-        weight: (Math.max(pacote.pesoMiligramas, 1) * unidadesNaCaixa) / 1_000_000,
+        weight: pesoCobradoMg / 1_000_000,
         quantity: 1,
       },
     ],

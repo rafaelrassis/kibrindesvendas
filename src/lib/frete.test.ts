@@ -257,7 +257,16 @@ describe("cotarFreteSuperFrete", () => {
       ]);
     });
 
-    await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 3);
+    // 100g/unidade x 3 = 300g: cai bem no teto da própria faixa (até 300g),
+    // então nem peso nem altura sofrem o arredondamento de faixa — o que
+    // isola o que este teste quer verificar (empilhamento por quantidade).
+    await cotarFreteSuperFrete(
+      "token",
+      "01310100",
+      "60000000",
+      { pesoMiligramas: 100000, alturaMm: 40, larguraMm: 110, comprimentoMm: 160 },
+      3
+    );
 
     expect(enviado!.services).toBe("1,2,31");
     // altura 40mm (4cm) x 3 unidades = 12cm de altura empilhada; largura e
@@ -266,9 +275,53 @@ describe("cotarFreteSuperFrete", () => {
       height: 12,
       width: 11,
       length: 16,
-      weight: 0.9,
+      weight: 0.3,
       quantity: 1,
     });
+  });
+
+  it("arredonda o peso pro teto da faixa (até 300g, depois de 1 em 1kg), nunca cotando abaixo do que a transportadora vai cobrar", async () => {
+    let enviado: { products: { weight: number }[] } | null = null;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      enviado = JSON.parse(init.body);
+      return respostaCom([
+        { id: 1, name: "PAC", price: 10, delivery_time: 5, company: { name: "Correios" } },
+      ]);
+    });
+
+    // 200mg/unidade (0,2g) — só pra deixar os números do teste redondos.
+    const leve = { pesoMiligramas: 200, alturaMm: 1, larguraMm: 110, comprimentoMm: 160 };
+
+    await cotarFreteSuperFrete("token", "01310100", "60000000", leve, 100); // 20g reais
+    expect(enviado!.products[0].weight).toBe(0.3); // sobe pro teto de "até 300g"
+
+    await cotarFreteSuperFrete("token", "01310100", "60000000", leve, 4500); // 900g reais
+    expect(enviado!.products[0].weight).toBe(1); // sobe pro teto de "até 1kg", não fica em 900g
+
+    await cotarFreteSuperFrete("token", "01310100", "60000000", leve, 5000); // exatamente 1kg
+    expect(enviado!.products[0].weight).toBe(1); // já está no teto, não pula pra 2kg
+  });
+
+  it("cota igual pra quantidades diferentes que caem na mesma faixa de peso", async () => {
+    const pesosEnviados: number[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const corpo = JSON.parse(init.body);
+      pesosEnviados.push(corpo.products[0].weight);
+      return respostaCom([
+        { id: 1, name: "PAC", price: 10, delivery_time: 5, company: { name: "Correios" } },
+      ]);
+    });
+
+    const leve = { pesoMiligramas: 200, alturaMm: 1, larguraMm: 110, comprimentoMm: 160 };
+    // 2000un = 400g reais e 4000un = 800g reais — os dois pesos ficam entre
+    // 300g e 1kg, então caem na mesma faixa ("até 1kg") e cotam igual.
+    const [a, b] = await Promise.all([
+      cotarFreteSuperFrete("token", "01310100", "60000000", leve, 2000),
+      cotarFreteSuperFrete("token", "01310100", "60000000", leve, 4000),
+    ]);
+
+    expect(a).toEqual(b);
+    expect(new Set(pesosEnviados)).toEqual(new Set([1]));
   });
 
   it("divide a caixa ao meio quando a rota rejeita, até cada metade caber, e soma o preço", async () => {
