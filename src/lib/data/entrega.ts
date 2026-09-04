@@ -78,7 +78,8 @@ async function cotarOpcoesFrete(
       cepOrigem,
       cepDestino,
       produto,
-      quantidade
+      quantidade,
+      config.freteAchataFaixaPeso
     );
     return opcoes && opcoes.length > 0 ? opcoes : estimativa;
   }

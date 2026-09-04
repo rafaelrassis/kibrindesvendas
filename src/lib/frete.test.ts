@@ -324,6 +324,21 @@ describe("cotarFreteSuperFrete", () => {
     expect(new Set(pesosEnviados)).toEqual(new Set([1]));
   });
 
+  it("com achatarFaixaPeso desligado, cota pelo peso real contínuo", async () => {
+    let enviado: { products: { weight: number; height: number }[] } | null = null;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      enviado = JSON.parse(init.body);
+      return respostaCom([
+        { id: 1, name: "PAC", price: 10, delivery_time: 5, company: { name: "Correios" } },
+      ]);
+    });
+
+    const leve = { pesoMiligramas: 200, alturaMm: 1, larguraMm: 110, comprimentoMm: 160 };
+    await cotarFreteSuperFrete("token", "01310100", "60000000", leve, 4500, false); // 900g reais
+
+    expect(enviado!.products[0].weight).toBe(0.9); // não sobe pro teto de 1kg
+  });
+
   it("divide a caixa ao meio quando a rota rejeita, até cada metade caber, e soma o preço", async () => {
     // Não existe um teto fixo — cada rota rejeita num tamanho diferente (visto
     // na prática: uma rota barrou uma caixa de 104cm enquanto outra aceitou

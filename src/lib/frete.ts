@@ -218,20 +218,28 @@ async function cotarComRecuo(
   cepDestino: string,
   pacote: PacoteFrete,
   unidadesNaCaixa: number,
-  chamadasRestantes: { valor: number }
+  chamadasRestantes: { valor: number },
+  achatarFaixaPeso: boolean
 ): Promise<{ tamanho: number; servicos: ServicoSuperFrete[] }[] | null> {
   if (chamadasRestantes.valor <= 0) return null;
   chamadasRestantes.valor -= 1;
 
-  const servicos = await cotarCaixaSuperFrete(token, cepOrigem, cepDestino, pacote, unidadesNaCaixa);
+  const servicos = await cotarCaixaSuperFrete(
+    token,
+    cepOrigem,
+    cepDestino,
+    pacote,
+    unidadesNaCaixa,
+    achatarFaixaPeso
+  );
   if (servicos) return [{ tamanho: unidadesNaCaixa, servicos }];
   if (unidadesNaCaixa <= 1) return null;
 
   const metade1 = Math.ceil(unidadesNaCaixa / 2);
   const metade2 = unidadesNaCaixa - metade1;
   const [r1, r2] = await Promise.all([
-    cotarComRecuo(token, cepOrigem, cepDestino, pacote, metade1, chamadasRestantes),
-    cotarComRecuo(token, cepOrigem, cepDestino, pacote, metade2, chamadasRestantes),
+    cotarComRecuo(token, cepOrigem, cepDestino, pacote, metade1, chamadasRestantes, achatarFaixaPeso),
+    cotarComRecuo(token, cepOrigem, cepDestino, pacote, metade2, chamadasRestantes, achatarFaixaPeso),
   ]);
   if (!r1 || !r2) return null;
   return [...r1, ...r2];
@@ -239,11 +247,12 @@ async function cotarComRecuo(
 
 // Os Correios cobram por faixa de peso na etiqueta de verdade (até 300g e
 // depois de 1 em 1kg — é o que aparece no seletor "Digitar peso" do site da
-// SuperFrete). A API de cotação, porém, devolve preço contínuo. Pra nunca
-// cobrar do cliente menos do que a transportadora vai cobrar da loja,
-// arredondamos o peso da caixa pro teto da própria faixa antes de cotar —
-// isso também acha a mesma cotação pra qualquer quantidade dentro da faixa
-// (66, 90, 200 ou 222 unidades pesando entre 300g e 1kg cotam igual).
+// SuperFrete). A API de cotação, porém, devolve preço contínuo. Quando
+// `freteAchataFaixaPeso` está ligado em /admin/configuracoes, arredondamos o
+// peso da caixa pro teto da própria faixa antes de cotar — isso acha a
+// mesma cotação pra qualquer quantidade dentro da faixa (66, 90, 200 ou 222
+// unidades pesando entre 300g e 1kg cotam igual). Desligado, cota pelo peso
+// real contínuo.
 function tetoDaFaixaMg(pesoMg: number): number {
   const pesoG = pesoMg / 1000;
   const tetoG = pesoG <= 300 ? 300 : Math.ceil(pesoG / 1000) * 1000;
@@ -258,10 +267,11 @@ async function cotarCaixaSuperFrete(
   cepOrigem: string,
   cepDestino: string,
   pacote: PacoteFrete,
-  unidadesNaCaixa: number
+  unidadesNaCaixa: number,
+  achatarFaixaPeso: boolean
 ): Promise<ServicoSuperFrete[] | null> {
   const pesoRealMg = Math.max(pacote.pesoMiligramas, 1) * unidadesNaCaixa;
-  const pesoCobradoMg = tetoDaFaixaMg(pesoRealMg);
+  const pesoCobradoMg = achatarFaixaPeso ? tetoDaFaixaMg(pesoRealMg) : pesoRealMg;
   // A altura sobe na mesma proporção que o peso: senão a cubagem (calculada
   // a partir da altura real, que continua variando unidade a unidade)
   // furaria o achatamento por faixa que acabamos de fazer no peso.
@@ -354,12 +364,19 @@ export async function cotarFreteSuperFrete(
   cepOrigem: string,
   cepDestino: string,
   pacote: PacoteFrete,
-  quantidade = 1
+  quantidade = 1,
+  achatarFaixaPeso = true
 ): Promise<OpcaoFrete[] | null> {
   const unidades = Math.max(1, Math.round(quantidade) || 1);
-  const caixas = await cotarComRecuo(token, cepOrigem, cepDestino, pacote, unidades, {
-    valor: MAX_TENTATIVAS_SUPERFRETE,
-  });
+  const caixas = await cotarComRecuo(
+    token,
+    cepOrigem,
+    cepDestino,
+    pacote,
+    unidades,
+    { valor: MAX_TENTATIVAS_SUPERFRETE },
+    achatarFaixaPeso
+  );
   if (!caixas) return null;
 
   const porServico = new Map<string, { valor: number; prazoDias: number; caixasCotadas: number }>();

@@ -17,6 +17,10 @@ export type ConfiguracaoLoja = {
   melhorEnvioTokenFinal: string | null;
   superFreteTokenConfigurado: boolean;
   superFreteTokenFinal: string | null;
+  // Cotação SuperFrete: arredonda peso e altura da caixa pro teto da faixa
+  // de peso dos Correios (até 300g, depois de 1 em 1kg) em vez do peso
+  // contínuo real — mesma quantidade dentro da faixa paga o mesmo frete.
+  freteAchataFaixaPeso: boolean;
   // null = frete grátis automático desligado. Com um valor, todo pedido cujo
   // total de produtos (sem frete) bater ou passar disso tem o frete zerado
   // — independe de cupom, e soma sem conflito com um cupom FRETE_GRATIS
@@ -41,6 +45,7 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
       : null,
     superFreteTokenConfigurado: !!config?.superFreteToken,
     superFreteTokenFinal: config?.superFreteToken ? config.superFreteToken.slice(-4) : null,
+    freteAchataFaixaPeso: config?.freteAchataFaixaPeso ?? true,
     freteGratisAcimaDe:
       config?.freteGratisAcimaDe != null ? Number(config.freteGratisAcimaDe) : null,
     shopeeComissaoPct:
@@ -58,6 +63,7 @@ export async function atualizarConfiguracaoLoja(dados: {
   superFreteToken?: string;
   // null desliga a regra; undefined deixa como está.
   freteGratisAcimaDe?: number | null;
+  freteAchataFaixaPeso?: boolean;
   // null desliga o default (volta a valer 0%); undefined deixa como está.
   shopeeComissaoPct?: number | null;
   shopeeFretePct?: number | null;
@@ -69,6 +75,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     melhorEnvioToken?: string | null;
     superFreteToken?: string | null;
     freteGratisAcimaDe?: number | null;
+    freteAchataFaixaPeso?: boolean;
     shopeeComissaoPct?: number | null;
     shopeeFretePct?: number | null;
     shopeeAdsPct?: number | null;
@@ -102,6 +109,10 @@ export async function atualizarConfiguracaoLoja(dados: {
     data.freteGratisAcimaDe = dados.freteGratisAcimaDe;
   }
 
+  if (dados.freteAchataFaixaPeso !== undefined) {
+    data.freteAchataFaixaPeso = dados.freteAchataFaixaPeso;
+  }
+
   for (const campo of ["shopeeComissaoPct", "shopeeFretePct", "shopeeAdsPct"] as const) {
     const valor = dados[campo];
     if (valor === undefined) continue;
@@ -120,6 +131,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       melhorEnvioToken: data.melhorEnvioToken,
       superFreteToken: data.superFreteToken,
       freteGratisAcimaDe: data.freteGratisAcimaDe,
+      freteAchataFaixaPeso: data.freteAchataFaixaPeso ?? true,
       shopeeComissaoPct: data.shopeeComissaoPct,
       shopeeFretePct: data.shopeeFretePct,
       shopeeAdsPct: data.shopeeAdsPct,

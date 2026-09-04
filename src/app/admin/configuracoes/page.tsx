@@ -11,6 +11,7 @@ export default function AdminConfiguracoesPage() {
   const [transportadora, setTransportadora] = useState<TransportadoraFrete>("MELHOR_ENVIO");
   const [tokenMelhorEnvio, setTokenMelhorEnvio] = useState("");
   const [tokenSuperFrete, setTokenSuperFrete] = useState("");
+  const [achatarFaixaPeso, setAchatarFaixaPeso] = useState(true);
   const [shopeeComissaoPct, setShopeeComissaoPct] = useState("");
   const [shopeeFretePct, setShopeeFretePct] = useState("");
   const [shopeeAdsPct, setShopeeAdsPct] = useState("");
@@ -26,6 +27,7 @@ export default function AdminConfiguracoesPage() {
         setConfig(c);
         setCepOrigem(c.cepOrigem);
         setTransportadora(c.transportadoraAtiva);
+        setAchatarFaixaPeso(c.freteAchataFaixaPeso);
         setShopeeComissaoPct(c.shopeeComissaoPct?.toString() ?? "");
         setShopeeFretePct(c.shopeeFretePct?.toString() ?? "");
         setShopeeAdsPct(c.shopeeAdsPct?.toString() ?? "");
@@ -44,12 +46,14 @@ export default function AdminConfiguracoesPage() {
       transportadoraAtiva: TransportadoraFrete;
       melhorEnvioToken?: string;
       superFreteToken?: string;
+      freteAchataFaixaPeso: boolean;
       shopeeComissaoPct: number | null;
       shopeeFretePct: number | null;
       shopeeAdsPct: number | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
+      freteAchataFaixaPeso: achatarFaixaPeso,
       shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
       shopeeFretePct: shopeeFretePct.trim() ? Number(shopeeFretePct) : null,
       shopeeAdsPct: shopeeAdsPct.trim() ? Number(shopeeAdsPct) : null,
@@ -163,6 +167,23 @@ export default function AdminConfiguracoesPage() {
               }
               className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
             />
+          </label>
+
+          <label className="flex items-start gap-2 mt-4">
+            <input
+              type="checkbox"
+              checked={achatarFaixaPeso}
+              onChange={(e) => setAchatarFaixaPeso(e.target.checked)}
+              className="mt-1"
+            />
+            <span className="text-sm text-ink/70">
+              Achatar cotação SuperFrete por faixa de peso dos Correios
+              <span className="block text-xs text-ink/50">
+                Ligado: cobra sempre o valor do teto da faixa (até 300g, depois de 1 em 1kg) —
+                pedidos com pesos diferentes na mesma faixa pagam o mesmo frete. Desligado: cota
+                pelo peso real, contínuo.
+              </span>
+            </span>
           </label>
         </div>
 

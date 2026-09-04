@@ -456,6 +456,11 @@ model ConfiguracaoLoja {
   // transportadora fica ativa por vez — trocar aqui não apaga o token da
   // outra, só deixa de consultá-lo.
   transportadoraAtiva TransportadoraFrete @default(MELHOR_ENVIO)
+  // Cotação SuperFrete: arredonda peso e altura da caixa pro teto da faixa
+  // de peso dos Correios (até 300g, depois de 1 em 1kg) antes de cotar, em
+  // vez do peso contínuo real — mesma quantidade dentro da faixa paga o
+  // mesmo frete, nunca menos do que a transportadora cobra da loja.
+  freteAchataFaixaPeso Boolean @default(true)
   // Frete grátis automático pra pedidos a partir desse valor (produto, sem
   // frete) — null desliga a regra. Independente de cupom: soma com um cupom
   // FRETE_GRATIS aplicado (o resultado é o mesmo, frete zerado, mas as duas
