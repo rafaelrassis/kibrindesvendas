@@ -21,6 +21,11 @@ export type Variacao = {
   // interno de admin, usado no cálculo de frete — ver dimensaoEfetiva em
   // estoque-variacao.ts.
   dimensoesValores?: Record<string, DimensaoValor> | null;
+  // Liga esse tipo como fonte de peso/dimensão por valor (ex: "Tamanho" sim,
+  // "Cor" não) — controla o que dimensaoEfetiva considera e o que o admin
+  // mostra pra preencher. Falsy (undefined/false) = ignora dimensoesValores
+  // desse tipo, mesmo que já tenha dado cadastrado.
+  afetaDimensao?: boolean;
 };
 
 export type DimensaoValor = {

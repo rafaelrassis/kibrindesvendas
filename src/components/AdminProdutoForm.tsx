@@ -27,6 +27,10 @@ type VariacaoForm = {
   // preencher só o peso e deixar altura/largura/comprimento em branco, que
   // aí usam o valor normal do produto). Ver dimensaoEfetiva.
   dimensoesValores: Record<string, DimensaoValorForm>;
+  // Liga esse tipo como fonte de peso/dimensão (ex: "Tamanho" sim, "Cor"
+  // não) — só tipo marcado aparece na seção "Peso e dimensões por variação"
+  // e só ele é considerado no cálculo de frete. Ver dimensaoEfetiva.
+  afetaDimensao: boolean;
 };
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
 
@@ -61,6 +65,7 @@ function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
         },
       ])
     ),
+    afetaDimensao: x.afetaDimensao ?? false,
   }));
 }
 
@@ -225,6 +230,12 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
 
   function removerVariacao(i: number) {
     setVariacoes((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function alternarAfetaDimensao(i: number) {
+    setVariacoes((prev) =>
+      prev.map((v, idx) => (idx === i ? { ...v, afetaDimensao: !v.afetaDimensao } : v))
+    );
   }
 
   function atualizarGradeEstoque(combinacao: string, valor: string) {
@@ -601,6 +612,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                     .filter(([, obj]) => Object.keys(obj).length > 0)
                 )
               : undefined,
+          afetaDimensao: v.afetaDimensao,
         })),
       materiais: materiais
         .filter((m) => m.nome.trim())
@@ -1041,6 +1053,15 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                   </button>
                 </div>
 
+                <label className="flex items-center gap-1.5 text-xs text-ink/60 pl-1">
+                  <input
+                    type="checkbox"
+                    checked={v.afetaDimensao}
+                    onChange={() => alternarAfetaDimensao(i)}
+                  />
+                  Afeta peso/dimensão (ex: tamanho) — não marque pra cor ou outro tipo que não muda a caixa
+                </label>
+
                 {/* Fotos por cor (até 4) — só pra variação "Cor". Sem foto, o
                     valor continua aparecendo como chip de texto na página do
                     produto (ver ProdutoPageClient). Selecionar essa cor lá
@@ -1180,7 +1201,15 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           onClick={() =>
             setVariacoes((prev) => [
               ...prev,
-              { tipo: "", valores: "", imagensValores: {}, precosValores: {}, custosValores: {}, dimensoesValores: {} },
+              {
+                tipo: "",
+                valores: "",
+                imagensValores: {},
+                precosValores: {},
+                custosValores: {},
+                dimensoesValores: {},
+                afetaDimensao: false,
+              },
             ])
           }
           className="text-pine text-xs mt-2 hover:underline"
@@ -1375,17 +1404,19 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       </div>
       </Secao>
 
-      {temVariacoes && (
+      {variacoes.some((v) => v.afetaDimensao && v.tipo.trim()) && (
         <Secao
           title="Peso e dimensões por variação"
           subtitle="Sobrescreve o peso/dimensão do produto pro valor escolhido"
         >
           <p className="text-xs text-ink/50 mb-3">
             Campo vazio usa o peso/dimensão do produto acima. Preencha só o que muda —
-            ex: só o peso, deixando altura/largura/comprimento em branco.
+            ex: só o peso, deixando altura/largura/comprimento em branco. Só aparece aqui o
+            tipo marcado como &quot;Afeta peso/dimensão&quot; em Variações.
           </p>
           <div className="space-y-4">
             {variacoes.map((v, i) => {
+              if (!v.afetaDimensao) return null;
               const tipo = v.tipo.trim();
               if (!tipo) return null;
               const valoresDoTipo = v.valores

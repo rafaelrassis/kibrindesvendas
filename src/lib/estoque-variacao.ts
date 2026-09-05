@@ -58,11 +58,18 @@ export function custoEfetivo(
 export function dimensaoEfetiva<
   T extends { pesoMiligramas: number; alturaMm: number; larguraMm: number; comprimentoMm: number }
 >(
-  produto: T & { variacoes: { tipo: string; dimensoesValores?: Record<string, DimensaoValor> | null }[] },
+  produto: T & {
+    variacoes: {
+      tipo: string;
+      afetaDimensao?: boolean;
+      dimensoesValores?: Record<string, DimensaoValor> | null;
+    }[];
+  },
   selecoes: Record<string, string>
 ): T {
   let override: DimensaoValor | undefined;
   for (const v of produto.variacoes) {
+    if (!v.afetaDimensao) continue;
     const valor = selecoes[v.tipo];
     if (valor == null) continue;
     const dim = v.dimensoesValores?.[valor];

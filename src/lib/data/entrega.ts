@@ -63,7 +63,7 @@ async function cotarOpcoesFrete(
         larguraMm: true,
         comprimentoMm: true,
         cepOrigemOverride: true,
-        variacoes: { select: { tipo: true, dimensoesValores: true } },
+        variacoes: { select: { tipo: true, afetaDimensao: true, dimensoesValores: true } },
       },
     }),
   ]);
@@ -77,6 +77,7 @@ async function cotarOpcoesFrete(
       ...produtoDb,
       variacoes: produtoDb.variacoes.map((v) => ({
         tipo: v.tipo,
+        afetaDimensao: v.afetaDimensao,
         dimensoesValores: v.dimensoesValores as Record<string, DimensaoValor> | null,
       })),
     },

@@ -17,7 +17,9 @@ describe("dimensaoEfetiva", () => {
   it("sem dimensoesValores cadastrado pro valor, usa as dimensões do produto", () => {
     const produto = {
       ...produtoBase,
-      variacoes: [{ tipo: "Tamanho", dimensoesValores: { "9x6": { pesoMiligramas: 5000 } } }],
+      variacoes: [
+        { tipo: "Tamanho", afetaDimensao: true, dimensoesValores: { "9x6": { pesoMiligramas: 5000 } } },
+      ],
     };
     expect(dimensaoEfetiva(produto, { Tamanho: "7x5" })).toMatchObject(produtoBase);
   });
@@ -25,7 +27,9 @@ describe("dimensaoEfetiva", () => {
   it("substitui só o peso, herdando altura/largura/comprimento do produto", () => {
     const produto = {
       ...produtoBase,
-      variacoes: [{ tipo: "Tamanho", dimensoesValores: { "7x5": { pesoMiligramas: 4500 } } }],
+      variacoes: [
+        { tipo: "Tamanho", afetaDimensao: true, dimensoesValores: { "7x5": { pesoMiligramas: 4500 } } },
+      ],
     };
     expect(dimensaoEfetiva(produto, { Tamanho: "7x5" })).toMatchObject({
       ...produtoBase,
@@ -39,6 +43,7 @@ describe("dimensaoEfetiva", () => {
       variacoes: [
         {
           tipo: "Tamanho",
+          afetaDimensao: true,
           dimensoesValores: {
             "10x7": { pesoMiligramas: 6000, alturaMm: 0.4, larguraMm: 180, comprimentoMm: 250 },
           },
@@ -57,12 +62,30 @@ describe("dimensaoEfetiva", () => {
     const produto = {
       ...produtoBase,
       variacoes: [
-        { tipo: "Cor", dimensoesValores: null },
-        { tipo: "Tamanho", dimensoesValores: { "14x10": { pesoMiligramas: 9000 } } },
+        { tipo: "Cor", afetaDimensao: true, dimensoesValores: null },
+        {
+          tipo: "Tamanho",
+          afetaDimensao: true,
+          dimensoesValores: { "14x10": { pesoMiligramas: 9000 } },
+        },
       ],
     };
     expect(
       dimensaoEfetiva(produto, { Cor: "Preta", Tamanho: "14x10" }).pesoMiligramas
     ).toBe(9000);
+  });
+
+  it("ignora dimensoesValores de tipo com afetaDimensao desligado", () => {
+    const produto = {
+      ...produtoBase,
+      variacoes: [
+        {
+          tipo: "Tamanho",
+          afetaDimensao: false,
+          dimensoesValores: { "14x10": { pesoMiligramas: 9000 } },
+        },
+      ],
+    };
+    expect(dimensaoEfetiva(produto, { Tamanho: "14x10" })).toMatchObject(produtoBase);
   });
 });

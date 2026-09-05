@@ -171,6 +171,11 @@ model Variacao {
   // Sem entrada pro valor, usa as dimensões normais do produto — ver
   // dimensaoEfetiva em lib/estoque-variacao.ts.
   dimensoesValores Json?
+  // Liga/desliga esse tipo de variação como fonte de dimensoesValores — ex:
+  // "Tamanho" afeta o frete, mas "Cor" não. Controla só o que dimensaoEfetiva
+  // considera (e o que o admin mostra pra preencher); dimensoesValores em si
+  // não é apagado ao desligar, só ignorado.
+  afetaDimensao Boolean @default(false)
 }
 
 // Slide do carrossel da home, editável em /admin/banners. `ordem` é a posição

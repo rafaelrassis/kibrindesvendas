@@ -138,6 +138,7 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
       ...v,
       custosValores: normalizarPrecosValores(p.variacoes[i]?.custosValores),
       dimensoesValores: normalizarDimensoesValores(p.variacoes[i]?.dimensoesValores),
+      afetaDimensao: p.variacoes[i]?.afetaDimensao ?? false,
     })),
     materiais,
     custoTotal: Math.round(custoTotal * 100) / 100,
@@ -291,6 +292,7 @@ export type DadosProduto = {
     precosValores?: Record<string, number> | null;
     custosValores?: Record<string, number> | null;
     dimensoesValores?: Record<string, DimensaoValor> | null;
+    afetaDimensao?: boolean;
   }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
@@ -483,6 +485,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
           precosValores: v.precosValores ?? undefined,
           custosValores: v.custosValores ?? undefined,
           dimensoesValores: v.dimensoesValores ?? undefined,
+          afetaDimensao: v.afetaDimensao ?? false,
         })),
       },
       estoqueVariacoes: {
@@ -583,6 +586,7 @@ export async function atualizarProduto(
               precosValores: v.precosValores ?? undefined,
               custosValores: v.custosValores ?? undefined,
               dimensoesValores: v.dimensoesValores ?? undefined,
+              afetaDimensao: v.afetaDimensao ?? false,
             })),
           },
         }),
