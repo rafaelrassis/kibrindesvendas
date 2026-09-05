@@ -37,6 +37,11 @@ export default function ProdutoPageClient() {
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
   const [corHover, setCorHover] = useState<string | null>(null);
   const [quantidade, setQuantidade] = useState(1);
+  // Espelha `quantidade` como texto livre no campo controlado — permite o
+  // campo ficar vazio enquanto o usuário apaga pra digitar outro número,
+  // sem o `min`/mínimo saltarem de volta a cada tecla (ver onChange do
+  // input de quantidade personalizável, mais abaixo).
+  const [quantidadeTexto, setQuantidadeTexto] = useState("1");
   // Produto carrega assíncrono — assim que a quantidade mínima chega, o
   // seletor já parte dela em vez de 1 (que pode nem ser um valor válido).
   // setState durante a renderização (não em efeito) é o padrão recomendado
@@ -44,7 +49,9 @@ export default function ProdutoPageClient() {
   const [produtoIdVisto, setProdutoIdVisto] = useState(produto?.id);
   if (produto && produto.id !== produtoIdVisto) {
     setProdutoIdVisto(produto.id);
-    setQuantidade(produto.quantidadeMinima || 1);
+    const inicial = produto.quantidadeMinima || 1;
+    setQuantidade(inicial);
+    setQuantidadeTexto(String(inicial));
   }
 
   // Quem já tem endereço salvo começa com o CEP dele preenchido; digitar por
@@ -501,12 +508,23 @@ export default function ProdutoPageClient() {
                     inputMode="numeric"
                     min={quantidadeMinima}
                     max={estoqueMaximo ?? undefined}
-                    value={quantidade}
+                    value={quantidadeTexto}
                     onChange={(e) => {
-                      const valor = Math.round(Number(e.target.value));
-                      setQuantidade(Number.isFinite(valor) && valor > 0 ? valor : quantidadeMinima);
+                      // Só dígitos — permite string vazia (apagando pra
+                      // digitar de novo) sem forçar o mínimo a cada tecla.
+                      // A validação de mínimo/máximo só entra no blur.
+                      const bruto = e.target.value;
+                      if (bruto !== "" && !/^\d+$/.test(bruto)) return;
+                      setQuantidadeTexto(bruto);
+                      const valor = Math.round(Number(bruto));
+                      if (bruto !== "" && Number.isFinite(valor) && valor > 0) {
+                        setQuantidade(valor);
+                      }
                     }}
-                    onBlur={() => setQuantidade(quantidadeEfetiva)}
+                    onBlur={() => {
+                      setQuantidade(quantidadeEfetiva);
+                      setQuantidadeTexto(String(quantidadeEfetiva));
+                    }}
                     className="w-24 h-10 border border-line rounded-full text-center text-sm font-medium tabular-nums"
                   />
                 ) : (
