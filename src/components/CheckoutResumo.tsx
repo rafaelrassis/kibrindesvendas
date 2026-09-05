@@ -85,7 +85,8 @@ export default function CheckoutResumo({
   const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(
     cepSelecionado ? formatarCep(cepSelecionado) : "",
     item?.produtoId,
-    quantidade
+    quantidade,
+    item?.variacoesEscolhidas
   );
 
   // EnderecoForm já trata o erro (mostra a própria mensagem) se `onSalvar`

@@ -7,6 +7,12 @@ import EditorFoto from "@/components/EditorFoto";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 import { buildCombinacaoKey, gerarCombinacoes, tipoTemFotoPorValor } from "@/lib/estoque-variacao";
 
+type DimensaoValorForm = {
+  pesoMiligramas: string;
+  alturaMm: string;
+  larguraMm: string;
+  comprimentoMm: string;
+};
 type VariacaoForm = {
   tipo: string;
   valores: string;
@@ -17,8 +23,19 @@ type VariacaoForm = {
   // Custo de material final por valor (mesmo padrão de precosValores).
   // Campo vazio usa o custoTotal normal do produto (soma de materiais).
   custosValores: Record<string, string>;
+  // Peso/dimensão final por valor — cada campo é independente (pode
+  // preencher só o peso e deixar altura/largura/comprimento em branco, que
+  // aí usam o valor normal do produto). Ver dimensaoEfetiva.
+  dimensoesValores: Record<string, DimensaoValorForm>;
 };
 type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
+
+const DIMENSAO_VAZIA: DimensaoValorForm = {
+  pesoMiligramas: "",
+  alturaMm: "",
+  larguraMm: "",
+  comprimentoMm: "",
+};
 
 function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
   return v.map((x) => ({
@@ -32,6 +49,17 @@ function paraVariacaoForm(v: ProdutoAdmin["variacoes"]): VariacaoForm[] {
       Object.entries((x as { custosValores?: Record<string, number> | null }).custosValores ?? {}).map(
         ([valor, custo]) => [valor, String(custo)]
       )
+    ),
+    dimensoesValores: Object.fromEntries(
+      Object.entries(x.dimensoesValores ?? {}).map(([valor, dim]) => [
+        valor,
+        {
+          pesoMiligramas: dim.pesoMiligramas != null ? String(dim.pesoMiligramas) : "",
+          alturaMm: dim.alturaMm != null ? String(dim.alturaMm) : "",
+          larguraMm: dim.larguraMm != null ? String(dim.larguraMm) : "",
+          comprimentoMm: dim.comprimentoMm != null ? String(dim.comprimentoMm) : "",
+        },
+      ])
     ),
   }));
 }
@@ -233,6 +261,25 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           delete custosValores[valor];
         }
         return { ...v, custosValores };
+      })
+    );
+  }
+
+  // Peso/dimensão por valor — mesmo padrão, mas campo a campo: cada um dos
+  // 4 inputs (peso/altura/largura/comprimento) atualiza só a própria chave
+  // dentro do objeto do valor, os outros ficam como estavam.
+  function atualizarDimensaoValor(
+    i: number,
+    valor: string,
+    campo: keyof DimensaoValorForm,
+    novo: string
+  ) {
+    setVariacoes((prev) =>
+      prev.map((v, idx) => {
+        if (idx !== i) return v;
+        const dimensoesValores = { ...v.dimensoesValores };
+        dimensoesValores[valor] = { ...(dimensoesValores[valor] ?? DIMENSAO_VAZIA), [campo]: novo };
+        return { ...v, dimensoesValores };
       })
     );
   }
@@ -530,6 +577,28 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                   Object.entries(v.custosValores)
                     .map(([valor, custo]) => [valor, Number(custo.replace(",", "."))] as const)
                     .filter(([, custo]) => Number.isFinite(custo) && custo >= 0)
+                )
+              : undefined,
+          dimensoesValores:
+            Object.keys(v.dimensoesValores).length > 0
+              ? Object.fromEntries(
+                  Object.entries(v.dimensoesValores)
+                    .map(([valor, dim]) => {
+                      const obj: Record<string, number> = {};
+                      for (const campo of [
+                        "pesoMiligramas",
+                        "alturaMm",
+                        "larguraMm",
+                        "comprimentoMm",
+                      ] as const) {
+                        const bruto = dim[campo].trim();
+                        if (!bruto) continue;
+                        const n = Number(bruto.replace(",", "."));
+                        if (Number.isFinite(n) && n >= 0) obj[campo] = n;
+                      }
+                      return [valor, obj] as const;
+                    })
+                    .filter(([, obj]) => Object.keys(obj).length > 0)
                 )
               : undefined,
         })),
@@ -1111,7 +1180,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           onClick={() =>
             setVariacoes((prev) => [
               ...prev,
-              { tipo: "", valores: "", imagensValores: {}, precosValores: {}, custosValores: {} },
+              { tipo: "", valores: "", imagensValores: {}, precosValores: {}, custosValores: {}, dimensoesValores: {} },
             ])
           }
           className="text-pine text-xs mt-2 hover:underline"
@@ -1305,6 +1374,88 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         </div>
       </div>
       </Secao>
+
+      {temVariacoes && (
+        <Secao
+          title="Peso e dimensões por variação"
+          subtitle="Sobrescreve o peso/dimensão do produto pro valor escolhido"
+        >
+          <p className="text-xs text-ink/50 mb-3">
+            Campo vazio usa o peso/dimensão do produto acima. Preencha só o que muda —
+            ex: só o peso, deixando altura/largura/comprimento em branco.
+          </p>
+          <div className="space-y-4">
+            {variacoes.map((v, i) => {
+              const tipo = v.tipo.trim();
+              if (!tipo) return null;
+              const valoresDoTipo = v.valores
+                .split(",")
+                .map((x) => x.trim())
+                .filter(Boolean);
+              if (valoresDoTipo.length === 0) return null;
+              return (
+                <div key={i}>
+                  <p className="text-sm font-medium mb-2">{tipo}</p>
+                  <div className="space-y-2">
+                    {valoresDoTipo.map((valor) => {
+                      const dim = v.dimensoesValores[valor] ?? DIMENSAO_VAZIA;
+                      return (
+                        <div
+                          key={valor}
+                          className="grid grid-cols-[auto_repeat(4,1fr)] gap-2 items-center border border-line rounded px-3 py-2"
+                        >
+                          <span className="text-sm font-medium truncate">{valor}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="Peso (mg)"
+                            value={dim.pesoMiligramas}
+                            onChange={(e) =>
+                              atualizarDimensaoValor(i, valor, "pesoMiligramas", e.target.value)
+                            }
+                            className="w-full border border-line rounded px-2 py-1 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            placeholder="Altura (mm)"
+                            value={dim.alturaMm}
+                            onChange={(e) =>
+                              atualizarDimensaoValor(i, valor, "alturaMm", e.target.value)
+                            }
+                            className="w-full border border-line rounded px-2 py-1 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="Largura (mm)"
+                            value={dim.larguraMm}
+                            onChange={(e) =>
+                              atualizarDimensaoValor(i, valor, "larguraMm", e.target.value)
+                            }
+                            className="w-full border border-line rounded px-2 py-1 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="Comprimento (mm)"
+                            value={dim.comprimentoMm}
+                            onChange={(e) =>
+                              atualizarDimensaoValor(i, valor, "comprimentoMm", e.target.value)
+                            }
+                            className="w-full border border-line rounded px-2 py-1 text-sm"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Secao>
+      )}
 
       <Secao title="Vitrine">
       <label className="flex items-center gap-2 text-sm">

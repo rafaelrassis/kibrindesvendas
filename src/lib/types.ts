@@ -15,6 +15,19 @@ export type Variacao = {
   // versão pública do produto (ver toDomainProduto). Ver custoEfetivo em
   // estoque-variacao.ts.
   custosValores?: Record<string, number> | null;
+  // Peso/dimensões final por valor (substitui campo a campo as dimensões do
+  // produto quando o valor escolhido tem entrada aqui — pode preencher só
+  // pesoMiligramas e herdar altura/largura/comprimento do produto). Dado
+  // interno de admin, usado no cálculo de frete — ver dimensaoEfetiva em
+  // estoque-variacao.ts.
+  dimensoesValores?: Record<string, DimensaoValor> | null;
+};
+
+export type DimensaoValor = {
+  pesoMiligramas?: number;
+  alturaMm?: number;
+  larguraMm?: number;
+  comprimentoMm?: number;
 };
 
 // Estoque de uma combinação específica (ex: Cor=Preta + Tamanho=G).

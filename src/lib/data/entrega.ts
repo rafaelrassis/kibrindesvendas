@@ -8,6 +8,8 @@ import {
   type OpcaoFrete,
 } from "@/lib/frete";
 import { prisma } from "@/lib/prisma";
+import { dimensaoEfetiva } from "@/lib/estoque-variacao";
+import type { DimensaoValor } from "@/lib/types";
 import { ErroDeNegocio } from "./erros";
 
 export type EnderecoDeEntrega = {
@@ -45,12 +47,13 @@ async function cotarOpcoesFrete(
   uf: string,
   cepDestino: string,
   produtoId?: string,
-  quantidade = 1
+  quantidade = 1,
+  variacoesEscolhidas?: Record<string, string>
 ): Promise<OpcaoFrete[]> {
   const estimativa: OpcaoFrete[] = [{ ...calcularFrete(uf), servico: "Estimativa" }];
   if (!produtoId) return estimativa;
 
-  const [config, produto] = await Promise.all([
+  const [config, produtoDb] = await Promise.all([
     prisma.configuracaoLoja.findUnique({ where: { id: "singleton" } }),
     prisma.produto.findUnique({
       where: { id: produtoId },
@@ -60,11 +63,25 @@ async function cotarOpcoesFrete(
         larguraMm: true,
         comprimentoMm: true,
         cepOrigemOverride: true,
+        variacoes: { select: { tipo: true, dimensoesValores: true } },
       },
     }),
   ]);
 
-  if (!config || !produto) return estimativa;
+  if (!config || !produtoDb) return estimativa;
+
+  // Variação escolhida (ex: tamanho de ímã) pode ter peso/dimensão próprios,
+  // que substituem os do produto campo a campo — ver dimensaoEfetiva.
+  const produto = dimensaoEfetiva(
+    {
+      ...produtoDb,
+      variacoes: produtoDb.variacoes.map((v) => ({
+        tipo: v.tipo,
+        dimensoesValores: v.dimensoesValores as Record<string, DimensaoValor> | null,
+      })),
+    },
+    variacoesEscolhidas ?? {}
+  );
 
   // Produto com fornecedor próprio (ex: camiseta despachada de Franca-SP)
   // cota a partir do CEP dele; os demais caem no CEP padrão da loja.
@@ -107,7 +124,8 @@ export async function consultarCep(
   cepBruto: unknown,
   produtoIdBruto?: unknown,
   quantidadeBruta?: unknown,
-  servicoEscolhidoBruto?: unknown
+  servicoEscolhidoBruto?: unknown,
+  variacoesEscolhidasBruta?: unknown
 ): Promise<EnderecoDeEntrega> {
   const cep = typeof cepBruto === "string" ? normalizarCep(cepBruto) : null;
   if (!cep) throw new ErroDeNegocio("CEP inválido: informe os 8 dígitos.");
@@ -117,6 +135,19 @@ export async function consultarCep(
     Number.isFinite(quantidadeNum) && quantidadeNum > 0 ? Math.round(quantidadeNum) : 1;
   const servicoEscolhido =
     typeof servicoEscolhidoBruto === "string" ? servicoEscolhidoBruto : undefined;
+  // Vem serializado em JSON na querystring (ex: {"Tamanho":"7x5"}) — corpo
+  // malformado ou ausente cai em "sem variação", igual produto sem grade.
+  let variacoesEscolhidas: Record<string, string> | undefined;
+  if (typeof variacoesEscolhidasBruta === "string" && variacoesEscolhidasBruta) {
+    try {
+      const parsed = JSON.parse(variacoesEscolhidasBruta);
+      if (parsed && typeof parsed === "object") variacoesEscolhidas = parsed;
+    } catch {
+      // ignora e segue sem override de dimensão
+    }
+  } else if (variacoesEscolhidasBruta && typeof variacoesEscolhidasBruta === "object") {
+    variacoesEscolhidas = variacoesEscolhidasBruta as Record<string, string>;
+  }
 
   let resposta: Response;
   try {
@@ -140,7 +171,13 @@ export async function consultarCep(
     throw new ErroDeNegocio("CEP não encontrado.", 404);
   }
 
-  const opcoesFrete = await cotarOpcoesFrete(dados.uf, cep, produtoId, quantidade);
+  const opcoesFrete = await cotarOpcoesFrete(
+    dados.uf,
+    cep,
+    produtoId,
+    quantidade,
+    variacoesEscolhidas
+  );
   // Serviço escolhido pelo cliente no checkout (ex: "SEDEX"), se existir e
   // continuar entre as opções cotadas agora; senão, a mais barata (primeira
   // da lista, já vem ordenada).
@@ -182,7 +219,8 @@ export async function consultarEnderecoSalvo(
   enderecoIdBruto: unknown,
   produtoIdBruto?: unknown,
   quantidadeBruta?: unknown,
-  servicoEscolhidoBruto?: unknown
+  servicoEscolhidoBruto?: unknown,
+  variacoesEscolhidasBruta?: unknown
 ): Promise<EnderecoDeEntregaSalvo> {
   const enderecoId = typeof enderecoIdBruto === "string" ? enderecoIdBruto : null;
   if (!enderecoId) throw new ErroDeNegocio("Escolha um endereço de entrega.");
@@ -194,7 +232,8 @@ export async function consultarEnderecoSalvo(
     salvo.cep,
     produtoIdBruto,
     quantidadeBruta,
-    servicoEscolhidoBruto
+    servicoEscolhidoBruto,
+    variacoesEscolhidasBruta
   );
 
   return {

@@ -164,6 +164,13 @@ model Variacao {
   // entrada, usa o custoTotal normal do produto. Ver custoEfetivo em
   // lib/estoque-variacao.ts. Dado interno, nunca sai pela API pública.
   custosValores  Json?
+  // Peso/dimensões final por valor (ex: "7x5" => { pesoMiligramas: 4500,
+  // alturaMm: 0.4, larguraMm: 150, comprimentoMm: 200 }). Mesmo padrão
+  // substitutivo de precosValores, mas campo a campo: um valor pode
+  // sobrescrever só o peso e herdar altura/largura/comprimento do produto.
+  // Sem entrada pro valor, usa as dimensões normais do produto — ver
+  // dimensaoEfetiva em lib/estoque-variacao.ts.
+  dimensoesValores Json?
 }
 
 // Slide do carrossel da home, editável em /admin/banners. `ordem` é a posição

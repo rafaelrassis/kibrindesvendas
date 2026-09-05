@@ -21,11 +21,30 @@ export type EnderecoConsultado = {
 // aviso de "Calculando...", até a resposta nova chegar.
 type Resposta = { cep: string; quantidade: number; endereco?: EnderecoConsultado; erro?: string };
 
+// Chave estável pra comparar/depender das variações escolhidas sem disparar
+// o efeito de novo a cada render por causa de um objeto novo com o mesmo
+// conteúdo (ex: pai recriando o Record a cada render).
+function chaveVariacoes(v?: Record<string, string>): string {
+  if (!v) return "";
+  return Object.keys(v)
+    .sort()
+    .map((k) => `${k}:${v[k]}`)
+    .join("|");
+}
+
 // Consulta o CEP (endereço + frete) sempre que ele fica completo. CEP
 // incompleto não dispara nada — é o estado normal de quem está digitando.
-export function useCep(valor: string, produtoId?: string, quantidade = 1) {
+// `variacoesEscolhidas` afeta o peso/dimensão cotados quando o produto tem
+// peso por valor de variação (ex: tamanho de ímã) — ver dimensaoEfetiva.
+export function useCep(
+  valor: string,
+  produtoId?: string,
+  quantidade = 1,
+  variacoesEscolhidas?: Record<string, string>
+) {
   const cep = normalizarCep(valor);
   const [resposta, setResposta] = useState<Resposta | undefined>(undefined);
+  const variacoesKey = chaveVariacoes(variacoesEscolhidas);
 
   useEffect(() => {
     if (!cep) return;
@@ -34,6 +53,9 @@ export function useCep(valor: string, produtoId?: string, quantidade = 1) {
     const params = new URLSearchParams();
     if (produtoId) params.set("produtoId", produtoId);
     if (quantidade > 1) params.set("quantidade", String(quantidade));
+    if (variacoesEscolhidas && Object.keys(variacoesEscolhidas).length > 0) {
+      params.set("variacoes", JSON.stringify(variacoesEscolhidas));
+    }
     const query = params.toString();
     const url = query ? `/api/cep/${cep}?${query}` : `/api/cep/${cep}`;
 
@@ -54,7 +76,8 @@ export function useCep(valor: string, produtoId?: string, quantidade = 1) {
     return () => {
       ativo = false;
     };
-  }, [cep, produtoId, quantidade]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- variacoesKey já resume variacoesEscolhidas
+  }, [cep, produtoId, quantidade, variacoesKey]);
 
   const atual =
     cep && resposta?.cep === cep && resposta?.quantidade === quantidade ? resposta : undefined;

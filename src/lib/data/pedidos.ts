@@ -56,7 +56,14 @@ export async function criarPedido(
       where: { id: item.produtoId },
       include: { estoqueVariacoes: true, variacoes: true },
     }),
-    consultarEnderecoSalvo(usuarioId, enderecoId, item.produtoId, quantidade, servicoFrete),
+    consultarEnderecoSalvo(
+      usuarioId,
+      enderecoId,
+      item.produtoId,
+      quantidade,
+      servicoFrete,
+      item.variacoesEscolhidas
+    ),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);

@@ -1,6 +1,6 @@
 // Sem "server-only": usado tanto no admin (montar a grade) quanto na página
 // do produto (checar a combinação escolhida), então roda no cliente também.
-import type { Produto } from "./types";
+import type { DimensaoValor, Produto } from "./types";
 
 // Chave canônica de uma combinação de variações escolhidas — tipos
 // ordenados alfabeticamente pra "Cor:Preta|Tamanho:G" dar sempre a mesma
@@ -47,6 +47,38 @@ export function custoEfetivo(
     if (custo != null) return custo;
   }
   return produto.custoTotal;
+}
+
+// Peso/dimensões pra uma seleção de variações: percorre as variações na
+// ordem cadastrada e usa a primeira entrada aplicável em dimensoesValores —
+// mas campo a campo, não tudo-ou-nada: um valor com só pesoMiligramas
+// cadastrado herda altura/largura/comprimento do produto normalmente. Sem
+// nenhuma entrada aplicável, cai nas dimensões normais do produto (mesmo
+// comportamento de sempre, produto sem essa config).
+export function dimensaoEfetiva<
+  T extends { pesoMiligramas: number; alturaMm: number; larguraMm: number; comprimentoMm: number }
+>(
+  produto: T & { variacoes: { tipo: string; dimensoesValores?: Record<string, DimensaoValor> | null }[] },
+  selecoes: Record<string, string>
+): T {
+  let override: DimensaoValor | undefined;
+  for (const v of produto.variacoes) {
+    const valor = selecoes[v.tipo];
+    if (valor == null) continue;
+    const dim = v.dimensoesValores?.[valor];
+    if (dim != null) {
+      override = dim;
+      break;
+    }
+  }
+  if (!override) return produto;
+  return {
+    ...produto,
+    pesoMiligramas: override.pesoMiligramas ?? produto.pesoMiligramas,
+    alturaMm: override.alturaMm ?? produto.alturaMm,
+    larguraMm: override.larguraMm ?? produto.larguraMm,
+    comprimentoMm: override.comprimentoMm ?? produto.comprimentoMm,
+  };
 }
 
 export function buildCombinacaoKey(escolhas: Record<string, string>): string {

@@ -4,7 +4,7 @@ import { slugify } from "@/lib/slug";
 import { ehUrlDeImagem } from "@/lib/imagens";
 import { ehUrlDeVideo } from "@/lib/video";
 import { normalizarCep } from "@/lib/frete";
-import type { Produto, ProdutoAdmin } from "@/lib/types";
+import type { DimensaoValor, Produto, ProdutoAdmin } from "@/lib/types";
 import type {
   Produto as ProdutoDb,
   Variacao as VariacaoDb,
@@ -46,6 +46,29 @@ export function normalizarPrecosValores(bruto: unknown): Record<string, number> 
   const entradas = Object.entries(bruto as Record<string, unknown>)
     .map(([valor, preco]) => [valor, Number(preco)] as const)
     .filter(([, preco]) => Number.isFinite(preco) && preco >= 0);
+  return entradas.length > 0 ? Object.fromEntries(entradas) : null;
+}
+
+// Mesma ideia, mas pro peso/dimensão por valor: cada valor guarda um objeto
+// parcial (só os campos que a variação sobrescreve), então valida campo a
+// campo em vez de tudo-ou-nada — entrada com só `pesoMiligramas` válido
+// mantém só esse campo, mesmo que `alturaMm` do JSON esteja quebrado.
+export function normalizarDimensoesValores(
+  bruto: unknown
+): Record<string, DimensaoValor> | null {
+  if (!bruto || typeof bruto !== "object") return null;
+  const CAMPOS = ["pesoMiligramas", "alturaMm", "larguraMm", "comprimentoMm"] as const;
+  const entradas = Object.entries(bruto as Record<string, unknown>)
+    .map(([valor, dim]) => {
+      if (!dim || typeof dim !== "object") return [valor, {}] as const;
+      const obj: DimensaoValor = {};
+      for (const campo of CAMPOS) {
+        const n = Number((dim as Record<string, unknown>)[campo]);
+        if (Number.isFinite(n) && n >= 0) obj[campo] = n;
+      }
+      return [valor, obj] as const;
+    })
+    .filter(([, dim]) => Object.keys(dim).length > 0);
   return entradas.length > 0 ? Object.fromEntries(entradas) : null;
 }
 
@@ -114,6 +137,7 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     variacoes: produtoPublico.variacoes.map((v, i) => ({
       ...v,
       custosValores: normalizarPrecosValores(p.variacoes[i]?.custosValores),
+      dimensoesValores: normalizarDimensoesValores(p.variacoes[i]?.dimensoesValores),
     })),
     materiais,
     custoTotal: Math.round(custoTotal * 100) / 100,
@@ -266,6 +290,7 @@ export type DadosProduto = {
     imagensValores?: Record<string, string[]> | null;
     precosValores?: Record<string, number> | null;
     custosValores?: Record<string, number> | null;
+    dimensoesValores?: Record<string, DimensaoValor> | null;
   }[];
   materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
@@ -363,6 +388,13 @@ function validar(dados: Partial<DadosProduto>) {
           throw new ErroDeNegocio(`Custo inválido em "${valor}" — não pode ser negativo.`);
         }
       }
+      for (const [valor, dim] of Object.entries(v.dimensoesValores ?? {})) {
+        for (const [campo, n] of Object.entries(dim)) {
+          if (n != null && !(Number(n) >= 0)) {
+            throw new ErroDeNegocio(`${campo} inválido em "${valor}" — não pode ser negativo.`);
+          }
+        }
+      }
     }
   }
   if (dados.estoque != null && (!Number.isInteger(dados.estoque) || dados.estoque < 0)) {
@@ -450,6 +482,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
           imagensValores: v.imagensValores ?? undefined,
           precosValores: v.precosValores ?? undefined,
           custosValores: v.custosValores ?? undefined,
+          dimensoesValores: v.dimensoesValores ?? undefined,
         })),
       },
       estoqueVariacoes: {
@@ -549,6 +582,7 @@ export async function atualizarProduto(
               imagensValores: v.imagensValores ?? undefined,
               precosValores: v.precosValores ?? undefined,
               custosValores: v.custosValores ?? undefined,
+              dimensoesValores: v.dimensoesValores ?? undefined,
             })),
           },
         }),
