@@ -305,6 +305,41 @@ export const faqs = [
     resposta:
       "Vendemos os mesmos produtos por um preço menor no site porque não pagamos a taxa da plataforma. A Shopee continua sendo uma opção com toda a proteção de compra de lá.",
   },
+  {
+    id: "faq-formas-pagamento",
+    ordem: 5,
+    pergunta: "Quais formas de pagamento vocês aceitam?",
+    resposta:
+      "Pix, cartão de crédito e boleto, tudo processado pelo Mercado Pago. O Pix costuma confirmar na hora; o boleto pode levar até 2 dias úteis para compensar.",
+  },
+  {
+    id: "faq-calculo-frete",
+    ordem: 6,
+    pergunta: "Como é calculado o frete?",
+    resposta:
+      "O frete é cotado direto com os Correios a partir do seu CEP, na etapa do carrinho, antes de você fechar o pedido. O valor e o prazo mudam conforme a região e o tamanho do pedido.",
+  },
+  {
+    id: "faq-rastreio-pedido",
+    ordem: 7,
+    pergunta: "Como acompanho o rastreio do meu pedido?",
+    resposta:
+      "Assim que o pedido é postado, o código de rastreio aparece na página do pedido, dentro do seu perfil, e você recebe uma notificação por lá também.",
+  },
+  {
+    id: "faq-quantidade-minima",
+    ordem: 8,
+    pergunta: "Existe quantidade mínima para personalizar um produto?",
+    resposta:
+      "Depende do produto: alguns têm quantidade mínima por causa do processo de produção. Isso fica indicado na própria página do produto, antes de você personalizar.",
+  },
+  {
+    id: "faq-troca-devolucao",
+    ordem: 9,
+    pergunta: "Como funciona troca ou devolução?",
+    resposta:
+      "Você pede a devolução direto pelo seu perfil, na página do pedido. Produtos com defeito ou divergentes do anunciado são trocados ou reembolsados; produtos personalizados sob medida têm avaliação caso a caso.",
+  },
 ];
 
 export function getProduto(id: string) {
