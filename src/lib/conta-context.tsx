@@ -92,7 +92,10 @@ export function ContaProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dados),
     });
-    if (!r.ok) throw new Error((await r.json()).error ?? "Não foi possível salvar.");
+    if (!r.ok) {
+      const corpo = await r.json().catch(() => null);
+      throw new Error(corpo?.error ?? "Não foi possível salvar.");
+    }
     setPerfil(await r.json());
   }, []);
 

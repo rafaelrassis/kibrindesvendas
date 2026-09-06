@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ErroDeNegocio } from "./erros";
 import { apenasDigitos, cpfValido } from "@/lib/cpf";
@@ -39,18 +40,27 @@ export async function atualizarPerfil(
     throw new ErroDeNegocio("CPF inválido.");
   }
 
-  const u = await prisma.usuario.update({
-    where: { id: usuarioId },
-    data: {
-      nome,
-      telefone,
-      // Mesmo formato usado no cadastro (só dígitos) — é o que vai direto pro
-      // Mercado Pago na hora de gerar o Pix.
-      cpf: apenasDigitos(cpfBruto),
-      aniversario: dados.aniversario?.trim() || null,
-    },
-    select: { nome: true, email: true, telefone: true, cpf: true, aniversario: true },
-  });
+  let u;
+  try {
+    u = await prisma.usuario.update({
+      where: { id: usuarioId },
+      data: {
+        nome,
+        telefone,
+        // Mesmo formato usado no cadastro (só dígitos) — é o que vai direto pro
+        // Mercado Pago na hora de gerar o Pix.
+        cpf: apenasDigitos(cpfBruto),
+        aniversario: dados.aniversario?.trim() || null,
+      },
+      select: { nome: true, email: true, telefone: true, cpf: true, aniversario: true },
+    });
+  } catch (e) {
+    // CPF é @unique: outra conta já usa esse número.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      throw new ErroDeNegocio("Esse CPF já está cadastrado em outra conta.");
+    }
+    throw e;
+  }
   return {
     nome: u.nome,
     email: u.email,
