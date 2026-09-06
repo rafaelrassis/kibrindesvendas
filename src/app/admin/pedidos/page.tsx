@@ -6,6 +6,7 @@ import { getPedidosRecentes } from "@/lib/data/pedidos";
 import { exigirAdmin } from "@/lib/admin";
 import { CLASSE_STATUS, labelStatus } from "@/lib/status-pedido";
 import { formatarCep } from "@/lib/frete";
+import { formatarCpf } from "@/lib/cpf";
 
 export default async function AdminPedidosPage() {
   await exigirAdmin();
@@ -42,7 +43,11 @@ export default async function AdminPedidosPage() {
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-ink/50 mb-2">{p.usuario.email}</p>
+              <p className="text-xs text-ink/50 mb-2">
+                {p.usuario.email}
+                {p.usuario.telefone && ` · ${p.usuario.telefone}`}
+                {p.usuario.cpf && ` · CPF ${formatarCpf(p.usuario.cpf)}`}
+              </p>
 
               {/* Mudar o status aqui avisa o cliente na tela de notificações */}
               <AdminPedidoStatus pedidoId={p.id} statusAtual={p.status} />
@@ -93,15 +98,28 @@ export default async function AdminPedidosPage() {
                 </p>
               )}
 
-              <p className="font-mono text-sm font-medium mt-2">
-                R$ {Number(p.total).toFixed(2).replace(".", ",")}{" "}
-                <span className="font-sans text-xs font-normal text-ink/50">
-                  {/* Frete zerado por cupom ou pelo valor mínimo da loja — dito
-                      com todas as letras pra não parecer erro de cálculo. */}
+              <div className="font-mono text-xs text-ink/50 mt-2 space-y-0.5">
+                <p>
+                  Produtos: R${" "}
+                  {(Number(p.total) - Number(p.frete) + Number(p.desconto))
+                    .toFixed(2)
+                    .replace(".", ",")}
+                </p>
+                {Number(p.desconto) > 0 && (
+                  <p>
+                    Desconto{p.cupomCodigo ? ` (${p.cupomCodigo})` : ""}: -R${" "}
+                    {Number(p.desconto).toFixed(2).replace(".", ",")}
+                  </p>
+                )}
+                <p>
+                  Frete:{" "}
                   {p.freteGratis
-                    ? "(frete grátis)"
-                    : `(frete R$ ${Number(p.frete).toFixed(2).replace(".", ",")})`}
-                </span>
+                    ? "grátis"
+                    : `R$ ${Number(p.frete).toFixed(2).replace(".", ",")}`}
+                </p>
+              </div>
+              <p className="font-mono text-sm font-medium mt-1">
+                Total: R$ {Number(p.total).toFixed(2).replace(".", ",")}
               </p>
             </div>
           ))}
