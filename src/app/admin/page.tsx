@@ -1,7 +1,10 @@
 import AdminNav from "@/components/AdminNav";
 import {
   GraficoCanal,
+  GraficoDevolucoes,
   GraficoFrete,
+  GraficoLucroPorDia,
+  GraficoLucroPorProduto,
   GraficoProdutos,
   GraficoStatus,
   GraficoVendas,
@@ -19,6 +22,9 @@ export default async function AdminPainelPage() {
     estoqueBaixo,
     vendasPorCanal,
     cuponsMaisUsados,
+    lucroPorDia,
+    lucroPorProduto,
+    devolucoesPorDia,
     resumo,
   } = await getDadosDoPainel();
 
@@ -42,6 +48,7 @@ export default async function AdminPainelPage() {
           valor={`${resumo.totalDevolucoes} (${resumo.taxaDevolucao.toFixed(1).replace(".", ",")}%)`}
           alerta={resumo.taxaDevolucao > 10}
         />
+        <Cartao label="Valor devolvido" valor={reais(resumo.valorDevolvido)} />
         <Cartao
           label="Lucro estimado"
           valor={`${reais(resumo.lucroEstimado)} (${resumo.margemPct.toFixed(0)}%)`}
@@ -53,6 +60,28 @@ export default async function AdminPainelPage() {
       <Bloco titulo="Vendas por dia">
         {semVendas ? <Vazio texto="Nenhuma venda no período." /> : <GraficoVendas dados={vendasPorDia} />}
       </Bloco>
+
+      <Bloco titulo="Faturamento x custo x lucro">
+        {semVendas ? <Vazio texto="Nenhuma venda no período." /> : <GraficoLucroPorDia dados={lucroPorDia} />}
+      </Bloco>
+
+      <div className="grid md:grid-cols-2 gap-4 mt-4 min-w-0">
+        <Bloco titulo="Lucro por produto (top 5)">
+          {lucroPorProduto.length === 0 ? (
+            <Vazio texto="Nenhuma venda no período." />
+          ) : (
+            <GraficoLucroPorProduto dados={lucroPorProduto} />
+          )}
+        </Bloco>
+
+        <Bloco titulo="Valor devolvido por dia">
+          {resumo.valorDevolvido === 0 ? (
+            <Vazio texto="Nenhuma devolução no período." />
+          ) : (
+            <GraficoDevolucoes dados={devolucoesPorDia} />
+          )}
+        </Bloco>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-4 mt-4 min-w-0">
         <Bloco titulo="Pedidos por status">

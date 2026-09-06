@@ -65,6 +65,9 @@ export type FreteServico = { servico: string; quantidade: number };
 export type ProdutoEstoqueBaixo = { nome: string; combinacao: string | null; estoque: number };
 export type CanalDeVenda = { canal: "Site" | "Shopee"; total: number; pedidos: number; ticketMedio: number };
 export type CupomUsado = { codigo: string; usos: number; descontoTotal: number };
+export type LucroDoDia = { dia: string; faturamento: number; custo: number; lucro: number };
+export type LucroPorProduto = { nome: string; receita: number; custo: number; lucro: number; margemPct: number };
+export type DevolucaoDoDia = { dia: string; valor: number };
 
 export type ResumoDoPainel = {
   totalVendas: number;
@@ -72,6 +75,7 @@ export type ResumoDoPainel = {
   ticketMedio: number;
   totalDevolucoes: number;
   taxaDevolucao: number;
+  valorDevolvido: number;
   lucroEstimado: number;
   margemPct: number;
   descontoTotalConcedido: number;
@@ -85,6 +89,9 @@ export type DadosDoPainel = {
   estoqueBaixo: ProdutoEstoqueBaixo[];
   vendasPorCanal: CanalDeVenda[];
   cuponsMaisUsados: CupomUsado[];
+  lucroPorDia: LucroDoDia[];
+  lucroPorProduto: LucroPorProduto[];
+  devolucoesPorDia: DevolucaoDoDia[];
   resumo: ResumoDoPainel;
 };
 
@@ -105,7 +112,7 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
   const [
     pedidos,
     produtosMaisVendidos,
-    lucroEstimado,
+    { lucroEstimado, lucroPorDia, lucroPorProduto },
     vendasPorFrete,
     estoqueBaixo,
     vendasPorCanal,
@@ -118,7 +125,7 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
       select: { status: true, total: true, createdAt: true },
     }),
     getProdutosMaisVendidos(inicio),
-    getLucroEstimado(inicio),
+    getLucroDetalhado(inicio, agora),
     getVendasPorFrete(inicio),
     getEstoqueBaixo(),
     getVendasPorCanal(inicio),
@@ -128,20 +135,36 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
   // Dia sem venda tem que aparecer como zero, senão a linha do gráfico pula o
   // buraco e finge que o movimento foi contínuo.
   const centavosPorDia = new Map<string, number>();
+  const centavosDevolvidosPorDia = new Map<string, number>();
   const vendasPorDia: VendaDoDia[] = [];
+  const devolucoesPorDia: DevolucaoDoDia[] = [];
   for (let i = DIAS - 1; i >= 0; i--) {
     centavosPorDia.set(CHAVE_DO_DIA.format(agora - i * UM_DIA), 0);
+    centavosDevolvidosPorDia.set(CHAVE_DO_DIA.format(agora - i * UM_DIA), 0);
     vendasPorDia.push({ dia: ROTULO_DO_DIA.format(agora - i * UM_DIA), total: 0 });
+    devolucoesPorDia.push({ dia: ROTULO_DO_DIA.format(agora - i * UM_DIA), valor: 0 });
   }
 
   const porStatus = new Map<StatusPedido, number>();
   let centavosVendidos = 0;
   let totalPedidos = 0;
   let totalDevolucoes = 0;
+  let centavosDevolvidos = 0;
 
   for (const pedido of pedidos) {
     porStatus.set(pedido.status, (porStatus.get(pedido.status) ?? 0) + 1);
-    if (STATUS_DE_DEVOLUCAO.includes(pedido.status)) totalDevolucoes++;
+    if (STATUS_DE_DEVOLUCAO.includes(pedido.status)) {
+      totalDevolucoes++;
+      const centavosPedido = emCentavos(pedido.total);
+      centavosDevolvidos += centavosPedido;
+      const chaveDevolucao = CHAVE_DO_DIA.format(pedido.createdAt);
+      if (centavosDevolvidosPorDia.has(chaveDevolucao)) {
+        centavosDevolvidosPorDia.set(
+          chaveDevolucao,
+          centavosDevolvidosPorDia.get(chaveDevolucao)! + centavosPedido
+        );
+      }
+    }
     if (!CONTA_COMO_VENDA[pedido.status]) continue;
 
     const centavos = emCentavos(pedido.total);
@@ -158,6 +181,9 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
 
   Array.from(centavosPorDia.values()).forEach((centavos, i) => {
     vendasPorDia[i].total = centavos / 100;
+  });
+  Array.from(centavosDevolvidosPorDia.values()).forEach((centavos, i) => {
+    devolucoesPorDia[i].valor = centavos / 100;
   });
 
   // Na ordem do fluxo (status-pedido.ts), não na ordem em que os pedidos
@@ -181,12 +207,16 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
     estoqueBaixo,
     vendasPorCanal,
     cuponsMaisUsados: cupons.itens,
+    lucroPorDia,
+    lucroPorProduto,
+    devolucoesPorDia,
     resumo: {
       totalVendas,
       totalPedidos,
       ticketMedio: totalPedidos > 0 ? Math.round(centavosVendidos / totalPedidos) / 100 : 0,
       totalDevolucoes,
       taxaDevolucao: totalPedidos > 0 ? (totalDevolucoes / totalPedidos) * 100 : 0,
+      valorDevolvido: centavosDevolvidos / 100,
       lucroEstimado,
       margemPct: totalVendas > 0 ? (lucroEstimado / totalVendas) * 100 : 0,
       descontoTotalConcedido: cupons.descontoTotal,
@@ -198,16 +228,30 @@ export async function getDadosDoPainel(): Promise<DadosDoPainel> {
 // material de cada item vendido, na variação efetivamente escolhida. Não
 // desconta frete/comissão — é custo de produto puro, igual ao usado no
 // cadastro. Dado sensível: só chega até o painel admin, nunca à API pública.
-async function getLucroEstimado(inicio: Date): Promise<number> {
+// Além do total, monta a mesma conta quebrada por dia (pra comparar com a
+// evolução de vendas) e por produto (pra achar o que mais/menos dá lucro,
+// já que o mais vendido nem sempre é o mais rentável).
+async function getLucroDetalhado(
+  inicio: Date,
+  agora: number
+): Promise<{ lucroEstimado: number; lucroPorDia: LucroDoDia[]; lucroPorProduto: LucroPorProduto[] }> {
   const itens = await prisma.itemPedido.findMany({
     where: { pedido: { createdAt: { gte: inicio }, status: { in: STATUS_DE_VENDA } } },
     select: {
       quantidade: true,
       precoUnitario: true,
       variacaoEscolhida: true,
-      produto: { include: { materiais: true, variacoes: true } },
+      pedido: { select: { createdAt: true } },
+      produto: { select: { nome: true, emoji: true, materiais: true, variacoes: true } },
     },
   });
+
+  const centavosPorDia = new Map<string, { faturamento: number; custo: number }>();
+  for (let i = DIAS - 1; i >= 0; i--) {
+    centavosPorDia.set(CHAVE_DO_DIA.format(agora - i * UM_DIA), { faturamento: 0, custo: 0 });
+  }
+
+  const porProduto = new Map<string, { nome: string; receita: number; custo: number }>();
 
   let centavosFaturados = 0;
   let centavosCusto = 0;
@@ -224,11 +268,49 @@ async function getLucroEstimado(inicio: Date): Promise<number> {
       })) },
       selecoes
     );
-    centavosFaturados += emCentavos(item.precoUnitario) * item.quantidade;
-    centavosCusto += Math.round(custoUnitario * 100) * item.quantidade;
+    const centavosItemFaturado = emCentavos(item.precoUnitario) * item.quantidade;
+    const centavosItemCusto = Math.round(custoUnitario * 100) * item.quantidade;
+    centavosFaturados += centavosItemFaturado;
+    centavosCusto += centavosItemCusto;
+
+    const chave = CHAVE_DO_DIA.format(item.pedido.createdAt);
+    const doDia = centavosPorDia.get(chave);
+    if (doDia) {
+      doDia.faturamento += centavosItemFaturado;
+      doDia.custo += centavosItemCusto;
+    }
+
+    const nomeProduto = `${item.produto.emoji} ${item.produto.nome}`;
+    const doProduto = porProduto.get(nomeProduto) ?? { nome: nomeProduto, receita: 0, custo: 0 };
+    doProduto.receita += centavosItemFaturado;
+    doProduto.custo += centavosItemCusto;
+    porProduto.set(nomeProduto, doProduto);
   }
 
-  return (centavosFaturados - centavosCusto) / 100;
+  const lucroPorDia: LucroDoDia[] = [];
+  for (let i = DIAS - 1; i >= 0; i--) {
+    const chave = CHAVE_DO_DIA.format(agora - i * UM_DIA);
+    const { faturamento, custo } = centavosPorDia.get(chave)!;
+    lucroPorDia.push({
+      dia: ROTULO_DO_DIA.format(agora - i * UM_DIA),
+      faturamento: faturamento / 100,
+      custo: custo / 100,
+      lucro: (faturamento - custo) / 100,
+    });
+  }
+
+  const lucroPorProduto = Array.from(porProduto.values())
+    .map((p) => ({
+      nome: p.nome,
+      receita: p.receita / 100,
+      custo: p.custo / 100,
+      lucro: (p.receita - p.custo) / 100,
+      margemPct: p.receita > 0 ? ((p.receita - p.custo) / p.receita) * 100 : 0,
+    }))
+    .sort((a, b) => b.lucro - a.lucro)
+    .slice(0, TOP_PRODUTOS);
+
+  return { lucroEstimado: (centavosFaturados - centavosCusto) / 100, lucroPorDia, lucroPorProduto };
 }
 
 // Serviço de frete escolhido em cada pedido pago (PAC, SEDEX...). null vira
