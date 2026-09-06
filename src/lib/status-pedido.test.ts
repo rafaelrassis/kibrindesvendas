@@ -6,6 +6,7 @@ import {
   STATUS_PEDIDO,
   labelStatus,
   podeSolicitarDevolucao,
+  valorReembolsoValido,
 } from "./status-pedido";
 
 describe("labelStatus", () => {
@@ -39,5 +40,29 @@ describe("podeSolicitarDevolucao", () => {
     expect(podeSolicitarDevolucao("DEVOLUCAO_SOLICITADA")).toBe(false);
     expect(podeSolicitarDevolucao("DEVOLVIDO")).toBe(false);
     expect(podeSolicitarDevolucao("CANCELADO")).toBe(false);
+  });
+});
+
+describe("valorReembolsoValido", () => {
+  it("aceita um valor positivo que cabe no total", () => {
+    expect(valorReembolsoValido(100, 0, 30)).toBe(true);
+  });
+
+  it("aceita reembolsos somados até bater exatamente o total", () => {
+    expect(valorReembolsoValido(100, 60, 40)).toBe(true);
+  });
+
+  it("recusa valor zero ou negativo", () => {
+    expect(valorReembolsoValido(100, 0, 0)).toBe(false);
+    expect(valorReembolsoValido(100, 0, -10)).toBe(false);
+  });
+
+  it("recusa quando a soma ultrapassa o total já pago", () => {
+    expect(valorReembolsoValido(100, 60, 41)).toBe(false);
+    expect(valorReembolsoValido(100, 0, 100.01)).toBe(false);
+  });
+
+  it("recusa valor não numérico", () => {
+    expect(valorReembolsoValido(100, 0, NaN)).toBe(false);
   });
 });

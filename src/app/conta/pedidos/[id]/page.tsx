@@ -123,6 +123,12 @@ export default function DetalhePedidoPage() {
             Motivo da devolução: {pedido.motivoDevolucao}
           </p>
         )}
+        {pedido.valorReembolsado ? (
+          <p className="text-xs text-pine-2 mt-2">
+            Reembolsamos {reais(pedido.valorReembolsado)} deste pedido — o produto continua com
+            você.
+          </p>
+        ) : null}
       </div>
 
       {/* Itens */}

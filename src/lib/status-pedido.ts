@@ -59,3 +59,16 @@ export function labelStatus(status: string) {
 export function podeSolicitarDevolucao(status: string) {
   return status === "ENTREGUE";
 }
+
+// Reembolso parcial (sem devolução do produto) não pode passar do que o
+// cliente pagou, somando com o que já tiver sido reembolsado antes — a soma
+// nunca pode superar `total`, senão a loja devolveria mais dinheiro do que
+// recebeu.
+export function valorReembolsoValido(total: number, jaReembolsado: number, novoValor: number) {
+  if (!Number.isFinite(novoValor) || novoValor <= 0) return false;
+  return emReaisArredondado(jaReembolsado + novoValor) <= emReaisArredondado(total);
+}
+
+function emReaisArredondado(valor: number) {
+  return Math.round(valor * 100) / 100;
+}

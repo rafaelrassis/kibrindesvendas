@@ -3,7 +3,7 @@ import { Prisma, StatusPedido } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ItemCarrinho } from "@/lib/cart-context";
 import type { Pedido } from "@/lib/types";
-import { podeSolicitarDevolucao } from "@/lib/status-pedido";
+import { podeSolicitarDevolucao, valorReembolsoValido } from "@/lib/status-pedido";
 import {
   baseUrl,
   pagamentoRealConfigurado,
@@ -378,6 +378,8 @@ export function paraPedidoPublico(pedido: PedidoComItens): Pedido {
     cupomCodigo: pedido.cupomCodigo,
     enderecoResumo: pedido.enderecoResumo,
     motivoDevolucao: pedido.motivoDevolucao,
+    valorReembolsado: pedido.valorReembolsado ? Number(pedido.valorReembolsado) : null,
+    motivoReembolso: pedido.motivoReembolso,
     codigoRastreio: pedido.codigoRastreio,
     pagamentoMock: pedido.pagamentoMock,
     createdAt: pedido.createdAt.toISOString(),
@@ -452,6 +454,69 @@ export async function solicitarDevolucao(usuarioId: string, id: string, motivoBr
 
     return paraPedidoPublico(atualizado);
   });
+}
+
+// Reembolso decidido pela loja: o cliente fica com o produto e recebe de
+// volta parte (ou todo) o dinheiro pago. Diferente da devolução física acima,
+// não mexe no `status` do pedido — o produto não vai voltar, então o fluxo de
+// entrega/devolução segue seu curso normal.
+export async function concederReembolsoSemDevolucao(
+  id: string,
+  valorBruto: unknown,
+  motivoBruto: unknown
+) {
+  const valor = Math.round(Number(valorBruto) * 100) / 100;
+  const motivo = typeof motivoBruto === "string" ? motivoBruto.trim() : "";
+  if (!motivo) throw new ErroDeNegocio("Descreva o motivo do reembolso.");
+
+  const pedido = await prisma.pedido.findUnique({
+    where: { id },
+    include: { usuario: true, itens: { include: { produto: true } } },
+  });
+  if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
+
+  const jaReembolsado = Number(pedido.valorReembolsado ?? 0);
+  if (!valorReembolsoValido(Number(pedido.total), jaReembolsado, valor)) {
+    throw new ErroDeNegocio(
+      "Valor de reembolso inválido — não pode ser zero, negativo, nem somar mais do que o pedido custou."
+    );
+  }
+
+  const totalReembolsado = emReais(jaReembolsado + valor);
+
+  const atualizado = await prisma.$transaction(async (tx) => {
+    const atualizado = await tx.pedido.update({
+      where: { id },
+      data: {
+        valorReembolsado: totalReembolsado,
+        motivoReembolso: motivo,
+        reembolsadoEm: new Date(),
+      },
+    });
+
+    await notificar(
+      pedido.usuarioId,
+      "Reembolso realizado",
+      `Devolvemos ${formatarReais(valor)} referente ao seu pedido. O produto continua com você.`,
+      tx
+    );
+
+    return atualizado;
+  });
+
+  enviarEmailStatusPedido(
+    pedido.usuario.email,
+    pedido.usuario.nome,
+    "Reembolso realizado",
+    `Devolvemos ${formatarReais(valor)} referente ao seu pedido #${pedido.id.slice(0, 8)}. O produto continua com você, não precisa devolver nada. Motivo: ${motivo}`,
+    resumoPedidoParaEmail(pedido)
+  ).catch(() => {});
+
+  return atualizado;
+}
+
+function formatarReais(valor: number) {
+  return `R$ ${valor.toFixed(2).replace(".", ",")}`;
 }
 
 // Apaga o pedido de vez (itens e personalização vão junto, por cascade no

@@ -337,6 +337,13 @@ model Pedido {
   enderecoComplemento   String?
   // Preenchido quando o cliente pede devolução, pra loja saber o que houve.
   motivoDevolucao String?
+  // Reembolso concedido pela loja sem o cliente devolver o produto (ex:
+  // avaria pequena, atraso). Fica registrado separado do fluxo de devolução
+  // física acima porque o produto continua com o cliente — não muda o
+  // `status` do pedido.
+  valorReembolsado Decimal?  @db.Decimal(10, 2)
+  motivoReembolso  String?
+  reembolsadoEm    DateTime?
   // Cupom aplicado neste pedido, se houver. O código fica congelado aqui
   // mesmo que o cupom seja editado ou apagado depois.
   cupomCodigo     String?

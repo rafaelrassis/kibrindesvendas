@@ -196,6 +196,10 @@ export type Pedido = {
   cupomCodigo: string | null;
   enderecoResumo: string | null;
   motivoDevolucao: string | null;
+  // Reembolso concedido pela loja sem devolução do produto — o cliente fica
+  // com o item e recebe (parte d)o dinheiro de volta. null = nenhum ainda.
+  valorReembolsado: number | null;
+  motivoReembolso: string | null;
   // Código dos Correios (ou da transportadora cotada), preenchido pelo admin
   // depois que o pedido é despachado. null até lá.
   codigoRastreio: string | null;

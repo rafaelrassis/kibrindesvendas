@@ -2,6 +2,7 @@ import AdminNav from "@/components/AdminNav";
 import AdminPedidoStatus from "@/components/AdminPedidoStatus";
 import AdminPedidoRastreio from "@/components/AdminPedidoRastreio";
 import AdminPedidoRemover from "@/components/AdminPedidoRemover";
+import AdminPedidoReembolso from "@/components/AdminPedidoReembolso";
 import { getPedidosRecentes } from "@/lib/data/pedidos";
 import { exigirAdmin } from "@/lib/admin";
 import { CLASSE_STATUS, labelStatus } from "@/lib/status-pedido";
@@ -52,6 +53,10 @@ export default async function AdminPedidosPage() {
               {/* Mudar o status aqui avisa o cliente na tela de notificações */}
               <AdminPedidoStatus pedidoId={p.id} statusAtual={p.status} />
               <AdminPedidoRastreio pedidoId={p.id} codigoAtual={p.codigoRastreio} />
+              <AdminPedidoReembolso
+                pedidoId={p.id}
+                valorJaReembolsado={p.valorReembolsado ? Number(p.valorReembolsado) : null}
+              />
               <AdminPedidoRemover pedidoId={p.id} />
 
               {p.itens.map((item) => (
@@ -95,6 +100,13 @@ export default async function AdminPedidosPage() {
               {p.motivoDevolucao && (
                 <p className="text-xs text-berry mt-1">
                   Devolução pedida pelo cliente: {p.motivoDevolucao}
+                </p>
+              )}
+
+              {p.motivoReembolso && (
+                <p className="text-xs text-berry mt-1">
+                  Reembolso de R$ {Number(p.valorReembolsado).toFixed(2).replace(".", ",")} sem
+                  devolução: {p.motivoReembolso}
                 </p>
               )}
 
