@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -16,8 +18,11 @@ import {
 } from "recharts";
 import type {
   CanalDeVenda,
+  DevolucaoDoDia,
   FatiaDeStatus,
   FreteServico,
+  LucroDoDia,
+  LucroPorProduto,
   ProdutoVendido,
   VendaDoDia,
 } from "@/lib/data/dashboard";
@@ -122,6 +127,96 @@ export function GraficoFrete({ dados }: { dados: FreteServico[] }) {
         />
         <Bar dataKey="quantidade" fill="#9c1c95" radius={[0, 4, 4, 0]} />
       </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function GraficoLucroPorDia({ dados }: { dados: LucroDoDia[] }) {
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={dados} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={GRADE} />
+          <XAxis dataKey="dia" tick={EIXO} interval={4} tickLine={false} />
+          <YAxis tick={EIXO} width={44} tickLine={false} axisLine={false} />
+          <Tooltip
+            contentStyle={CAIXA_TOOLTIP}
+            formatter={(valor, nome) => [reais(Number(valor)), NOME_SERIE_LUCRO[String(nome)] ?? String(nome)]}
+          />
+          <Line type="monotone" dataKey="faturamento" stroke="#9c1c95" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="custo" stroke="#d9a63e" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="lucro" stroke="#3f6b4c" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+
+      <ul className="mt-2 flex justify-center gap-4 text-xs text-ink/60">
+        <LegendaLinha cor="#9c1c95" texto="Faturamento" />
+        <LegendaLinha cor="#d9a63e" texto="Custo" />
+        <LegendaLinha cor="#3f6b4c" texto="Lucro" />
+      </ul>
+    </div>
+  );
+}
+
+const NOME_SERIE_LUCRO: Record<string, string> = {
+  faturamento: "Faturamento",
+  custo: "Custo",
+  lucro: "Lucro",
+};
+
+function LegendaLinha({ cor, texto }: { cor: string; texto: string }) {
+  return (
+    <li className="flex items-center gap-1.5">
+      <span aria-hidden className="h-0.5 w-3 shrink-0" style={{ background: cor }} />
+      {texto}
+    </li>
+  );
+}
+
+// Empilhado de propósito: custo + lucro somam a receita, então a barra mostra
+// de cara qual fatia do preço vendido virou material e qual sobrou de lucro.
+export function GraficoLucroPorProduto({ dados }: { dados: LucroPorProduto[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <BarChart data={dados} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={GRADE} horizontal={false} />
+        <XAxis type="number" tick={EIXO} tickFormatter={(v) => reais(Number(v))} tickLine={false} />
+        <YAxis type="category" dataKey="nome" tick={EIXO} width={130} tickLine={false} />
+        <Tooltip
+          contentStyle={CAIXA_TOOLTIP}
+          formatter={(valor, nome) => [reais(Number(valor)), NOME_SERIE_LUCRO[String(nome)] ?? String(nome)]}
+          labelFormatter={(_, payload) => {
+            const margem = payload?.[0]?.payload?.margemPct;
+            return typeof margem === "number" ? `Margem: ${margem.toFixed(0)}%` : "";
+          }}
+        />
+        <Bar dataKey="custo" stackId="preco" fill="#d9a63e" radius={[0, 0, 0, 0]} />
+        <Bar dataKey="lucro" stackId="preco" fill="#3f6b4c" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function GraficoDevolucoes({ dados }: { dados: DevolucaoDoDia[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <AreaChart data={dados} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={GRADE} />
+        <XAxis dataKey="dia" tick={EIXO} interval={4} tickLine={false} />
+        <YAxis tick={EIXO} width={44} tickLine={false} axisLine={false} />
+        <Tooltip
+          contentStyle={CAIXA_TOOLTIP}
+          formatter={(valor) => [reais(Number(valor)), "Devolvido"]}
+        />
+        <Area
+          type="monotone"
+          dataKey="valor"
+          stroke="#b23a48"
+          fill="#b23a48"
+          fillOpacity={0.15}
+          strokeWidth={2}
+        />
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
