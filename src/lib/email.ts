@@ -168,9 +168,10 @@ export async function enviarEmailStatusPedido(
   mensagem: string,
   pedido?: ResumoPedidoEmail
 ) {
+  const assunto = pedido ? `${titulo} — Pedido #${pedido.id.slice(0, 8)}` : titulo;
   await enviar(
     destinatario,
-    titulo,
+    assunto,
     layout(
       titulo,
       `<p>Olá, ${escaparHtml(nome)}!</p><p>${mensagem}</p>${pedido ? tabelaItens(pedido) : ""}`
