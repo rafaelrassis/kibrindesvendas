@@ -27,8 +27,10 @@ export async function POST(req: NextRequest) {
   const emailNormalizado = email.trim().toLowerCase();
   const ip = ipDaRequisicao(req.headers);
 
-  const porIp = checarLimite(`login:ip:${ip}`, LIMITE_IP, JANELA_SEGUNDOS);
-  const porEmail = checarLimite(`login:email:${emailNormalizado}`, LIMITE_EMAIL, JANELA_SEGUNDOS);
+  const [porIp, porEmail] = await Promise.all([
+    checarLimite(`login:ip:${ip}`, LIMITE_IP, JANELA_SEGUNDOS),
+    checarLimite(`login:email:${emailNormalizado}`, LIMITE_EMAIL, JANELA_SEGUNDOS),
+  ]);
   if (!porIp.permitido || !porEmail.permitido) {
     const espera = !porIp.permitido ? porIp.espereSegundos : (porEmail as { espereSegundos: number }).espereSegundos;
     return NextResponse.json(

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = ipDaRequisicao(req.headers);
-  const limite = checarLimite(`recuperar:${ip}`, LIMITE, JANELA_SEGUNDOS);
+  const limite = await checarLimite(`recuperar:${ip}`, LIMITE, JANELA_SEGUNDOS);
   if (!limite.permitido) {
     return NextResponse.json(
       { error: "Muitas tentativas. Aguarde alguns minutos e tente de novo." },
