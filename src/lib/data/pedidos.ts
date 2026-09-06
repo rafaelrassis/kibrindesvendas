@@ -13,7 +13,7 @@ import {
 import { consultarEnderecoSalvo, resumoDoEnderecoSalvo } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
-import { enviarEmailStatusPedido } from "@/lib/email";
+import { enviarEmailStatusPedido, type ResumoPedidoEmail } from "@/lib/email";
 import { devolverUsoCupom, normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
 import { getConfiguracaoLoja } from "./configuracao";
 import {
@@ -248,7 +248,22 @@ export async function criarPedido(
       "Pedido recebido!",
       produto.requerPersonalizacao
         ? `Recebemos seu pedido de ${produto.nome}. Sua arte entrou na fila de validação da nossa equipe.`
-        : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`
+        : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`,
+      {
+        id: pedido.id,
+        itens: [
+          {
+            nomeProduto: produto.nome,
+            quantidade,
+            precoUnitario,
+            variacao: item.variacoesEscolhidas ?? null,
+          },
+        ],
+        frete,
+        freteGratis,
+        desconto,
+        total,
+      }
     ).catch(() => {});
     return { pedido, checkoutUrl: `/pedido/confirmado?id=${pedido.id}` };
   }
@@ -476,6 +491,36 @@ const AVISO_POR_STATUS: Partial<Record<StatusPedido, string>> = {
   CANCELADO: "Seu pedido foi cancelado.",
 };
 
+// Reconstrói o resumo de itens/valores pro e-mail a partir do pedido já
+// gravado — os mesmos dados que a tela "Meus pedidos" mostra pro cliente.
+function resumoPedidoParaEmail(pedido: {
+  id: string;
+  frete: Prisma.Decimal | number;
+  freteGratis: boolean;
+  desconto: Prisma.Decimal | number;
+  total: Prisma.Decimal | number;
+  itens: {
+    quantidade: number;
+    precoUnitario: Prisma.Decimal | number;
+    variacaoEscolhida: Prisma.JsonValue;
+    produto: { nome: string };
+  }[];
+}): ResumoPedidoEmail {
+  return {
+    id: pedido.id,
+    itens: pedido.itens.map((item) => ({
+      nomeProduto: item.produto.nome,
+      quantidade: item.quantidade,
+      precoUnitario: Number(item.precoUnitario),
+      variacao: (item.variacaoEscolhida as Record<string, string> | null) ?? null,
+    })),
+    frete: Number(pedido.frete),
+    freteGratis: pedido.freteGratis,
+    desconto: Number(pedido.desconto),
+    total: Number(pedido.total),
+  };
+}
+
 // O status chega do corpo JSON da rota, então é texto até prova em contrário.
 function validarStatus(valor: unknown): StatusPedido {
   const valores = Object.values(StatusPedido) as string[];
@@ -488,7 +533,10 @@ function validarStatus(valor: unknown): StatusPedido {
 export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
   const status = validarStatus(statusBruto);
 
-  const pedido = await prisma.pedido.findUnique({ where: { id }, include: { usuario: true } });
+  const pedido = await prisma.pedido.findUnique({
+    where: { id },
+    include: { usuario: true, itens: { include: { produto: true } } },
+  });
   if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
 
   // Reenviar o mesmo status (dois cliques no select) não gera aviso repetido.
@@ -511,7 +559,8 @@ export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
       pedido.usuario.email,
       pedido.usuario.nome,
       "Atualização do seu pedido",
-      aviso
+      aviso,
+      resumoPedidoParaEmail(pedido)
     ).catch(() => {});
   }
 
@@ -530,7 +579,10 @@ export async function definirCodigoRastreio(id: string, codigoBruto: unknown) {
     throw new ErroDeNegocio("Código de rastreio muito longo.");
   }
 
-  const pedido = await prisma.pedido.findUnique({ where: { id }, include: { usuario: true } });
+  const pedido = await prisma.pedido.findUnique({
+    where: { id },
+    include: { usuario: true, itens: { include: { produto: true } } },
+  });
   if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
 
   const atualizado = await prisma.$transaction(async (tx) => {
@@ -558,7 +610,8 @@ export async function definirCodigoRastreio(id: string, codigoBruto: unknown) {
       pedido.usuario.email,
       pedido.usuario.nome,
       "Código de rastreio disponível",
-      `Seu pedido já tem código de rastreio: ${codigo}.`
+      `Seu pedido já tem código de rastreio: ${codigo}.`,
+      resumoPedidoParaEmail(pedido)
     ).catch(() => {});
   }
 
@@ -598,7 +651,7 @@ export async function registrarRetornoDoPagamento(pagamentoId: string) {
 
   const pedido = await prisma.pedido.findUnique({
     where: { id: pedidoId },
-    include: { usuario: true },
+    include: { usuario: true, itens: { include: { produto: true } } },
   });
   if (!pedido) return;
 
@@ -633,8 +686,12 @@ export async function registrarRetornoDoPagamento(pagamentoId: string) {
 
   const aviso = AVISO_POR_PAGAMENTO[status];
   if (aviso) {
-    enviarEmailStatusPedido(pedido.usuario.email, pedido.usuario.nome, aviso.titulo, aviso.mensagem).catch(
-      () => {}
-    );
+    enviarEmailStatusPedido(
+      pedido.usuario.email,
+      pedido.usuario.nome,
+      aviso.titulo,
+      aviso.mensagem,
+      resumoPedidoParaEmail(pedido)
+    ).catch(() => {});
   }
 }
