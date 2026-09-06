@@ -12,7 +12,16 @@ export default async function SuportePage() {
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-display text-3xl mb-2">Suporte / FAQ</h1>
       <p className="text-ink/60 mb-8">
-        Dúvidas mais comuns. Não encontrou o que precisa? Chama no WhatsApp.
+        Dúvidas mais comuns. Não encontrou o que precisa? Chama no WhatsApp:{" "}
+        <a
+          href="https://wa.me/5511978150707"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-pine underline hover:text-mustard"
+        >
+          (11) 97815-0707
+        </a>
+        .
       </p>
 
       <FaqAcordeao faqs={faqs} />

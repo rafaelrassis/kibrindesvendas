@@ -289,7 +289,7 @@ export const faqs = [
     ordem: 2,
     pergunta: "E se a minha arte estiver com problema?",
     resposta:
-      "Nossa equipe confere resolução, enquadramento e legibilidade antes de imprimir. Se algo estiver fora do padrão, entramos em contato pelo WhatsApp antes de seguir.",
+      "Nossa equipe confere resolução, enquadramento e legibilidade antes de imprimir. Se algo estiver fora do padrão, entramos em contato pelo WhatsApp (11) 97815-0707 — wa.me/5511978150707 — antes de seguir.",
   },
   {
     id: "faq-previa-ia",
@@ -338,7 +338,7 @@ export const faqs = [
     ordem: 9,
     pergunta: "Como funciona troca ou devolução?",
     resposta:
-      "Você pede a devolução direto pelo seu perfil, na página do pedido. Produtos com defeito ou divergentes do anunciado são trocados ou reembolsados; produtos personalizados sob medida têm avaliação caso a caso.",
+      "Você pede a devolução direto pelo seu perfil, na página do pedido. Produtos com defeito ou divergentes do anunciado são trocados ou reembolsados; produtos personalizados sob medida têm avaliação caso a caso. Qualquer dúvida, fale com a gente pelo WhatsApp (11) 97815-0707 — wa.me/5511978150707.",
   },
 ];
 
