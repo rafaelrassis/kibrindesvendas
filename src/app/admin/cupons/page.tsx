@@ -194,6 +194,8 @@ export default function AdminCuponsPage() {
                   {c.valorMinimoPedido > 0 && ` · pedido mín. ${reais(c.valorMinimoPedido)}`}
                   {c.validoAte &&
                     ` · válido até ${new Date(c.validoAte).toLocaleDateString("pt-BR")}`}
+                  {c.produtoNome && ` · só para ${c.produtoNome}`}
+                  {c.primeiraCompra && " · só na 1ª compra"}
                 </p>
                 <p className="text-xs text-ink/40 mt-0.5">
                   {c.usos} uso{c.usos === 1 ? "" : "s"}

@@ -60,6 +60,19 @@ export type EstadoCupom = {
   usoMaximo: number | null;
   usos: number;
   valorMinimoPedido: number;
+  // Restringe o cupom a um produto específico — null = vale pra qualquer um.
+  produtoId: string | null;
+  // true = só vale se o cliente nunca teve um pedido antes.
+  primeiraCompra: boolean;
+};
+
+// O que muda pedido a pedido (e cliente a cliente), diferente de `EstadoCupom`
+// que é só o cadastro do cupom em si. `jaComprou` é resolvido por quem chama
+// (ver usuarioJaComprou em data/cupons.ts) — esta função continua pura, sem
+// tocar banco.
+export type ContextoPedidoCupom = {
+  produtoId?: string | null;
+  jaComprou?: boolean;
 };
 
 export type Indisponibilidade = { mensagem: string; status: number };
@@ -70,6 +83,7 @@ export type Indisponibilidade = { mensagem: string; status: number };
 export function checarDisponibilidade(
   cupom: EstadoCupom,
   valorPedido: number,
+  contexto: ContextoPedidoCupom = {},
   agora = Date.now()
 ): Indisponibilidade | null {
   if (!cupom.ativo) {
@@ -86,6 +100,12 @@ export function checarDisponibilidade(
       mensagem: `Pedido mínimo de ${formatarPreco(cupom.valorMinimoPedido)} para este cupom.`,
       status: 400,
     };
+  }
+  if (cupom.produtoId && cupom.produtoId !== contexto.produtoId) {
+    return { mensagem: "Este cupom não vale para este produto.", status: 400 };
+  }
+  if (cupom.primeiraCompra && contexto.jaComprou) {
+    return { mensagem: "Este cupom vale só na primeira compra.", status: 400 };
   }
   return null;
 }

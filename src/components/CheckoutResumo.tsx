@@ -154,7 +154,7 @@ export default function CheckoutResumo({
     fetch("/api/cupons/validar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigo, valorPedido: precoProduto }),
+      body: JSON.stringify({ codigo, valorPedido: precoProduto, produtoId: item?.produtoId }),
     })
       .then(async (r) => {
         const data = await r.json();
@@ -183,7 +183,7 @@ export default function CheckoutResumo({
     return () => {
       cancelado = true;
     };
-  }, [cupomAplicado, precoProduto]);
+  }, [cupomAplicado, precoProduto, item?.produtoId]);
 
   if (carregando) {
     return (
@@ -238,7 +238,7 @@ export default function CheckoutResumo({
     fetch("/api/cupons/validar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigo: codigoCupom, valorPedido }),
+      body: JSON.stringify({ codigo: codigoCupom, valorPedido, produtoId: item?.produtoId }),
       // (valorPedido já é preço unitário × quantidade)
     })
       .then(async (r) => {

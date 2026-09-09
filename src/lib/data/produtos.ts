@@ -626,6 +626,17 @@ export async function removerProduto(id: string) {
     );
   }
 
+  // Mesmo motivo do bloqueio acima, agora pro cupom: a FK é RESTRICT (ver
+  // migration do cupom), então o banco já recusaria isso — checa aqui antes
+  // pra devolver um erro amigável em vez do 500 que a constraint daria.
+  const emCupom = await prisma.cupom.count({ where: { produtoId: id } });
+  if (emCupom > 0) {
+    throw new ErroDeNegocio(
+      `Não é possível remover: produto está vinculado a ${emCupom} cupom(ns).`,
+      409
+    );
+  }
+
   await prisma.produto.delete({ where: { id } });
 }
 

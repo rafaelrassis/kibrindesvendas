@@ -14,7 +14,13 @@ import { consultarEnderecoSalvo, resumoDoEnderecoSalvo } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
 import { enviarEmailStatusPedido, type ResumoPedidoEmail } from "@/lib/email";
-import { devolverUsoCupom, normalizarCodigo, registrarUsoCupom, validarCupom } from "./cupons";
+import {
+  devolverUsoCupom,
+  normalizarCodigo,
+  registrarUsoCupom,
+  usuarioJaComprou,
+  validarCupom,
+} from "./cupons";
 import { getConfiguracaoLoja } from "./configuracao";
 import {
   decrementarEstoque,
@@ -136,7 +142,7 @@ export async function criarPedido(
   const precoTotalProduto = precoUnitario * quantidade;
   const temCupom = typeof cupomCodigo === "string" && cupomCodigo.trim();
   const { cupom, desconto, freteGratis: freteGratisPorCupom } = temCupom
-    ? await validarCupom(cupomCodigo, precoTotalProduto)
+    ? await validarCupom(cupomCodigo, precoTotalProduto, { usuarioId, produtoId: produto.id })
     : { cupom: null, desconto: 0, freteGratis: false };
 
   // Frete grátis automático por valor mínimo (ConfiguracaoLoja, editável em
@@ -162,6 +168,21 @@ export async function criarPedido(
   const total = emReais(subtotal + frete);
 
   const pedido = await prisma.$transaction(async (tx) => {
+    // Cupom de primeira compra: reconfere "o cliente nunca comprou" já
+    // dentro da transação, atrás de uma trava por usuário — sem ela, duas
+    // abas abrindo o checkout ao mesmo tempo leriam as duas "nenhum pedido
+    // ainda" (nenhuma commitou nada) e as duas passariam. O advisory lock
+    // serializa qualquer criarPedido concorrente do mesmo usuarioId enquanto
+    // as duas disputam esse cupom: a segunda só segue depois que a primeira
+    // commita (ou desfaz), e nesse ponto o histórico já reflete a primeira.
+    // Some junto com a transação (xact_lock), não precisa liberar à mão.
+    if (cupom?.primeiraCompra) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${usuarioId}))`;
+      if (await usuarioJaComprou(usuarioId, tx)) {
+        throw new ErroDeNegocio("Este cupom vale só na primeira compra.", 409);
+      }
+    }
+
     const criado = await tx.pedido.create({
       data: {
         usuarioId,
@@ -210,7 +231,7 @@ export async function criarPedido(
     // derruba a transação inteira: o cliente ouve "cupom esgotado" e não sobra
     // pedido gravado com um desconto que o cupom não podia mais dar.
     if (cupom) {
-      await registrarUsoCupom(cupom.id, tx, precoTotalProduto);
+      await registrarUsoCupom(cupom.id, tx, precoTotalProduto, produto.id);
     }
 
     // Mesmo raciocínio pro estoque: produto sem controle passa direto, com

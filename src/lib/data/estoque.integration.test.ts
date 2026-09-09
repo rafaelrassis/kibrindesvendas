@@ -95,6 +95,10 @@ beforeAll(async () => {
       nome: "Cliente de teste",
       email: "teste-estoque@example.com",
       senhaHash: "nao-usado",
+      // Sem isso, todo teste que liga `gateway.pagamentoReal` esbarra antes
+      // no bloqueio de "complete seu CPF" (ver criarPedido) — não é o que
+      // essas suítes exercitam.
+      cpf: "11111111111",
     },
   });
 });

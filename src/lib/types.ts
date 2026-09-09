@@ -130,6 +130,13 @@ export type Cupom = {
   usoMaximo: number | null;
   usos: number;
   valorMinimoPedido: number;
+  // Restringe o cupom a um produto específico — null = vale pra qualquer um.
+  produtoId: string | null;
+  // Nome do produto vinculado, só pra exibição no admin — null se não houver
+  // restrição de produto.
+  produtoNome: string | null;
+  // true = só vale se o cliente nunca teve pedido antes.
+  primeiraCompra: boolean;
   createdAt: string;
 };
 

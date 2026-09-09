@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Cupom } from "@/lib/types";
+import type { Cupom, ProdutoAdmin } from "@/lib/types";
 
 // input datetime-local não aceita ISO com timezone; corta pro formato que ele
 // entende e ignora horário — cupom expira no fim do dia escolhido.
@@ -25,8 +25,17 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
   const [valorMinimoPedido, setValorMinimoPedido] = useState(
     cupom?.valorMinimoPedido ? cupom.valorMinimoPedido.toString() : ""
   );
+  const [produtoId, setProdutoId] = useState(cupom?.produtoId ?? "");
+  const [primeiraCompra, setPrimeiraCompra] = useState(cupom?.primeiraCompra ?? false);
+  const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/produtos")
+      .then((r) => r.json())
+      .then((lista) => setProdutos(Array.isArray(lista) ? lista : []));
+  }, []);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +54,8 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
       validoAte: validoAte || null,
       usoMaximo: usoMaximo ? Number(usoMaximo) : null,
       valorMinimoPedido: valorMinimoPedido ? Number(valorMinimoPedido) : 0,
+      produtoId: produtoId || null,
+      primeiraCompra,
     };
 
     setEnviando(true);
@@ -149,9 +160,33 @@ export default function AdminCupomForm({ cupom }: { cupom?: Cupom }) {
         />
       </Campo>
 
+      <Campo label="Produto (opcional)">
+        <select
+          value={produtoId}
+          onChange={(e) => setProdutoId(e.target.value)}
+          className="w-full border border-line rounded px-3 py-2 text-sm"
+        >
+          <option value="">Vale para qualquer produto</option>
+          {produtos.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
+            </option>
+          ))}
+        </select>
+      </Campo>
+
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
         Cupom ativo
+      </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={primeiraCompra}
+          onChange={(e) => setPrimeiraCompra(e.target.checked)}
+        />
+        Só vale na primeira compra do cliente
       </label>
 
       {erro && <p className="text-sm text-berry">{erro}</p>}

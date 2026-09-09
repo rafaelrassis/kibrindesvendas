@@ -41,13 +41,19 @@ const { atualizarCupom, criarCupom, devolverUsoCupom, registrarUsoCupom } = awai
   "./cupons"
 );
 const { criarPedido } = await import("./pedidos");
+const { removerProduto } = await import("./produtos");
 
 const CATEGORIA_ID = "teste-cupom-categoria";
 const PRODUTO_ID = "teste-cupom-produto";
+// Segundo produto, só pra exercitar cupom restrito a um produto específico —
+// sem ele não dá pra provar que o cupom recusa um produto "errado", só que
+// aceita o único que existe.
+const PRODUTO_ID_2 = "teste-cupom-produto-2";
 const USUARIO_ID = "teste-cupom-usuario";
 const PRECO = 100;
 
 const item: ItemCarrinho = { produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
+const item2: ItemCarrinho = { produtoId: PRODUTO_ID_2, variacoesEscolhidas: {}, quantidade: 1 };
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,7 +69,7 @@ async function limparCupons() {
 
 beforeAll(async () => {
   await limparCupons();
-  await prisma.produto.deleteMany({ where: { id: PRODUTO_ID } });
+  await prisma.produto.deleteMany({ where: { id: { in: [PRODUTO_ID, PRODUTO_ID_2] } } });
   await prisma.usuario.deleteMany({ where: { id: USUARIO_ID } });
   await prisma.categoria.deleteMany({ where: { id: CATEGORIA_ID } });
 
@@ -82,12 +88,28 @@ beforeAll(async () => {
       cor: "#3F6B4C",
     },
   });
+  await prisma.produto.create({
+    data: {
+      id: PRODUTO_ID_2,
+      nome: "Segundo produto de teste",
+      descricao: "Produto criado pela suíte de integração, pra cupom restrito.",
+      categoriaId: CATEGORIA_ID,
+      preco: PRECO,
+      precoShopee: PRECO + 20,
+      emoji: "🧪",
+      cor: "#3F6B4C",
+    },
+  });
   await prisma.usuario.create({
     data: {
       id: USUARIO_ID,
       nome: "Cliente de teste",
       email: "teste-cupom@example.com",
       senhaHash: "nao-usado",
+      // Sem isso, todo teste que liga `gateway.pagamentoReal` esbarra antes
+      // no bloqueio de "complete seu CPF" (ver criarPedido) — não é o que
+      // essas suítes exercitam.
+      cpf: "11111111111",
     },
   });
 });
@@ -99,7 +121,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await prisma.produto.deleteMany({ where: { id: PRODUTO_ID } });
+  await prisma.produto.deleteMany({ where: { id: { in: [PRODUTO_ID, PRODUTO_ID_2] } } });
   await prisma.usuario.deleteMany({ where: { id: USUARIO_ID } });
   await prisma.categoria.deleteMany({ where: { id: CATEGORIA_ID } });
   await prisma.$disconnect();
@@ -325,5 +347,235 @@ describe("CHECK constraints (rede de segurança do banco)", () => {
     await expect(
       prisma.$executeRaw`UPDATE "Cupom" SET usos = -1 WHERE codigo = 'TESTECHECK2'`
     ).rejects.toThrow(/cupom_usos_nao_negativo/);
+  });
+});
+
+describe("cupom restrito a um produto", () => {
+  it("aplica normalmente quando o pedido é do produto vinculado", async () => {
+    await criarCupom({ codigo: "TESTEPRODUTO", tipo: "FIXO", valor: 5, produtoId: PRODUTO_ID });
+
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTEPRODUTO");
+    expect(pedido.cupomCodigo).toBe("TESTEPRODUTO");
+  });
+
+  it("recusa quando o pedido é de outro produto — tanto no preview quanto ao gravar", async () => {
+    await criarCupom({ codigo: "TESTEPRODUTO2", tipo: "FIXO", valor: 5, produtoId: PRODUTO_ID });
+
+    await expect(
+      criarPedido(USUARIO_ID, item2, "teste-endereco-id", "TESTEPRODUTO2")
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/não vale para este produto/),
+    });
+    expect(await prisma.pedido.count({ where: { cupomCodigo: "TESTEPRODUTO2" } })).toBe(0);
+  });
+
+  it("cupom sem produto vinculado aceita qualquer um dos dois produtos", async () => {
+    await criarCupom({ codigo: "TESTESEMPRODUTO", tipo: "FIXO", valor: 5 });
+
+    const a = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTESEMPRODUTO");
+    expect(a.pedido.cupomCodigo).toBe("TESTESEMPRODUTO");
+  });
+
+  it("registrarUsoCupom sozinho também recusa produto errado — reconferência atômica, redundante ao preview", async () => {
+    const cupom = await criarCupom({
+      codigo: "TESTEPRODUTORACE",
+      tipo: "FIXO",
+      valor: 5,
+      produtoId: PRODUTO_ID,
+    });
+
+    await expect(
+      prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx, undefined, PRODUTO_ID_2))
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/não vale para este produto/),
+    });
+    expect((await prisma.cupom.findUnique({ where: { id: cupom.id } }))?.usos).toBe(0);
+
+    await prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx, undefined, PRODUTO_ID));
+    expect((await prisma.cupom.findUnique({ where: { id: cupom.id } }))?.usos).toBe(1);
+  });
+
+  it("registrarUsoCupom sem produtoId informado não exige restrição (compatível com quem chama fora do fluxo de pedido)", async () => {
+    const cupom = await criarCupom({
+      codigo: "TESTEPRODUTOSEMCHECK",
+      tipo: "FIXO",
+      valor: 5,
+      produtoId: PRODUTO_ID,
+    });
+
+    await prisma.$transaction((tx) => registrarUsoCupom(cupom.id, tx));
+    expect((await prisma.cupom.findUnique({ where: { id: cupom.id } }))?.usos).toBe(1);
+  });
+});
+
+describe("cupom de primeira compra", () => {
+  it("libera pra quem nunca comprou", async () => {
+    await criarCupom({ codigo: "TESTE1COMPRA", tipo: "FIXO", valor: 5, primeiraCompra: true });
+
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTE1COMPRA");
+    expect(pedido.cupomCodigo).toBe("TESTE1COMPRA");
+  });
+
+  it("recusa numa segunda compra, depois de uma primeira já paga", async () => {
+    await criarPedido(USUARIO_ID, item, "teste-endereco-id");
+    await criarCupom({ codigo: "TESTE1COMPRA2", tipo: "FIXO", valor: 5, primeiraCompra: true });
+
+    await expect(
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTE1COMPRA2")
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/primeira compra/),
+    });
+  });
+
+  it("recusa mesmo se o pedido anterior ainda está aguardando pagamento (não precisa ter pago pra contar)", async () => {
+    gateway.pagamentoReal = true;
+    gateway.criarPreferencia.mockResolvedValue({ init_point: "https://mp.exemplo/checkout" });
+    await criarPedido(USUARIO_ID, item, "teste-endereco-id");
+    gateway.pagamentoReal = false;
+
+    await criarCupom({ codigo: "TESTE1COMPRA3", tipo: "FIXO", valor: 5, primeiraCompra: true });
+
+    await expect(
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTE1COMPRA3")
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/primeira compra/),
+    });
+  });
+
+  it("pedido cancelado não conta como compra — o cupom de primeira compra continua valendo", async () => {
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
+    await prisma.pedido.update({ where: { id: pedido.id }, data: { status: "CANCELADO" } });
+
+    await criarCupom({ codigo: "TESTE1COMPRA4", tipo: "FIXO", valor: 5, primeiraCompra: true });
+
+    const { pedido: novo } = await criarPedido(
+      USUARIO_ID,
+      item,
+      "teste-endereco-id",
+      "TESTE1COMPRA4"
+    );
+    expect(novo.cupomCodigo).toBe("TESTE1COMPRA4");
+  });
+
+  it("duas compras simultâneas do mesmo cliente novo: só uma consegue o cupom de primeira compra", async () => {
+    await criarCupom({ codigo: "TESTE1COMPRARACE", tipo: "FIXO", valor: 5, primeiraCompra: true });
+
+    const resultados = await Promise.allSettled([
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTE1COMPRARACE"),
+      criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTE1COMPRARACE"),
+    ]);
+
+    expect(resultados.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    const recusado = resultados.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(recusado.reason).toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/primeira compra/),
+    });
+
+    // Só um pedido de verdade ficou de pé: o perdedor da corrida derruba a
+    // própria transação inteira, não fica um pedido "meio criado" no banco.
+    expect(
+      await prisma.pedido.count({ where: { usuarioId: USUARIO_ID, status: { not: "CANCELADO" } } })
+    ).toBe(1);
+    const cupom = await prisma.cupom.findUnique({ where: { codigo: "TESTE1COMPRARACE" } });
+    expect(cupom?.usos).toBe(1);
+  });
+
+  it("cupom comum (sem a flag) não se importa com histórico de compras", async () => {
+    await criarPedido(USUARIO_ID, item, "teste-endereco-id");
+    await criarCupom({ codigo: "TESTENAOPRIMEIRA", tipo: "FIXO", valor: 5 });
+
+    const { pedido } = await criarPedido(
+      USUARIO_ID,
+      item,
+      "teste-endereco-id",
+      "TESTENAOPRIMEIRA"
+    );
+    expect(pedido.cupomCodigo).toBe("TESTENAOPRIMEIRA");
+  });
+});
+
+describe("combinação: produto específico + primeira compra", () => {
+  it("produto errado barra mesmo sendo de fato a primeira compra do cliente", async () => {
+    await criarCupom({
+      codigo: "TESTECOMBO",
+      tipo: "FIXO",
+      valor: 5,
+      produtoId: PRODUTO_ID,
+      primeiraCompra: true,
+    });
+
+    await expect(
+      criarPedido(USUARIO_ID, item2, "teste-endereco-id", "TESTECOMBO")
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/não vale para este produto/),
+    });
+  });
+
+  it("libera só quando o produto bate e é mesmo a primeira compra", async () => {
+    await criarCupom({
+      codigo: "TESTECOMBO2",
+      tipo: "FIXO",
+      valor: 5,
+      produtoId: PRODUTO_ID,
+      primeiraCompra: true,
+    });
+
+    const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id", "TESTECOMBO2");
+    expect(pedido.cupomCodigo).toBe("TESTECOMBO2");
+  });
+});
+
+describe("produto vinculado a cupom não pode ser removido", () => {
+  const PRODUTO_TEMP_ID = "teste-cupom-produto-temp";
+
+  it("bloqueia remover o produto enquanto o cupom apontar pra ele; libera depois de desvincular", async () => {
+    // Idempotente: limpa antes de criar, pra sobreviver a uma execução
+    // anterior que tenha falhado no meio e deixado sujeira.
+    await prisma.cupom.deleteMany({ where: { produtoId: PRODUTO_TEMP_ID } });
+    await prisma.produto.deleteMany({ where: { id: PRODUTO_TEMP_ID } });
+    await prisma.produto.create({
+      data: {
+        id: PRODUTO_TEMP_ID,
+        nome: "Produto temporário",
+        descricao: "Só pra testar o bloqueio de remoção.",
+        categoriaId: CATEGORIA_ID,
+        preco: PRECO,
+        precoShopee: PRECO + 20,
+        emoji: "🧪",
+        cor: "#3F6B4C",
+      },
+    });
+
+    const cupom = await criarCupom({
+      codigo: "TESTEVINCULO",
+      tipo: "FIXO",
+      valor: 5,
+      produtoId: PRODUTO_TEMP_ID,
+    });
+
+    await expect(removerProduto(PRODUTO_TEMP_ID)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringMatching(/vinculado a \d+ cupom/),
+    });
+
+    await atualizarCupom(cupom.id, { produtoId: null });
+    await expect(removerProduto(PRODUTO_TEMP_ID)).resolves.toBeUndefined();
+  });
+
+  it("criar ou editar cupom com produtoId inexistente devolve 404, não 500", async () => {
+    await expect(
+      criarCupom({ codigo: "TESTEPRODUTOFANTASMA", tipo: "FIXO", valor: 5, produtoId: "nao-existe" })
+    ).rejects.toMatchObject({ status: 404, message: "Produto não encontrado." });
+
+    const cupom = await criarCupom({ codigo: "TESTEPRODUTOFANTASMA2", tipo: "FIXO", valor: 5 });
+    await expect(
+      atualizarCupom(cupom.id, { produtoId: "nao-existe" })
+    ).rejects.toMatchObject({ status: 404, message: "Produto não encontrado." });
   });
 });

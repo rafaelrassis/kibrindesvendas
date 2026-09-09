@@ -17,6 +17,8 @@ function cupom(ajustes: Partial<EstadoCupom> = {}): EstadoCupom {
     usoMaximo: null,
     usos: 0,
     valorMinimoPedido: 0,
+    produtoId: null,
+    primeiraCompra: false,
     ...ajustes,
   };
 }
@@ -102,8 +104,10 @@ describe("checarDisponibilidade", () => {
     const ultimoSegundoDoDia = new Date("2026-08-25T23:59:59-03:00").getTime();
     const primeiroSegundoDoDiaSeguinte = new Date("2026-08-26T00:00:00-03:00").getTime();
 
-    expect(checarDisponibilidade(cupom({ validoAte }), 100, ultimoSegundoDoDia)).toBeNull();
-    expect(checarDisponibilidade(cupom({ validoAte }), 100, primeiroSegundoDoDiaSeguinte)).toEqual({
+    expect(checarDisponibilidade(cupom({ validoAte }), 100, {}, ultimoSegundoDoDia)).toBeNull();
+    expect(
+      checarDisponibilidade(cupom({ validoAte }), 100, {}, primeiroSegundoDoDiaSeguinte)
+    ).toEqual({
       mensagem: "Este cupom expirou.",
       status: 400,
     });
@@ -112,7 +116,7 @@ describe("checarDisponibilidade", () => {
   it("não expira às 21h do dia anterior, que é o que dá lendo a data em UTC", () => {
     const validoAte = paraValidoAte("2026-08-25");
     const meioDiaDoDia25 = new Date("2026-08-25T12:00:00-03:00").getTime();
-    expect(checarDisponibilidade(cupom({ validoAte }), 100, meioDiaDoDia25)).toBeNull();
+    expect(checarDisponibilidade(cupom({ validoAte }), 100, {}, meioDiaDoDia25)).toBeNull();
   });
 
   it("recusa quando o limite de usos já foi atingido", () => {
@@ -134,5 +138,106 @@ describe("checarDisponibilidade", () => {
       status: 400,
     });
     expect(checarDisponibilidade(promo, 39.9 * 3)).toBeNull();
+  });
+});
+
+describe("checarDisponibilidade — restrito a um produto", () => {
+  it("cupom sem produto vinculado vale pra qualquer produto, mesmo sem contexto nenhum", () => {
+    expect(checarDisponibilidade(cupom(), 100)).toBeNull();
+    expect(checarDisponibilidade(cupom(), 100, { produtoId: "produto-x" })).toBeNull();
+    expect(checarDisponibilidade(cupom(), 100, { produtoId: null })).toBeNull();
+  });
+
+  it("libera quando o produto do pedido é exatamente o vinculado", () => {
+    const promo = cupom({ produtoId: "produto-x" });
+    expect(checarDisponibilidade(promo, 100, { produtoId: "produto-x" })).toBeNull();
+  });
+
+  it("recusa quando o produto do pedido é outro", () => {
+    const promo = cupom({ produtoId: "produto-x" });
+    expect(checarDisponibilidade(promo, 100, { produtoId: "produto-y" })).toEqual({
+      mensagem: "Este cupom não vale para este produto.",
+      status: 400,
+    });
+  });
+
+  it("recusa quando o pedido não informa produto nenhum (undefined vira null)", () => {
+    const promo = cupom({ produtoId: "produto-x" });
+    expect(checarDisponibilidade(promo, 100)).toEqual({
+      mensagem: "Este cupom não vale para este produto.",
+      status: 400,
+    });
+    expect(checarDisponibilidade(promo, 100, {})).toEqual({
+      mensagem: "Este cupom não vale para este produto.",
+      status: 400,
+    });
+  });
+
+  it("um pedido com dois itens de produtos diferentes não engana a checagem por engano de string vazia", () => {
+    const promo = cupom({ produtoId: "produto-x" });
+    // string vazia não é igual a "produto-x" nem é o mesmo "nada" que null —
+    // continua recusando, não passa por engano de coerção.
+    expect(checarDisponibilidade(promo, 100, { produtoId: "" })).toEqual({
+      mensagem: "Este cupom não vale para este produto.",
+      status: 400,
+    });
+  });
+});
+
+describe("checarDisponibilidade — restrito à primeira compra", () => {
+  it("cupom comum (primeiraCompra: false) vale mesmo pra quem já comprou", () => {
+    expect(checarDisponibilidade(cupom(), 100, { jaComprou: true })).toBeNull();
+  });
+
+  it("libera cupom de primeira compra pra quem nunca comprou", () => {
+    const promo = cupom({ primeiraCompra: true });
+    expect(checarDisponibilidade(promo, 100, { jaComprou: false })).toBeNull();
+    expect(checarDisponibilidade(promo, 100, {})).toBeNull();
+    expect(checarDisponibilidade(promo, 100)).toBeNull();
+  });
+
+  it("recusa cupom de primeira compra pra quem já comprou antes", () => {
+    const promo = cupom({ primeiraCompra: true });
+    expect(checarDisponibilidade(promo, 100, { jaComprou: true })).toEqual({
+      mensagem: "Este cupom vale só na primeira compra.",
+      status: 400,
+    });
+  });
+});
+
+describe("checarDisponibilidade — combinação de travas", () => {
+  it("produto errado barra antes mesmo de chegar na checagem de primeira compra", () => {
+    const promo = cupom({ produtoId: "produto-x", primeiraCompra: true });
+    // Já comprou (violaria as duas regras) e ainda por cima é outro produto:
+    // a mensagem devolvida é sempre uma indisponibilidade real, nunca null.
+    expect(checarDisponibilidade(promo, 100, { produtoId: "produto-y", jaComprou: true })).toEqual(
+      { mensagem: "Este cupom não vale para este produto.", status: 400 }
+    );
+  });
+
+  it("só libera quando produto bate E é mesmo a primeira compra", () => {
+    const promo = cupom({ produtoId: "produto-x", primeiraCompra: true });
+    expect(
+      checarDisponibilidade(promo, 100, { produtoId: "produto-x", jaComprou: true })
+    ).toEqual({ mensagem: "Este cupom vale só na primeira compra.", status: 400 });
+    expect(
+      checarDisponibilidade(promo, 100, { produtoId: "produto-x", jaComprou: false })
+    ).toBeNull();
+  });
+
+  it("todas as travas continuam valendo junto com produto e primeira compra", () => {
+    const promo = cupom({
+      ativo: true,
+      usoMaximo: 5,
+      usos: 5,
+      valorMinimoPedido: 10,
+      produtoId: "produto-x",
+      primeiraCompra: true,
+    });
+    // Limite de usos é conferido antes das travas novas — continua sendo o
+    // primeiro motivo reportado, mesmo com produto certo e cliente novo.
+    expect(
+      checarDisponibilidade(promo, 100, { produtoId: "produto-x", jaComprou: false })
+    ).toEqual({ mensagem: "Este cupom já atingiu o limite de usos.", status: 400 });
   });
 });
