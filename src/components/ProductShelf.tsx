@@ -42,10 +42,10 @@ export default function ProductShelf({
             <Link
               key={p.id}
               href={`/produto/${p.id}`}
-              className="shrink-0 w-36 md:w-44 bg-white border border-line rounded-lg p-3 hover:shadow-md transition-shadow"
+              className="shrink-0 w-36 md:w-56 bg-white border border-line rounded-lg p-3 md:p-4 hover:shadow-md transition-shadow"
             >
               <div
-                className="w-full aspect-square rounded flex items-center justify-center text-4xl mb-2 overflow-hidden"
+                className="w-full aspect-square rounded flex items-center justify-center text-4xl md:text-5xl mb-2 overflow-hidden"
                 style={{ backgroundColor: `${p.cor}22` }}
               >
                 {p.imagens[0] ? (
@@ -55,22 +55,22 @@ export default function ProductShelf({
                   p.emoji
                 )}
               </div>
-              <p className="text-xs leading-snug line-clamp-2 mb-1 h-8">{p.nome}</p>
+              <p className="text-xs md:text-sm leading-snug line-clamp-2 mb-1 h-8 md:h-10">{p.nome}</p>
               <div className="flex items-baseline gap-1.5 flex-wrap">
-                <p className="font-mono text-sm font-medium">
+                <p className="font-mono text-sm md:text-base font-medium">
                   R$ {p.preco.toFixed(2).replace(".", ",")}
                 </p>
                 {desconto.ativo && (
-                  <p className="font-mono text-[11px] text-ink/40 line-through">
+                  <p className="font-mono text-[11px] md:text-xs text-ink/40 line-through">
                     {formatarPreco(p.precoOriginal!)}
                   </p>
                 )}
               </div>
               {desconto.ativo ? (
-                <p className="text-[11px] text-berry font-medium">-{desconto.percentual}%</p>
+                <p className="text-[11px] md:text-xs text-berry font-medium">-{desconto.percentual}%</p>
               ) : (
                 comparacao.mostrar && (
-                  <p className="text-[11px] text-berry">
+                  <p className="text-[11px] md:text-xs text-berry">
                     -{comparacao.percentual}% vs Shopee
                   </p>
                 )
