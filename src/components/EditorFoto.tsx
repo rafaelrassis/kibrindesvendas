@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 // pra impressão exatamente como enviado, e editar mudaria o que a pessoa
 // confirmou como "arte final".
 
-const ZOOM_MIN = 1;
+const ESCALA_PADRAO = 1;
 const ZOOM_MAX = 3;
 
 export type EditorFotoProps = {
@@ -39,11 +39,30 @@ export default function EditorFoto({
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   const [pronto, setPronto] = useState(false);
-  const [escala, setEscala] = useState(ZOOM_MIN);
+  const [escala, setEscala] = useState(ESCALA_PADRAO);
   const [angulo, setAngulo] = useState(0); // 0 | 90 | 180 | 270
+  const [zoomMin, setZoomMin] = useState(ESCALA_PADRAO);
   const offset = useRef({ x: 0, y: 0 });
   const arrastoRef = useRef<{ x: number; y: number } | null>(null);
   const pinçaRef = useRef<{ distancia: number; escalaInicial: number } | null>(null);
+
+  function tamanhoTela() {
+    const r = stageRef.current?.getBoundingClientRect();
+    return { w: r?.width ?? 0, h: r?.height ?? 0 };
+  }
+
+  // Menor zoom que ainda cabe a imagem inteira dentro do quadro (letterbox),
+  // em vez de travar no "cover" (preencher o quadro inteiro cortando a sobra).
+  function calcularZoomMin(img: HTMLImageElement, anguloAtual: number) {
+    const { w, h } = tamanhoTela();
+    if (w === 0 || h === 0) return ESCALA_PADRAO;
+    const girado90 = anguloAtual % 180 !== 0;
+    const imgW = girado90 ? img.height : img.width;
+    const imgH = girado90 ? img.width : img.height;
+    const coverBase = Math.max(w / imgW, h / imgH);
+    const containBase = Math.min(w / imgW, h / imgH);
+    return containBase / coverBase;
+  }
 
   // Carrega a imagem quando um arquivo novo chega. Quando `arquivo` vira
   // null o componente não renderiza (return null lá embaixo), então não há
@@ -56,7 +75,8 @@ export default function EditorFoto({
     img.onload = () => {
       imgRef.current = img;
       offset.current = { x: 0, y: 0 };
-      setEscala(ZOOM_MIN);
+      setZoomMin(calcularZoomMin(img, 0));
+      setEscala(ESCALA_PADRAO);
       setAngulo(0);
       setPronto(true);
     };
@@ -64,10 +84,16 @@ export default function EditorFoto({
     return () => URL.revokeObjectURL(url);
   }, [arquivo]);
 
-  function tamanhoTela() {
-    const r = stageRef.current?.getBoundingClientRect();
-    return { w: r?.width ?? 0, h: r?.height ?? 0 };
-  }
+  // Girar troca largura por altura da imagem, então o menor zoom que cabe a
+  // imagem inteira muda junto.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!pronto || !img) return;
+    const min = calcularZoomMin(img, angulo);
+    setZoomMin(min);
+    setEscala((atual) => Math.max(min, Math.min(ZOOM_MAX, atual)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [angulo, pronto]);
 
   function limitarOffset(novaEscala = escala) {
     const { w, h } = tamanhoTela();
@@ -92,6 +118,8 @@ export default function EditorFoto({
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
 
     const girado90 = angulo % 180 !== 0;
     const imgW = girado90 ? img.height : img.width;
@@ -156,7 +184,7 @@ export default function EditorFoto({
       if ("touches" in e && e.touches.length === 2 && pinçaRef.current) {
         const nova = distanciaEntreToques(e.touches);
         const novaEscala = Math.max(
-          ZOOM_MIN,
+          zoomMin,
           Math.min(ZOOM_MAX, pinçaRef.current.escalaInicial * (nova / pinçaRef.current.distancia))
         );
         limitarOffset(novaEscala);
@@ -195,11 +223,11 @@ export default function EditorFoto({
       canvas.removeEventListener("touchend", soltar);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pronto, escala]);
+  }, [pronto, escala, zoomMin]);
 
   function resetar() {
     offset.current = { x: 0, y: 0 };
-    setEscala(ZOOM_MIN);
+    setEscala(ESCALA_PADRAO);
     setAngulo(0);
   }
 
@@ -215,6 +243,8 @@ export default function EditorFoto({
     saida.height = saidaH;
     const ctx = saida.getContext("2d");
     if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, saidaW, saidaH);
 
     const fator = saidaW / w;
     const girado90 = angulo % 180 !== 0;
@@ -277,7 +307,7 @@ export default function EditorFoto({
             <span className="text-ink/40 text-sm w-4 text-center">−</span>
             <input
               type="range"
-              min={ZOOM_MIN * 100}
+              min={zoomMin * 100}
               max={ZOOM_MAX * 100}
               value={escala * 100}
               onChange={(e) => {
