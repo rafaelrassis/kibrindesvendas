@@ -69,7 +69,7 @@ export default function PromoBanner({ banners }: { banners: Banner[] }) {
           <Link
             key={s.id}
             href={s.ctaHref}
-            className="snap-start shrink-0 w-full rounded-xl overflow-hidden relative aspect-[5/2] md:aspect-[16/5] bg-cover bg-center"
+            className="snap-start shrink-0 w-full rounded-xl overflow-hidden relative aspect-[5/2] md:aspect-[98/25] bg-cover bg-center"
             style={{
               backgroundColor: s.corFundo,
               backgroundImage: s.imagemUrl ? `url(${s.imagemUrl})` : undefined,
