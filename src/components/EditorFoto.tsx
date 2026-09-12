@@ -245,7 +245,7 @@ export default function EditorFoto({
 
   return (
     <div className="fixed inset-0 bg-ink/55 z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-paper w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[92vh]">
+      <div className="bg-paper w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl flex flex-col max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-3.5 border-b border-line">
           <h2 className="text-sm font-semibold">{titulo}</h2>
           <button
@@ -260,7 +260,7 @@ export default function EditorFoto({
 
         <div
           ref={stageRef}
-          className="relative bg-paper-2 overflow-hidden touch-none select-none"
+          className="relative bg-paper-2 overflow-hidden touch-none select-none shrink-0"
           style={{ aspectRatio: aspecto }}
         >
           <canvas ref={canvasRef} className="block w-full h-full cursor-grab active:cursor-grabbing" />
