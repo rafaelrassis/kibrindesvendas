@@ -29,7 +29,7 @@ export default function ProductCard({
         >
           {produto.imagens[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={produto.imagens[0]} alt={produto.nome} className="w-full h-full object-cover" />
+            <img src={produto.imagens[0]} alt={produto.nome} className="w-full h-full object-cover" draggable={false} />
           ) : (
             <span>{produto.emoji}</span>
           )}

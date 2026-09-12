@@ -725,7 +725,7 @@ function ProdutoGaleria({
             aria-label="Ver foto em tela cheia"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.url} alt={nome} className="w-full h-full object-cover" />
+            <img src={item.url} alt={nome} className="w-full h-full object-cover" draggable={false} />
             <span className="absolute bottom-2 right-2 bg-black/50 text-white text-[11px] px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               🔍 Ampliar
             </span>
