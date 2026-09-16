@@ -59,10 +59,20 @@ export default async function AdminPedidosPage() {
               />
               <AdminPedidoRemover pedidoId={p.id} />
 
-              {p.itens.map((item) => (
+              {p.itens.map((item) => {
+                const variacoes = (item.variacaoEscolhida as Record<string, string> | null) ?? null;
+                const variacoesTexto = variacoes
+                  ? Object.entries(variacoes)
+                      .map(([chave, valor]) => `${chave}: ${valor}`)
+                      .join(", ")
+                  : "";
+                return (
                 <div key={item.id} className="text-sm py-1 border-t border-line/60 mt-1">
                   <p>
                     {item.produto.emoji} {item.produto.nome} × {item.quantidade}
+                    {variacoesTexto && (
+                      <span className="text-ink/50"> — {variacoesTexto}</span>
+                    )}
                   </p>
                   {item.personalizacao && (
                     <p className="text-xs text-ink/50 mt-0.5">
@@ -86,7 +96,8 @@ export default async function AdminPedidosPage() {
                     </p>
                   )}
                 </div>
-              ))}
+                );
+              })}
 
               {/* Sem o endereço aqui a loja não tem como despachar. */}
               <p className="text-xs text-ink/50 mt-2">
