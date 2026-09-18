@@ -72,7 +72,6 @@ function calcularValorCampo(campo: { tipo: TipoCampo; valor: number }, valorVend
 export default function AdminVendasShopeePage() {
   const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
   const [vendas, setVendas] = useState<VendaShopee[]>([]);
-  const [template, setTemplate] = useState<CampoValorForm[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -88,19 +87,10 @@ export default function AdminVendasShopeePage() {
     Promise.all([
       fetch("/api/admin/produtos").then((r) => r.json()),
       fetch("/api/admin/vendas-shopee").then((r) => r.json()),
-      fetch("/api/admin/configuracoes").then((r) => r.json()),
     ])
-      .then(([produtosRes, vendasRes, config]: [unknown, unknown, ConfiguracaoLoja]) => {
+      .then(([produtosRes, vendasRes]) => {
         setProdutos(Array.isArray(produtosRes) ? produtosRes : []);
         setVendas(Array.isArray(vendasRes) ? vendasRes : []);
-        setTemplate(
-          config.camposMargemShopee.map((c) => ({
-            nome: c.nome,
-            tipo: c.tipo,
-            sinal: c.sinal,
-            valor: c.valorPadrao?.toString() ?? "",
-          }))
-        );
       })
       .catch(() => setErro("Não foi possível carregar os dados."))
       .finally(() => setCarregando(false));
@@ -110,19 +100,10 @@ export default function AdminVendasShopeePage() {
     Promise.all([
       fetch("/api/admin/produtos").then((r) => r.json()),
       fetch("/api/admin/vendas-shopee").then((r) => r.json()),
-      fetch("/api/admin/configuracoes").then((r) => r.json()),
     ])
-      .then(([produtosRes, vendasRes, config]: [unknown, unknown, ConfiguracaoLoja]) => {
+      .then(([produtosRes, vendasRes]) => {
         setProdutos(Array.isArray(produtosRes) ? produtosRes : []);
         setVendas(Array.isArray(vendasRes) ? vendasRes : []);
-        setTemplate(
-          config.camposMargemShopee.map((c) => ({
-            nome: c.nome,
-            tipo: c.tipo,
-            sinal: c.sinal,
-            valor: c.valorPadrao?.toString() ?? "",
-          }))
-        );
       })
       .catch(() => setErro("Não foi possível carregar os dados."))
       .finally(() => setCarregando(false));
@@ -143,9 +124,26 @@ export default function AdminVendasShopeePage() {
     }));
   }, [produtoSelecionado]);
 
-  function abrirForm() {
-    setForm({ ...FORM_VAZIO, valoresShopee: template.map((c) => ({ ...c })) });
+  // Busca o template na hora de abrir (em vez de carregar uma vez no mount)
+  // pra sempre trazer os campos atuais, editáveis, mesmo se a config mudou
+  // desde que a página carregou.
+  async function abrirForm() {
     setMostrarForm(true);
+    setForm(FORM_VAZIO);
+    try {
+      const config: ConfiguracaoLoja = await fetch("/api/admin/configuracoes").then((r) =>
+        r.json()
+      );
+      const valoresShopee = config.camposMargemShopee.map((c) => ({
+        nome: c.nome,
+        tipo: c.tipo,
+        sinal: c.sinal,
+        valor: c.valorPadrao?.toString() ?? "",
+      }));
+      setForm((f) => ({ ...f, valoresShopee }));
+    } catch {
+      setErro("Não foi possível carregar os campos de margem.");
+    }
   }
 
   function editarCampoForm(i: number, patch: Partial<CampoValorForm>) {
