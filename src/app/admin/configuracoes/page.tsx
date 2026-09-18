@@ -14,8 +14,18 @@ type CampoForm = {
   valorPadrao: string;
 };
 
+// Number.toString() usa ponto; os campos de valor aqui só aceitam vírgula
+// como decimal (padrão pt-BR).
+function numParaTexto(n: number | null | undefined): string {
+  return n != null ? n.toString().replace(".", ",") : "";
+}
+
+function comoDecimalBr(v: string): string {
+  return v.replace(".", ",");
+}
+
 function paraCampoForm(c: CampoMargemShopee): CampoForm {
-  return { nome: c.nome, tipo: c.tipo, sinal: c.sinal, valorPadrao: c.valorPadrao?.toString() ?? "" };
+  return { nome: c.nome, tipo: c.tipo, sinal: c.sinal, valorPadrao: numParaTexto(c.valorPadrao) };
 }
 
 const CAMPO_VAZIO: CampoForm = { nome: "", tipo: "percentual", sinal: "subtrai", valorPadrao: "" };
@@ -252,7 +262,9 @@ export default function AdminConfiguracoesPage() {
                   value={c.valorPadrao}
                   onChange={(e) =>
                     setCampos((cs) =>
-                      cs.map((x, j) => (j === i ? { ...x, valorPadrao: e.target.value } : x))
+                      cs.map((x, j) =>
+                        j === i ? { ...x, valorPadrao: comoDecimalBr(e.target.value) } : x
+                      )
                     )
                   }
                   placeholder="valor padrão"

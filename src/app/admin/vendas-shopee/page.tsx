@@ -38,6 +38,18 @@ function formatarData(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
+// Número pra texto editável em pt-BR (vírgula) — Number.toString() usa ponto,
+// então nunca serve direto pra pré-preencher um campo decimal aqui.
+function numParaTexto(n: number | null | undefined): string {
+  return n != null ? n.toString().replace(".", ",") : "";
+}
+
+// Ponto digitado (teclado numérico de celular costuma emitir ponto) vira
+// vírgula na hora — os campos de valor só aceitam vírgula como decimal.
+function comoDecimalBr(v: string): string {
+  return v.replace(".", ",");
+}
+
 // Estado editável de um campo do template dentro do form — valor em texto
 // pra aceitar digitação livre, convertido ao salvar.
 type CampoValorForm = {
@@ -138,7 +150,7 @@ export default function AdminVendasShopeePage() {
         nome: c.nome,
         tipo: c.tipo,
         sinal: c.sinal,
-        valor: c.valorPadrao?.toString() ?? "",
+        valor: numParaTexto(c.valorPadrao),
       }));
       setForm((f) => ({ ...f, valoresShopee }));
     } catch {
@@ -233,8 +245,8 @@ export default function AdminVendasShopeePage() {
       produtoId: v.produtoId,
       combinacao: v.combinacao ?? "",
       quantidade: String(v.quantidade),
-      valorVenda: String(v.valorVenda),
-      valoresShopee: v.valoresShopee.map((c) => ({ ...c, valor: String(c.valor) })),
+      valorVenda: numParaTexto(v.valorVenda),
+      valoresShopee: v.valoresShopee.map((c) => ({ ...c, valor: numParaTexto(c.valor) })),
     });
   }
 
@@ -372,7 +384,9 @@ export default function AdminVendasShopeePage() {
                 inputMode="decimal"
                 className="w-full border border-line rounded px-3 py-2 text-sm"
                 value={form.valorVenda}
-                onChange={(e) => setForm((f) => ({ ...f, valorVenda: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, valorVenda: comoDecimalBr(e.target.value) }))
+                }
               />
             </div>
           </div>
@@ -392,7 +406,7 @@ export default function AdminVendasShopeePage() {
                       inputMode="decimal"
                       className="w-full border border-line rounded px-2 py-1.5 text-sm"
                       value={c.valor}
-                      onChange={(e) => editarCampoForm(i, { valor: e.target.value })}
+                      onChange={(e) => editarCampoForm(i, { valor: comoDecimalBr(e.target.value) })}
                     />
                   </div>
                 ))}
@@ -465,7 +479,7 @@ export default function AdminVendasShopeePage() {
                     className="border border-line rounded px-2 py-1.5 text-sm"
                     value={formEdicao.valorVenda}
                     onChange={(e) =>
-                      setFormEdicao((f) => ({ ...f, valorVenda: e.target.value }))
+                      setFormEdicao((f) => ({ ...f, valorVenda: comoDecimalBr(e.target.value) }))
                     }
                     placeholder="Subtotal dos Produtos"
                   />
@@ -481,7 +495,7 @@ export default function AdminVendasShopeePage() {
                         setFormEdicao((f) => ({
                           ...f,
                           valoresShopee: f.valoresShopee.map((x, j) =>
-                            j === i ? { ...x, valor: e.target.value } : x
+                            j === i ? { ...x, valor: comoDecimalBr(e.target.value) } : x
                           ),
                         }))
                       }
