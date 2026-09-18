@@ -3,7 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminNav from "@/components/AdminNav";
 import type { ProdutoAdmin } from "@/lib/types";
+import type { ConfiguracaoLoja } from "@/lib/data/configuracao";
 import { gerarCombinacoes, buildCombinacaoKey } from "@/lib/estoque-variacao";
+
+type TipoCampo = "percentual" | "valor";
+type SinalCampo = "soma" | "subtrai";
+
+type ValorShopee = {
+  nome: string;
+  tipo: TipoCampo;
+  sinal: SinalCampo;
+  valor: number;
+};
 
 type VendaShopee = {
   id: string;
@@ -13,9 +24,7 @@ type VendaShopee = {
   quantidade: number;
   valorVenda: number;
   custoTotal: number;
-  comissaoPct: number;
-  fretePct: number;
-  adsPct: number;
+  valoresShopee: ValorShopee[];
   taxasValor: number;
   lucro: number;
   createdAt: string;
@@ -29,16 +38,23 @@ function formatarData(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
-// Estado editável de margens/quantidade/valor — usado tanto pro form de
+// Estado editável de um campo do template dentro do form — valor em texto
+// pra aceitar digitação livre, convertido ao salvar.
+type CampoValorForm = {
+  nome: string;
+  tipo: TipoCampo;
+  sinal: SinalCampo;
+  valor: string;
+};
+
+// Estado editável de quantidade/valor/campos — usado tanto pro form de
 // lançamento novo quanto pra edição inline de um item da lista.
 type FormState = {
   produtoId: string;
   combinacao: string;
   quantidade: string;
   valorVenda: string;
-  comissaoPct: string;
-  fretePct: string;
-  adsPct: string;
+  valoresShopee: CampoValorForm[];
 };
 
 const FORM_VAZIO: FormState = {
@@ -46,14 +62,17 @@ const FORM_VAZIO: FormState = {
   combinacao: "",
   quantidade: "1",
   valorVenda: "",
-  comissaoPct: "",
-  fretePct: "",
-  adsPct: "",
+  valoresShopee: [],
 };
+
+function calcularValorCampo(campo: { tipo: TipoCampo; valor: number }, valorVenda: number) {
+  return campo.tipo === "percentual" ? valorVenda * (campo.valor / 100) : campo.valor;
+}
 
 export default function AdminVendasShopeePage() {
   const [produtos, setProdutos] = useState<ProdutoAdmin[]>([]);
   const [vendas, setVendas] = useState<VendaShopee[]>([]);
+  const [template, setTemplate] = useState<CampoValorForm[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -69,10 +88,19 @@ export default function AdminVendasShopeePage() {
     Promise.all([
       fetch("/api/admin/produtos").then((r) => r.json()),
       fetch("/api/admin/vendas-shopee").then((r) => r.json()),
+      fetch("/api/admin/configuracoes").then((r) => r.json()),
     ])
-      .then(([produtosRes, vendasRes]) => {
+      .then(([produtosRes, vendasRes, config]: [unknown, unknown, ConfiguracaoLoja]) => {
         setProdutos(Array.isArray(produtosRes) ? produtosRes : []);
         setVendas(Array.isArray(vendasRes) ? vendasRes : []);
+        setTemplate(
+          config.camposMargemShopee.map((c) => ({
+            nome: c.nome,
+            tipo: c.tipo,
+            sinal: c.sinal,
+            valor: c.valorPadrao?.toString() ?? "",
+          }))
+        );
       })
       .catch(() => setErro("Não foi possível carregar os dados."))
       .finally(() => setCarregando(false));
@@ -82,10 +110,19 @@ export default function AdminVendasShopeePage() {
     Promise.all([
       fetch("/api/admin/produtos").then((r) => r.json()),
       fetch("/api/admin/vendas-shopee").then((r) => r.json()),
+      fetch("/api/admin/configuracoes").then((r) => r.json()),
     ])
-      .then(([produtosRes, vendasRes]) => {
+      .then(([produtosRes, vendasRes, config]: [unknown, unknown, ConfiguracaoLoja]) => {
         setProdutos(Array.isArray(produtosRes) ? produtosRes : []);
         setVendas(Array.isArray(vendasRes) ? vendasRes : []);
+        setTemplate(
+          config.camposMargemShopee.map((c) => ({
+            nome: c.nome,
+            tipo: c.tipo,
+            sinal: c.sinal,
+            valor: c.valorPadrao?.toString() ?? "",
+          }))
+        );
       })
       .catch(() => setErro("Não foi possível carregar os dados."))
       .finally(() => setCarregando(false));
@@ -106,26 +143,16 @@ export default function AdminVendasShopeePage() {
     }));
   }, [produtoSelecionado]);
 
-  // Busca as margens efetivas (override do produto ou default global) pra
-  // pré-preencher o form assim que um produto é escolhido — o admin só edita
-  // se quiser corrigir algo especificamente nesta venda.
-  async function selecionarProduto(produtoId: string) {
-    setForm((f) => ({ ...f, produtoId, combinacao: "" }));
-    if (!produtoId) return;
-    try {
-      const margens = await fetch(`/api/admin/vendas-shopee/margens/${produtoId}`).then((r) =>
-        r.json()
-      );
-      setForm((f) => ({
-        ...f,
-        produtoId,
-        comissaoPct: String(margens.comissaoPct ?? 0),
-        fretePct: String(margens.fretePct ?? 0),
-        adsPct: String(margens.adsPct ?? 0),
-      }));
-    } catch {
-      // Sem as margens, o admin ainda consegue digitar na mão.
-    }
+  function abrirForm() {
+    setForm({ ...FORM_VAZIO, valoresShopee: template.map((c) => ({ ...c })) });
+    setMostrarForm(true);
+  }
+
+  function editarCampoForm(i: number, patch: Partial<CampoValorForm>) {
+    setForm((f) => ({
+      ...f,
+      valoresShopee: f.valoresShopee.map((c, j) => (j === i ? { ...c, ...patch } : c)),
+    }));
   }
 
   // Preview de custo/lucro calculado no cliente só pra exibição — o valor
@@ -148,10 +175,23 @@ export default function AdminVendasShopeePage() {
   const qtd = Number(form.quantidade) || 0;
   const valorVenda = Number(form.valorVenda.replace(",", ".")) || 0;
   const custoTotalPreview = Math.round(previewCusto * qtd * 100) / 100;
-  const pctTotal =
-    (Number(form.comissaoPct) || 0) + (Number(form.fretePct) || 0) + (Number(form.adsPct) || 0);
-  const taxasPreview = Math.round(valorVenda * (pctTotal / 100) * 100) / 100;
-  const lucroPreview = Math.round((valorVenda - custoTotalPreview - taxasPreview) * 100) / 100;
+  const camposPreview = useMemo(
+    () =>
+      form.valoresShopee.map((c) => ({
+        ...c,
+        valorCalculado: calcularValorCampo({ tipo: c.tipo, valor: Number(c.valor) || 0 }, valorVenda),
+      })),
+    [form.valoresShopee, valorVenda]
+  );
+  const taxasPreview =
+    Math.round(
+      camposPreview.filter((c) => c.sinal === "subtrai").reduce((s, c) => s + c.valorCalculado, 0) * 100
+    ) / 100;
+  const ajustePreview = camposPreview.reduce(
+    (s, c) => s + (c.sinal === "subtrai" ? -c.valorCalculado : c.valorCalculado),
+    0
+  );
+  const lucroPreview = Math.round((valorVenda - custoTotalPreview + ajustePreview) * 100) / 100;
 
   async function salvarVenda() {
     setErro("");
@@ -169,9 +209,12 @@ export default function AdminVendasShopeePage() {
           combinacao: form.combinacao || null,
           quantidade: Number(form.quantidade),
           valorVenda: Number(form.valorVenda.replace(",", ".")),
-          comissaoPct: Number(form.comissaoPct) || 0,
-          fretePct: Number(form.fretePct) || 0,
-          adsPct: Number(form.adsPct) || 0,
+          valoresShopee: form.valoresShopee.map((c) => ({
+            nome: c.nome,
+            tipo: c.tipo,
+            sinal: c.sinal,
+            valor: Number(c.valor.replace(",", ".")) || 0,
+          })),
         }),
       });
       const dados = await resp.json();
@@ -193,9 +236,7 @@ export default function AdminVendasShopeePage() {
       combinacao: v.combinacao ?? "",
       quantidade: String(v.quantidade),
       valorVenda: String(v.valorVenda),
-      comissaoPct: String(v.comissaoPct),
-      fretePct: String(v.fretePct),
-      adsPct: String(v.adsPct),
+      valoresShopee: v.valoresShopee.map((c) => ({ ...c, valor: String(c.valor) })),
     });
   }
 
@@ -208,9 +249,12 @@ export default function AdminVendasShopeePage() {
         body: JSON.stringify({
           quantidade: Number(formEdicao.quantidade),
           valorVenda: Number(formEdicao.valorVenda.replace(",", ".")),
-          comissaoPct: Number(formEdicao.comissaoPct) || 0,
-          fretePct: Number(formEdicao.fretePct) || 0,
-          adsPct: Number(formEdicao.adsPct) || 0,
+          valoresShopee: formEdicao.valoresShopee.map((c) => ({
+            nome: c.nome,
+            tipo: c.tipo,
+            sinal: c.sinal,
+            valor: Number(c.valor.replace(",", ".")) || 0,
+          })),
         }),
       });
       const dados = await resp.json();
@@ -270,7 +314,7 @@ export default function AdminVendasShopeePage() {
 
       {!mostrarForm && (
         <button
-          onClick={() => setMostrarForm(true)}
+          onClick={abrirForm}
           className="w-full bg-pine text-white text-sm font-semibold rounded py-2.5 mb-4"
         >
           + Nova venda Shopee
@@ -284,7 +328,7 @@ export default function AdminVendasShopeePage() {
             <select
               className="w-full border border-line rounded px-3 py-2 text-sm"
               value={form.produtoId}
-              onChange={(e) => selecionarProduto(e.target.value)}
+              onChange={(e) => setForm((f) => ({ ...f, produtoId: e.target.value, combinacao: "" }))}
             >
               <option value="">Selecione…</option>
               {produtos.map((p) => (
@@ -335,40 +379,28 @@ export default function AdminVendasShopeePage() {
             </div>
           </div>
 
-          <div className="bg-paper-2 rounded p-2 space-y-2">
-            <div className="text-[10px] font-semibold text-gray-500">
-              MARGENS (edite se precisar corrigir só nesta venda)
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-[10px] block mb-1">Comissão %</label>
-                <input
-                  inputMode="decimal"
-                  className="w-full border border-line rounded px-2 py-1.5 text-sm"
-                  value={form.comissaoPct}
-                  onChange={(e) => setForm((f) => ({ ...f, comissaoPct: e.target.value }))}
-                />
+          {form.valoresShopee.length > 0 && (
+            <div className="bg-paper-2 rounded p-2 space-y-2">
+              <div className="text-[10px] font-semibold text-gray-500">
+                CAMPOS DO PEDIDO (edite se precisar corrigir só nesta venda)
               </div>
-              <div>
-                <label className="text-[10px] block mb-1">Frete %</label>
-                <input
-                  inputMode="decimal"
-                  className="w-full border border-line rounded px-2 py-1.5 text-sm"
-                  value={form.fretePct}
-                  onChange={(e) => setForm((f) => ({ ...f, fretePct: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] block mb-1">Ads %</label>
-                <input
-                  inputMode="decimal"
-                  className="w-full border border-line rounded px-2 py-1.5 text-sm"
-                  value={form.adsPct}
-                  onChange={(e) => setForm((f) => ({ ...f, adsPct: e.target.value }))}
-                />
+              <div className="grid grid-cols-2 gap-2">
+                {form.valoresShopee.map((c, i) => (
+                  <div key={i}>
+                    <label className="text-[10px] block mb-1">
+                      {c.nome} ({c.tipo === "percentual" ? "%" : "R$"})
+                    </label>
+                    <input
+                      inputMode="decimal"
+                      className="w-full border border-line rounded px-2 py-1.5 text-sm"
+                      value={c.valor}
+                      onChange={(e) => editarCampoForm(i, { valor: e.target.value })}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
           {form.produtoId && (
             <div className="text-xs space-y-1 border-t border-line pt-2">
@@ -377,7 +409,7 @@ export default function AdminVendasShopeePage() {
                 <span>{reais(custoTotalPreview)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Taxas ({pctTotal}%)</span>
+                <span>Taxas</span>
                 <span className="text-berry">{reais(taxasPreview)}</span>
               </div>
               <div className="flex justify-between font-bold">
@@ -440,30 +472,24 @@ export default function AdminVendasShopeePage() {
                     placeholder="Valor vendido"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <input
-                    inputMode="decimal"
-                    className="border border-line rounded px-2 py-1.5 text-sm"
-                    value={formEdicao.comissaoPct}
-                    onChange={(e) =>
-                      setFormEdicao((f) => ({ ...f, comissaoPct: e.target.value }))
-                    }
-                    placeholder="Comissão %"
-                  />
-                  <input
-                    inputMode="decimal"
-                    className="border border-line rounded px-2 py-1.5 text-sm"
-                    value={formEdicao.fretePct}
-                    onChange={(e) => setFormEdicao((f) => ({ ...f, fretePct: e.target.value }))}
-                    placeholder="Frete %"
-                  />
-                  <input
-                    inputMode="decimal"
-                    className="border border-line rounded px-2 py-1.5 text-sm"
-                    value={formEdicao.adsPct}
-                    onChange={(e) => setFormEdicao((f) => ({ ...f, adsPct: e.target.value }))}
-                    placeholder="Ads %"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  {formEdicao.valoresShopee.map((c, i) => (
+                    <input
+                      key={i}
+                      inputMode="decimal"
+                      className="border border-line rounded px-2 py-1.5 text-sm"
+                      value={c.valor}
+                      onChange={(e) =>
+                        setFormEdicao((f) => ({
+                          ...f,
+                          valoresShopee: f.valoresShopee.map((x, j) =>
+                            j === i ? { ...x, valor: e.target.value } : x
+                          ),
+                        }))
+                      }
+                      placeholder={`${c.nome} (${c.tipo === "percentual" ? "%" : "R$"})`}
+                    />
+                  ))}
                 </div>
                 <div className="flex gap-2">
                   <button

@@ -3,7 +3,22 @@
 import { useEffect, useState } from "react";
 import AdminNav from "@/components/AdminNav";
 import type { TransportadoraFrete } from "@prisma/client";
-import type { ConfiguracaoLoja } from "@/lib/data/configuracao";
+import type { ConfiguracaoLoja, CampoMargemShopee } from "@/lib/data/configuracao";
+
+// Estado local de edição de um campo do template — valor em texto pra
+// aceitar input livre (inclusive vazio), convertido pro payload ao salvar.
+type CampoForm = {
+  nome: string;
+  tipo: CampoMargemShopee["tipo"];
+  sinal: CampoMargemShopee["sinal"];
+  valorPadrao: string;
+};
+
+function paraCampoForm(c: CampoMargemShopee): CampoForm {
+  return { nome: c.nome, tipo: c.tipo, sinal: c.sinal, valorPadrao: c.valorPadrao?.toString() ?? "" };
+}
+
+const CAMPO_VAZIO: CampoForm = { nome: "", tipo: "percentual", sinal: "subtrai", valorPadrao: "" };
 
 export default function AdminConfiguracoesPage() {
   const [config, setConfig] = useState<ConfiguracaoLoja | null>(null);
@@ -12,9 +27,7 @@ export default function AdminConfiguracoesPage() {
   const [tokenMelhorEnvio, setTokenMelhorEnvio] = useState("");
   const [tokenSuperFrete, setTokenSuperFrete] = useState("");
   const [achatarFaixaPeso, setAchatarFaixaPeso] = useState(true);
-  const [shopeeComissaoPct, setShopeeComissaoPct] = useState("");
-  const [shopeeFretePct, setShopeeFretePct] = useState("");
-  const [shopeeAdsPct, setShopeeAdsPct] = useState("");
+  const [campos, setCampos] = useState<CampoForm[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -28,9 +41,7 @@ export default function AdminConfiguracoesPage() {
         setCepOrigem(c.cepOrigem);
         setTransportadora(c.transportadoraAtiva);
         setAchatarFaixaPeso(c.freteAchataFaixaPeso);
-        setShopeeComissaoPct(c.shopeeComissaoPct?.toString() ?? "");
-        setShopeeFretePct(c.shopeeFretePct?.toString() ?? "");
-        setShopeeAdsPct(c.shopeeAdsPct?.toString() ?? "");
+        setCampos(c.camposMargemShopee.map(paraCampoForm));
       })
       .finally(() => setCarregando(false));
   }, []);
@@ -47,16 +58,19 @@ export default function AdminConfiguracoesPage() {
       melhorEnvioToken?: string;
       superFreteToken?: string;
       freteAchataFaixaPeso: boolean;
-      shopeeComissaoPct: number | null;
-      shopeeFretePct: number | null;
-      shopeeAdsPct: number | null;
+      camposMargemShopee: CampoMargemShopee[];
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
       freteAchataFaixaPeso: achatarFaixaPeso,
-      shopeeComissaoPct: shopeeComissaoPct.trim() ? Number(shopeeComissaoPct) : null,
-      shopeeFretePct: shopeeFretePct.trim() ? Number(shopeeFretePct) : null,
-      shopeeAdsPct: shopeeAdsPct.trim() ? Number(shopeeAdsPct) : null,
+      camposMargemShopee: campos
+        .filter((c) => c.nome.trim())
+        .map((c) => ({
+          nome: c.nome.trim(),
+          tipo: c.tipo,
+          sinal: c.sinal,
+          valorPadrao: c.valorPadrao.trim() ? Number(c.valorPadrao.replace(",", ".")) : null,
+        })),
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -188,43 +202,80 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         <div>
-          <p className="text-sm font-medium mb-2">Vendas Shopee — margens padrão</p>
+          <p className="text-sm font-medium mb-2">Vendas Shopee — campos do pedido</p>
           <p className="text-xs text-ink/50 mb-3">
-            Usadas ao lançar uma venda em Vendas Shopee, quando o produto não tem margem
-            própria definida no cadastro. Em branco = 0%.
+            Template usado ao lançar uma venda em Vendas Shopee — espelhe os campos reais do
+            pedido (Comissão, Frete, Ads, Renda estimada…). Cada lançamento guarda seu próprio
+            valor; editar aqui não muda vendas já lançadas.
           </p>
-          <div className="grid grid-cols-3 gap-3">
-            <label className="block">
-              <span className="text-sm text-ink/70">Comissão %</span>
-              <input
-                type="number"
-                step="0.01"
-                value={shopeeComissaoPct}
-                onChange={(e) => setShopeeComissaoPct(e.target.value)}
-                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm text-ink/70">Frete %</span>
-              <input
-                type="number"
-                step="0.01"
-                value={shopeeFretePct}
-                onChange={(e) => setShopeeFretePct(e.target.value)}
-                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm text-ink/70">Ads %</span>
-              <input
-                type="number"
-                step="0.01"
-                value={shopeeAdsPct}
-                onChange={(e) => setShopeeAdsPct(e.target.value)}
-                className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
-              />
-            </label>
+          <div className="space-y-2">
+            {campos.map((c, i) => (
+              <div key={i} className="flex gap-1.5 items-start">
+                <input
+                  value={c.nome}
+                  onChange={(e) =>
+                    setCampos((cs) => cs.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))
+                  }
+                  placeholder="Nome do campo"
+                  className="flex-1 border border-line rounded px-2 py-2 text-sm min-w-0"
+                />
+                <select
+                  value={c.tipo}
+                  onChange={(e) =>
+                    setCampos((cs) =>
+                      cs.map((x, j) =>
+                        j === i ? { ...x, tipo: e.target.value as CampoMargemShopee["tipo"] } : x
+                      )
+                    )
+                  }
+                  className="border border-line rounded px-1.5 py-2 text-sm bg-white"
+                >
+                  <option value="percentual">%</option>
+                  <option value="valor">R$</option>
+                </select>
+                <select
+                  value={c.sinal}
+                  onChange={(e) =>
+                    setCampos((cs) =>
+                      cs.map((x, j) =>
+                        j === i ? { ...x, sinal: e.target.value as CampoMargemShopee["sinal"] } : x
+                      )
+                    )
+                  }
+                  className="border border-line rounded px-1.5 py-2 text-sm bg-white"
+                >
+                  <option value="subtrai">− lucro</option>
+                  <option value="soma">+ lucro</option>
+                </select>
+                <input
+                  inputMode="decimal"
+                  value={c.valorPadrao}
+                  onChange={(e) =>
+                    setCampos((cs) =>
+                      cs.map((x, j) => (j === i ? { ...x, valorPadrao: e.target.value } : x))
+                    )
+                  }
+                  placeholder="valor padrão"
+                  className="w-24 border border-line rounded px-2 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCampos((cs) => cs.filter((_, j) => j !== i))}
+                  className="px-2 py-2 text-sm border border-line rounded text-berry"
+                  aria-label="Remover campo"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setCampos((cs) => [...cs, { ...CAMPO_VAZIO }])}
+            className="mt-2 text-sm border border-line rounded px-3 py-1.5"
+          >
+            + Adicionar campo
+          </button>
         </div>
 
         {erro && <p className="text-sm text-berry">{erro}</p>}

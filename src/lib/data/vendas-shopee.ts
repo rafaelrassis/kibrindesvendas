@@ -2,9 +2,20 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { custoEfetivo } from "@/lib/estoque-variacao";
 import { getConfiguracaoLoja } from "./configuracao";
+import type { CampoMargemShopee } from "./configuracao";
 import { normalizarPrecosValores } from "./produtos";
 import { ErroDeNegocio } from "./erros";
 import type { Prisma } from "@prisma/client";
+
+// Snapshot de um campo do template aplicado numa venda específica — nome,
+// tipo e sinal congelados no lançamento, imutáveis a mudanças posteriores no
+// template (ConfiguracaoLoja.camposMargemShopee).
+export type ValorMargemShopee = {
+  nome: string;
+  tipo: "percentual" | "valor";
+  sinal: "soma" | "subtrai";
+  valor: number;
+};
 
 export type VendaShopee = {
   id: string;
@@ -14,9 +25,7 @@ export type VendaShopee = {
   quantidade: number;
   valorVenda: number;
   custoTotal: number;
-  comissaoPct: number;
-  fretePct: number;
-  adsPct: number;
+  valoresShopee: ValorMargemShopee[];
   // Derivados — não guardados no banco, calculados na leitura a partir do
   // snapshot acima (nunca recalculam custo/margem do produto atual).
   taxasValor: number;
@@ -26,15 +35,30 @@ export type VendaShopee = {
 
 type VendaShopeeDb = Prisma.VendaShopeeGetPayload<{ include: { produto: true } }>;
 
+// Valor em R$ que um campo representa nesta venda: % sobre o valor vendido,
+// ou o próprio valor fixo.
+function valorCalculadoDoCampo(campo: ValorMargemShopee, valorVenda: number): number {
+  return campo.tipo === "percentual" ? valorVenda * (campo.valor / 100) : campo.valor;
+}
+
 function toVendaShopee(v: VendaShopeeDb): VendaShopee {
   const valorVenda = Number(v.valorVenda);
   const custoTotal = Number(v.custoTotal);
-  const comissaoPct = Number(v.comissaoPct);
-  const fretePct = Number(v.fretePct);
-  const adsPct = Number(v.adsPct);
-  const taxasValor =
-    Math.round(valorVenda * ((comissaoPct + fretePct + adsPct) / 100) * 100) / 100;
-  const lucro = Math.round((valorVenda - custoTotal - taxasValor) * 100) / 100;
+  const valoresShopee = (v.valoresShopee as ValorMargemShopee[]) ?? [];
+
+  let taxasValor = 0;
+  let ajuste = 0;
+  for (const campo of valoresShopee) {
+    const valorCalculado = valorCalculadoDoCampo(campo, valorVenda);
+    if (campo.sinal === "subtrai") {
+      taxasValor += valorCalculado;
+      ajuste -= valorCalculado;
+    } else {
+      ajuste += valorCalculado;
+    }
+  }
+  taxasValor = Math.round(taxasValor * 100) / 100;
+  const lucro = Math.round((valorVenda - custoTotal + ajuste) * 100) / 100;
 
   return {
     id: v.id,
@@ -44,9 +68,7 @@ function toVendaShopee(v: VendaShopeeDb): VendaShopee {
     quantidade: v.quantidade,
     valorVenda,
     custoTotal,
-    comissaoPct,
-    fretePct,
-    adsPct,
+    valoresShopee,
     taxasValor,
     lucro,
     createdAt: v.createdAt.toISOString(),
@@ -61,21 +83,16 @@ export async function getVendasShopee(): Promise<VendaShopee[]> {
   return vendas.map(toVendaShopee);
 }
 
-// Margens efetivas de um produto: override do produto quando preenchido,
-// senão o default global de ConfiguracaoLoja, senão 0 — mesmo padrão
-// substitutivo de precoEfetivo/custoEfetivo (não soma, escolhe uma fonte).
-export async function margensShopeeDoProduto(produtoId: string) {
-  const [produto, config] = await Promise.all([
-    prisma.produto.findUnique({ where: { id: produtoId } }),
-    getConfiguracaoLoja(),
-  ]);
-  if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
-
-  return {
-    comissaoPct: Number(produto.shopeeComissaoPct ?? config.shopeeComissaoPct ?? 0),
-    fretePct: Number(produto.shopeeFretePct ?? config.shopeeFretePct ?? 0),
-    adsPct: Number(produto.shopeeAdsPct ?? config.shopeeAdsPct ?? 0),
-  };
+// Template atual pra pré-preencher o form de lançamento — cada campo
+// entra com o valorPadrao configurado (ou 0, se em branco).
+export async function templateValoresShopee(): Promise<ValorMargemShopee[]> {
+  const config = await getConfiguracaoLoja();
+  return config.camposMargemShopee.map((c: CampoMargemShopee) => ({
+    nome: c.nome,
+    tipo: c.tipo,
+    sinal: c.sinal,
+    valor: c.valorPadrao ?? 0,
+  }));
 }
 
 export type DadosVendaShopee = {
@@ -83,12 +100,30 @@ export type DadosVendaShopee = {
   combinacao?: string | null;
   quantidade: number;
   valorVenda: number;
-  // Margens explícitas (o form manda o valor pré-preenchido, editável). Sem
-  // isso, resolve pelo default do produto/loja.
-  comissaoPct?: number;
-  fretePct?: number;
-  adsPct?: number;
+  // Snapshot explícito (o form manda os valores pré-preenchidos pelo
+  // template, editáveis nesta venda). Sem isso, usa o template atual.
+  valoresShopee?: ValorMargemShopee[];
 };
+
+function validarValoresShopee(valores: ValorMargemShopee[]) {
+  for (const campo of valores) {
+    if (!campo.nome?.trim()) {
+      throw new ErroDeNegocio("Todo campo de margem precisa de um nome.");
+    }
+    if (campo.tipo !== "percentual" && campo.tipo !== "valor") {
+      throw new ErroDeNegocio(`Tipo inválido em "${campo.nome}".`);
+    }
+    if (campo.sinal !== "soma" && campo.sinal !== "subtrai") {
+      throw new ErroDeNegocio(`Sinal inválido em "${campo.nome}".`);
+    }
+    if (!Number.isFinite(campo.valor) || campo.valor < 0) {
+      throw new ErroDeNegocio(`Valor inválido em "${campo.nome}".`);
+    }
+    if (campo.tipo === "percentual" && campo.valor > 100) {
+      throw new ErroDeNegocio(`"${campo.nome}" é percentual — não pode passar de 100.`);
+    }
+  }
+}
 
 function validar(dados: Partial<DadosVendaShopee>) {
   if (dados.quantidade !== undefined && (!Number.isInteger(dados.quantidade) || dados.quantidade < 1)) {
@@ -97,14 +132,8 @@ function validar(dados: Partial<DadosVendaShopee>) {
   if (dados.valorVenda !== undefined && !(dados.valorVenda > 0)) {
     throw new ErroDeNegocio("Informe o valor vendido, maior que zero.");
   }
-  for (const [campo, valor] of [
-    ["comissaoPct", dados.comissaoPct],
-    ["fretePct", dados.fretePct],
-    ["adsPct", dados.adsPct],
-  ] as const) {
-    if (valor !== undefined && (valor < 0 || valor > 100)) {
-      throw new ErroDeNegocio(`${campo} precisa estar entre 0 e 100.`);
-    }
+  if (dados.valoresShopee !== undefined) {
+    validarValoresShopee(dados.valoresShopee);
   }
 }
 
@@ -151,7 +180,7 @@ export async function criarVendaShopee(dados: DadosVendaShopee): Promise<VendaSh
   validar(dados);
 
   const custoUnitario = await custoDoProduto(dados.produtoId, dados.combinacao);
-  const margensPadrao = await margensShopeeDoProduto(dados.produtoId);
+  const valoresShopee = dados.valoresShopee ?? (await templateValoresShopee());
 
   const venda = await prisma.vendaShopee.create({
     data: {
@@ -160,9 +189,7 @@ export async function criarVendaShopee(dados: DadosVendaShopee): Promise<VendaSh
       quantidade: dados.quantidade,
       valorVenda: dados.valorVenda,
       custoTotal: Math.round(custoUnitario * dados.quantidade * 100) / 100,
-      comissaoPct: dados.comissaoPct ?? margensPadrao.comissaoPct,
-      fretePct: dados.fretePct ?? margensPadrao.fretePct,
-      adsPct: dados.adsPct ?? margensPadrao.adsPct,
+      valoresShopee: valoresShopee as unknown as Prisma.InputJsonValue,
     },
     include: { produto: true },
   });
@@ -191,9 +218,7 @@ export async function atualizarVendaShopee(
       quantidade: dados.quantidade,
       valorVenda: dados.valorVenda,
       custoTotal: dados.custoTotal,
-      comissaoPct: dados.comissaoPct,
-      fretePct: dados.fretePct,
-      adsPct: dados.adsPct,
+      valoresShopee: dados.valoresShopee as unknown as Prisma.InputJsonValue | undefined,
     },
     include: { produto: true },
   });

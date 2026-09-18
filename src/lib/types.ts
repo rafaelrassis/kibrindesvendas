@@ -110,11 +110,6 @@ export type ProdutoAdmin = Produto & {
   custoTotal: number;
   lucro: number;
   margemPercentual: number | null;
-  // Override de margem Shopee deste produto — null = usa o default global
-  // da loja (ver ConfiguracaoLoja.shopeeComissaoPct e cia).
-  shopeeComissaoPct: number | null;
-  shopeeFretePct: number | null;
-  shopeeAdsPct: number | null;
   // CEP de despacho deste produto, quando difere do CEP padrão da loja
   // (fornecedor terceirizado). null = usa o CEP padrão.
   cepOrigemOverride: string | null;

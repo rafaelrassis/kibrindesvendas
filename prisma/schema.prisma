@@ -105,12 +105,6 @@ model Produto {
   // cupom em vez de bloquear a remoção, e ele passaria a valer pra qualquer
   // produto — uma forma de burlar a trava sem editar o cupom.
   cupons               Cupom[]
-  // Overrides de margem pra venda manual na Shopee (área /admin/vendas-shopee).
-  // null = usa o default global de ConfiguracaoLoja. Nunca sai pela API
-  // pública, só pela rota /api/admin — mesmo tratamento de custo de material.
-  shopeeComissaoPct    Decimal?          @db.Decimal(5, 2)
-  shopeeFretePct       Decimal?          @db.Decimal(5, 2)
-  shopeeAdsPct         Decimal?          @db.Decimal(5, 2)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 }
@@ -509,20 +503,21 @@ model ConfiguracaoLoja {
   // FRETE_GRATIS aplicado (o resultado é o mesmo, frete zerado, mas as duas
   // origens coexistem sem conflito).
   freteGratisAcimaDe Decimal? @db.Decimal(10, 2)
-  // Defaults globais de margem pra venda manual na Shopee — usados quando o
-  // produto não tem override próprio (ver Produto.shopeeComissaoPct e cia).
-  // null = 0% nesse componente até ser configurado.
-  shopeeComissaoPct Decimal? @db.Decimal(5, 2)
-  shopeeFretePct    Decimal? @db.Decimal(5, 2)
-  shopeeAdsPct      Decimal? @db.Decimal(5, 2)
+  // Template dos campos do pedido Shopee (comissão, frete, ads, etc.) usado
+  // pra montar o form de lançamento em /admin/vendas-shopee — lista editável
+  // de { nome, tipo: "percentual"|"valor", sinal: "soma"|"subtrai",
+  // valorPadrao }. null/[] até configurar; cada venda lançada guarda seu
+  // próprio snapshot (ver VendaShopee.valoresShopee), imutável a mudanças
+  // feitas aqui depois.
+  camposMargemShopee Json?
   updatedAt        DateTime @updatedAt
 }
 
 // Venda lançada manualmente pelo admin quando o mesmo produto é vendido fora
 // do site, na Shopee. Reaproveita o custo de material já cadastrado no
-// produto (custoEfetivo) em vez de duplicar cadastro. Comissão/frete/ads são
-// SNAPSHOT do que estava configurado (produto ou default global) no momento
-// do lançamento — mudar a config depois não recalcula vendas já lançadas.
+// produto (custoEfetivo) em vez de duplicar cadastro. valoresShopee é
+// SNAPSHOT do template (ConfiguracaoLoja.camposMargemShopee) no momento do
+// lançamento — mudar a config depois não recalcula vendas já lançadas.
 model VendaShopee {
   id            String   @id @default(cuid())
   produtoId     String
@@ -535,9 +530,10 @@ model VendaShopee {
   valorVenda    Decimal  @db.Decimal(10, 2)
   // Custo de material total da venda (quantidade × custoEfetivo), snapshot.
   custoTotal    Decimal  @db.Decimal(10, 2)
-  comissaoPct   Decimal  @db.Decimal(5, 2)
-  fretePct      Decimal  @db.Decimal(5, 2)
-  adsPct        Decimal  @db.Decimal(5, 2)
+  // Snapshot de cada campo do template (nome/tipo/sinal/valor) aplicado
+  // nesta venda — imutável a mudanças feitas depois em
+  // ConfiguracaoLoja.camposMargemShopee.
+  valoresShopee Json
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

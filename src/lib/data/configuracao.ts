@@ -1,10 +1,23 @@
 import "server-only";
-import { TransportadoraFrete } from "@prisma/client";
+import { TransportadoraFrete, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizarCep } from "@/lib/frete";
 import { ErroDeNegocio } from "./erros";
 
 const CEP_ORIGEM_PADRAO = "01310100";
+
+export type TipoCampoMargemShopee = "percentual" | "valor";
+export type SinalCampoMargemShopee = "soma" | "subtrai";
+
+// Um campo do template do pedido Shopee (ex: "Comissão", "Renda estimada do
+// pedido"). tipo diz se valorPadrao/valor lançado é % sobre o valor vendido
+// ou R$ fixo; sinal diz se soma ou subtrai do lucro.
+export type CampoMargemShopee = {
+  nome: string;
+  tipo: TipoCampoMargemShopee;
+  sinal: SinalCampoMargemShopee;
+  valorPadrao: number | null;
+};
 
 export type ConfiguracaoLoja = {
   cepOrigem: string;
@@ -26,12 +39,9 @@ export type ConfiguracaoLoja = {
   // — independe de cupom, e soma sem conflito com um cupom FRETE_GRATIS
   // aplicado junto (o resultado final é o mesmo: frete 0).
   freteGratisAcimaDe: number | null;
-  // Defaults globais de margem pra venda manual na Shopee (/admin/vendas-shopee).
-  // Um produto pode sobrescrever cada campo individualmente — ver
-  // margensShopeeDoProduto em vendas-shopee.ts. null = 0% até configurar.
-  shopeeComissaoPct: number | null;
-  shopeeFretePct: number | null;
-  shopeeAdsPct: number | null;
+  // Template dos campos do pedido Shopee usado ao lançar venda em
+  // /admin/vendas-shopee. [] até configurar.
+  camposMargemShopee: CampoMargemShopee[];
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -48,11 +58,31 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     freteAchataFaixaPeso: config?.freteAchataFaixaPeso ?? true,
     freteGratisAcimaDe:
       config?.freteGratisAcimaDe != null ? Number(config.freteGratisAcimaDe) : null,
-    shopeeComissaoPct:
-      config?.shopeeComissaoPct != null ? Number(config.shopeeComissaoPct) : null,
-    shopeeFretePct: config?.shopeeFretePct != null ? Number(config.shopeeFretePct) : null,
-    shopeeAdsPct: config?.shopeeAdsPct != null ? Number(config.shopeeAdsPct) : null,
+    camposMargemShopee: (config?.camposMargemShopee as CampoMargemShopee[] | null) ?? [],
   };
+}
+
+function validarCamposMargemShopee(campos: CampoMargemShopee[]): CampoMargemShopee[] {
+  return campos.map((campo) => {
+    const nome = campo.nome?.trim();
+    if (!nome) throw new ErroDeNegocio("Todo campo precisa de um nome.");
+    if (campo.tipo !== "percentual" && campo.tipo !== "valor") {
+      throw new ErroDeNegocio(`Tipo inválido em "${nome}".`);
+    }
+    if (campo.sinal !== "soma" && campo.sinal !== "subtrai") {
+      throw new ErroDeNegocio(`Sinal inválido em "${nome}".`);
+    }
+    const valorPadrao = campo.valorPadrao;
+    if (valorPadrao != null) {
+      if (!Number.isFinite(valorPadrao) || valorPadrao < 0) {
+        throw new ErroDeNegocio(`Valor padrão inválido em "${nome}".`);
+      }
+      if (campo.tipo === "percentual" && valorPadrao > 100) {
+        throw new ErroDeNegocio(`"${nome}" é percentual — não pode passar de 100.`);
+      }
+    }
+    return { nome, tipo: campo.tipo, sinal: campo.sinal, valorPadrao: valorPadrao ?? null };
+  });
 }
 
 export async function atualizarConfiguracaoLoja(dados: {
@@ -64,10 +94,8 @@ export async function atualizarConfiguracaoLoja(dados: {
   // null desliga a regra; undefined deixa como está.
   freteGratisAcimaDe?: number | null;
   freteAchataFaixaPeso?: boolean;
-  // null desliga o default (volta a valer 0%); undefined deixa como está.
-  shopeeComissaoPct?: number | null;
-  shopeeFretePct?: number | null;
-  shopeeAdsPct?: number | null;
+  // Substitui o template inteiro; undefined deixa como está.
+  camposMargemShopee?: CampoMargemShopee[];
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -76,9 +104,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     superFreteToken?: string | null;
     freteGratisAcimaDe?: number | null;
     freteAchataFaixaPeso?: boolean;
-    shopeeComissaoPct?: number | null;
-    shopeeFretePct?: number | null;
-    shopeeAdsPct?: number | null;
+    camposMargemShopee?: Prisma.InputJsonValue;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -113,13 +139,10 @@ export async function atualizarConfiguracaoLoja(dados: {
     data.freteAchataFaixaPeso = dados.freteAchataFaixaPeso;
   }
 
-  for (const campo of ["shopeeComissaoPct", "shopeeFretePct", "shopeeAdsPct"] as const) {
-    const valor = dados[campo];
-    if (valor === undefined) continue;
-    if (valor !== null && (valor < 0 || valor > 100)) {
-      throw new ErroDeNegocio(`${campo} precisa estar entre 0 e 100.`);
-    }
-    data[campo] = valor;
+  if (dados.camposMargemShopee !== undefined) {
+    data.camposMargemShopee = validarCamposMargemShopee(
+      dados.camposMargemShopee
+    ) as unknown as Prisma.InputJsonValue;
   }
 
   await prisma.configuracaoLoja.upsert({
@@ -132,9 +155,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       superFreteToken: data.superFreteToken,
       freteGratisAcimaDe: data.freteGratisAcimaDe,
       freteAchataFaixaPeso: data.freteAchataFaixaPeso ?? true,
-      shopeeComissaoPct: data.shopeeComissaoPct,
-      shopeeFretePct: data.shopeeFretePct,
-      shopeeAdsPct: data.shopeeAdsPct,
+      camposMargemShopee: data.camposMargemShopee,
     },
     update: data,
   });
