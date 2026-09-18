@@ -256,16 +256,19 @@ async function getLucroDetalhado(
   let centavosFaturados = 0;
   let centavosCusto = 0;
   for (const item of itens) {
-    const custoTotalProduto = item.produto.materiais.reduce(
-      (soma, m) => soma + Number(m.quantidade) * Number(m.custoUnitario),
-      0
-    );
     const selecoes = (item.variacaoEscolhida as Record<string, string> | null) ?? {};
     const custoUnitario = custoEfetivo(
-      { custoTotal: custoTotalProduto, variacoes: item.produto.variacoes.map((v) => ({
-        tipo: v.tipo,
-        custosValores: v.custosValores as Record<string, number> | null,
-      })) },
+      {
+        materiais: item.produto.materiais.map((m) => ({
+          quantidade: Number(m.quantidade),
+          custoUnitario: Number(m.custoUnitario),
+          variacaoValor: m.variacaoValor,
+        })),
+        variacoes: item.produto.variacoes.map((v) => ({
+          tipo: v.tipo,
+          custosValores: v.custosValores as Record<string, number> | null,
+        })),
+      },
       selecoes
     );
     const centavosItemFaturado = emCentavos(item.precoUnitario) * item.quantidade;

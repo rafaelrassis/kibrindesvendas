@@ -32,21 +32,41 @@ export function precoEfetivo(
   return produto.preco;
 }
 
-// Custo de material pra uma seleção de variações: mesmo algoritmo de
-// precoEfetivo, mas pra custosValores. Sem entrada aplicável, cai no
-// custoTotal normal do produto (soma de MaterialProduto). Uso restrito ao
-// admin — nunca chamado com dado vindo da API pública.
+// Soma dos materiais comuns (sem variacaoValor) — o custo-base do produto,
+// antes de qualquer variação escolhida.
+export function custoComumMateriais(
+  materiais: { quantidade: number; custoUnitario: number; variacaoValor?: string | null }[]
+): number {
+  return materiais
+    .filter((m) => !m.variacaoValor)
+    .reduce((soma, m) => soma + m.quantidade * m.custoUnitario, 0);
+}
+
+// Custo de material pra uma seleção de variações. Ordem de prioridade, por
+// variação na ordem cadastrada: 1) override manual em custosValores, se
+// houver; 2) comuns + materiais vinculados ao valor escolhido
+// (MaterialProduto.variacaoValor); sem seleção aplicável, cai no custo
+// comum. Uso restrito ao admin — nunca chamado com dado vindo da API
+// pública.
 export function custoEfetivo(
-  produto: { custoTotal: number; variacoes: { tipo: string; custosValores?: Record<string, number> | null }[] },
+  produto: {
+    materiais: { quantidade: number; custoUnitario: number; variacaoValor?: string | null }[];
+    variacoes: { tipo: string; custosValores?: Record<string, number> | null }[];
+  },
   selecoes: Record<string, string>
 ): number {
+  const comuns = custoComumMateriais(produto.materiais);
   for (const v of produto.variacoes) {
     const valor = selecoes[v.tipo];
     if (valor == null) continue;
-    const custo = v.custosValores?.[valor];
-    if (custo != null) return custo;
+    const overrideManual = v.custosValores?.[valor];
+    if (overrideManual != null) return overrideManual;
+    const especificos = produto.materiais
+      .filter((m) => m.variacaoValor === valor)
+      .reduce((soma, m) => soma + m.quantidade * m.custoUnitario, 0);
+    if (especificos > 0) return comuns + especificos;
   }
-  return produto.custoTotal;
+  return comuns;
 }
 
 // Peso/dimensões pra uma seleção de variações: percorre as variações na

@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { custoEfetivo } from "@/lib/estoque-variacao";
+import { custoEfetivo, custoComumMateriais } from "@/lib/estoque-variacao";
 import { getConfiguracaoLoja } from "./configuracao";
 import type { CampoMargemShopee } from "./configuracao";
 import { normalizarPrecosValores } from "./produtos";
@@ -146,12 +146,13 @@ async function custoDoProduto(produtoId: string, combinacao: string | null | und
   });
   if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
 
-  const custoTotalProduto = produto.materiais.reduce(
-    (soma, m) => soma + Number(m.quantidade) * Number(m.custoUnitario),
-    0
-  );
+  const materiais = produto.materiais.map((m) => ({
+    quantidade: Number(m.quantidade),
+    custoUnitario: Number(m.custoUnitario),
+    variacaoValor: m.variacaoValor,
+  }));
 
-  if (!combinacao) return custoTotalProduto;
+  if (!combinacao) return custoComumMateriais(materiais);
 
   // combinacao vem como "Tipo:Valor|Tipo:Valor" — reconstrói as seleções
   // pra reaproveitar custoEfetivo, que espera um Record<tipo, valor>.
@@ -163,7 +164,7 @@ async function custoDoProduto(produtoId: string, combinacao: string | null | und
 
   return custoEfetivo(
     {
-      custoTotal: custoTotalProduto,
+      materiais,
       variacoes: produto.variacoes.map((v) => ({
         tipo: v.tipo,
         custosValores: normalizarPrecosValores(v.custosValores),

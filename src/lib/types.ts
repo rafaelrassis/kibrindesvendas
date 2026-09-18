@@ -101,6 +101,9 @@ export type MaterialProduto = {
   nome: string;
   quantidade: number;
   custoUnitario: number;
+  // null = comum a todas as variações. Preenchido = só entra no custo de
+  // quem escolher esse valor (ver custoEfetivo em lib/estoque-variacao.ts).
+  variacaoValor: string | null;
 };
 
 // Versão do produto só pra telas /admin: inclui o custo de material, dado

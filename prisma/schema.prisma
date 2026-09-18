@@ -110,8 +110,10 @@ model Produto {
 }
 
 // Uma linha de material/insumo gasto no produto (ex: "Caneca branca", 1un,
-// R$ 8,90). A soma de `quantidade * custoUnitario` de todas as linhas é o
-// custo do produto, usado só internamente pra calcular a margem.
+// R$ 8,90). A soma de `quantidade * custoUnitario` das linhas comuns
+// (variacaoValor null) é o custo-base do produto. Linha com variacaoValor
+// preenchido só entra no custo de quem escolher aquele valor — ver
+// custoEfetivo em lib/estoque-variacao.ts.
 model MaterialProduto {
   id            String  @id @default(cuid())
   produtoId     String
@@ -119,6 +121,10 @@ model MaterialProduto {
   nome          String
   quantidade    Decimal @default(1) @db.Decimal(10, 3)
   custoUnitario Decimal @db.Decimal(10, 2)
+  // null = material comum, entra no custo de qualquer variação escolhida.
+  // Preenchido = só entra no custo quando o valor escolhido bate com este
+  // (mesma string usada em Variacao.valores; não é uma FK).
+  variacaoValor String?
 }
 
 // Estoque de uma combinação específica de variações (ex: Cor=Preta +

@@ -32,7 +32,13 @@ type VariacaoForm = {
   // e só ele é considerado no cálculo de frete. Ver dimensaoEfetiva.
   afetaDimensao: boolean;
 };
-type MaterialForm = { nome: string; quantidade: string; custoUnitario: string };
+type MaterialForm = {
+  nome: string;
+  quantidade: string;
+  custoUnitario: string;
+  // "" = comum a todas as variações; senão, um dos valores de variacoes.
+  variacaoValor: string;
+};
 
 const DIMENSAO_VAZIA: DimensaoValorForm = {
   pesoMiligramas: "",
@@ -74,6 +80,7 @@ function paraMaterialForm(m: ProdutoAdmin["materiais"] | undefined): MaterialFor
     nome: x.nome,
     quantidade: String(x.quantidade),
     custoUnitario: String(x.custoUnitario),
+    variacaoValor: x.variacaoValor ?? "",
   }));
 }
 
@@ -207,6 +214,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     }));
   const temVariacoes = variacoesValidas.length > 0;
   const combinacoes = temVariacoes ? gerarCombinacoes(variacoesValidas) : [];
+  // Valores de variação únicos, pra oferecer no seletor de cada material —
+  // é a mesma string usada em custosValores/variacaoValor, não amarrada ao
+  // tipo (produto com um só grupo de variação, caso normal aqui).
+  const valoresDeVariacao = Array.from(new Set(variacoesValidas.flatMap((v) => v.valores)));
 
   useEffect(() => {
     fetch("/api/categorias")
@@ -486,8 +497,11 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   }
 
   // Cálculo ao vivo, só pra guiar o cadastro — o valor de verdade é
-  // recalculado no servidor a partir do que for salvo.
+  // recalculado no servidor a partir do que for salvo. Só materiais comuns
+  // (sem variacaoValor) entram no custo-base; os vinculados a uma variação
+  // só contam pra quem escolher aquele valor (ver custoPorValor abaixo).
   const custoTotal = materiais.reduce((soma, m) => {
+    if (m.variacaoValor) return soma;
     const qtd = Number(m.quantidade.replace(",", "."));
     const custo = Number(m.custoUnitario.replace(",", "."));
     return soma + (Number.isFinite(qtd) && Number.isFinite(custo) ? qtd * custo : 0);
@@ -610,6 +624,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           nome: m.nome.trim(),
           quantidade: Number(m.quantidade.replace(",", ".")) || 0,
           custoUnitario: Number(m.custoUnitario.replace(",", ".")) || 0,
+          variacaoValor: m.variacaoValor || null,
         })),
     };
 
@@ -920,6 +935,21 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                 inputMode="decimal"
                 className="w-24 border border-line rounded px-2 py-2 text-sm"
               />
+              {temVariacoes && (
+                <select
+                  value={m.variacaoValor}
+                  onChange={(e) => atualizarMaterial(i, "variacaoValor", e.target.value)}
+                  className="border border-line rounded px-2 py-2 text-sm text-ink/70"
+                  title="Vincular a uma variação — vazio entra no custo de todas"
+                >
+                  <option value="">Todas as variações</option>
+                  {valoresDeVariacao.map((v) => (
+                    <option key={v} value={v}>
+                      Só {v}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={() => removerMaterial(i)}
@@ -933,7 +963,10 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
         <button
           type="button"
           onClick={() =>
-            setMateriais((prev) => [...prev, { nome: "", quantidade: "1", custoUnitario: "" }])
+            setMateriais((prev) => [
+              ...prev,
+              { nome: "", quantidade: "1", custoUnitario: "", variacaoValor: "" },
+            ])
           }
           className="text-pine text-xs mt-2 hover:underline"
         >
@@ -1078,9 +1111,17 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                       const precoValorNum = v.precosValores[valor]
                         ? Number(v.precosValores[valor].replace(",", "."))
                         : Number(preco || 0);
+                      // Mesma prioridade do custoEfetivo no servidor: override
+                      // manual > comuns + materiais vinculados a este valor.
+                      const custoMateriaisDoValor = materiais.reduce((soma, m) => {
+                        if (m.variacaoValor !== valor) return soma;
+                        const qtd = Number(m.quantidade.replace(",", "."));
+                        const custo = Number(m.custoUnitario.replace(",", "."));
+                        return soma + (Number.isFinite(qtd) && Number.isFinite(custo) ? qtd * custo : 0);
+                      }, 0);
                       const custoValorNum = v.custosValores[valor]
                         ? Number(v.custosValores[valor].replace(",", "."))
-                        : custoTotal;
+                        : custoTotal + custoMateriaisDoValor;
                       const margemValor =
                         precoValorNum > 0
                           ? ((precoValorNum - custoValorNum) / precoValorNum) * 100
@@ -1120,11 +1161,16 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
                                 min="0"
                                 value={v.custosValores[valor] ?? ""}
                                 onChange={(e) => atualizarCustoValor(i, valor, e.target.value)}
-                                placeholder={reais(custoTotal)}
+                                placeholder={reais(custoTotal + custoMateriaisDoValor)}
                                 className="w-full border border-line rounded px-2 py-1 text-xs"
                               />
                             </label>
                           </div>
+                          {custoMateriaisDoValor > 0 && !v.custosValores[valor] && (
+                            <p className="text-[10px] text-ink/40 mt-1">
+                              Vazio usa materiais vinculados: {reais(custoTotal + custoMateriaisDoValor)}
+                            </p>
+                          )}
                         </div>
                       );
                     })}

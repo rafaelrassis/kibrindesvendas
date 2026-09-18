@@ -4,6 +4,7 @@ import { slugify } from "@/lib/slug";
 import { ehUrlDeImagem } from "@/lib/imagens";
 import { ehUrlDeVideo } from "@/lib/video";
 import { normalizarCep } from "@/lib/frete";
+import { custoComumMateriais } from "@/lib/estoque-variacao";
 import type { DimensaoValor, Produto, ProdutoAdmin } from "@/lib/types";
 import type {
   Produto as ProdutoDb,
@@ -127,8 +128,12 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     nome: m.nome,
     quantidade: Number(m.quantidade),
     custoUnitario: Number(m.custoUnitario),
+    variacaoValor: m.variacaoValor,
   }));
-  const custoTotal = materiais.reduce((soma, m) => soma + m.quantidade * m.custoUnitario, 0);
+  // custoTotal aqui é só o custo comum (materiais sem variação vinculada) —
+  // a base exibida no topo do form. Custo por variação é calculado à parte
+  // via custoEfetivo (comuns + materiais daquele valor).
+  const custoTotal = custoComumMateriais(materiais);
   const preco = Number(p.preco);
   const lucro = Math.round((preco - custoTotal) * 100) / 100;
   const produtoPublico = toProduto(p);
@@ -291,7 +296,12 @@ export type DadosProduto = {
     dimensoesValores?: Record<string, DimensaoValor> | null;
     afetaDimensao?: boolean;
   }[];
-  materiais?: { nome: string; quantidade: number; custoUnitario: number }[];
+  materiais?: {
+    nome: string;
+    quantidade: number;
+    custoUnitario: number;
+    variacaoValor?: string | null;
+  }[];
   // null explícito desliga o controle de estoque; undefined deixa como está.
   // Só se aplica a produto sem variações — com variações o controle é por
   // combinação, ver estoqueVariacoes abaixo.
@@ -479,6 +489,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
           nome: m.nome,
           quantidade: m.quantidade,
           custoUnitario: m.custoUnitario,
+          variacaoValor: m.variacaoValor || null,
         })),
       },
     },
@@ -581,6 +592,7 @@ export async function atualizarProduto(
               nome: m.nome,
               quantidade: m.quantidade,
               custoUnitario: m.custoUnitario,
+              variacaoValor: m.variacaoValor || null,
             })),
           },
         }),
