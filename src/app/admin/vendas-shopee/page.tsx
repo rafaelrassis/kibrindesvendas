@@ -367,7 +367,7 @@ export default function AdminVendasShopeePage() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold block mb-1">Valor vendido (R$)</label>
+              <label className="text-xs font-semibold block mb-1">Subtotal dos Produtos (R$)</label>
               <input
                 inputMode="decimal"
                 className="w-full border border-line rounded px-3 py-2 text-sm"
@@ -467,7 +467,7 @@ export default function AdminVendasShopeePage() {
                     onChange={(e) =>
                       setFormEdicao((f) => ({ ...f, valorVenda: e.target.value }))
                     }
-                    placeholder="Valor vendido"
+                    placeholder="Subtotal dos Produtos"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">

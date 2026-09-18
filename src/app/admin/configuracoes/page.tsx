@@ -276,6 +276,16 @@ export default function AdminConfiguracoesPage() {
           >
             + Adicionar campo
           </button>
+
+          <p className="text-xs text-ink/50 mt-3">
+            Campos como aparecem no pedido real da Shopee (tela de detalhes do pedido, em{" "}
+            <span className="italic">Informações de Pagamento</span>): <strong>Subtotal dos
+            Produtos</strong> (já é o valor vendido, digitado no lançamento — não entra aqui),{" "}
+            <strong>Subtotal estimado do frete</strong>, <strong>Cupons &amp; descontos</strong>,{" "}
+            <strong>Taxas e Encargos</strong> — e o resultado, <strong>Renda estimada do
+            pedido</strong>, é o que esta tela chama de lucro líquido (calculado, não é um
+            campo pra cadastrar).
+          </p>
         </div>
 
         {erro && <p className="text-sm text-berry">{erro}</p>}
