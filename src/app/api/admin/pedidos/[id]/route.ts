@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { atualizarStatusPedido, definirCodigoRastreio, removerPedido } from "@/lib/data/pedidos";
+import {
+  atualizarStatusPedido,
+  definirCodigoRastreio,
+  definirFreteCusto,
+  removerPedido,
+} from "@/lib/data/pedidos";
 import { bloqueioAdmin } from "@/lib/admin";
 import { corpoJson, respostaDeErro } from "@/lib/api";
 
@@ -10,9 +15,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
 
   try {
-    const { status, codigoRastreio } = await corpoJson<{
+    const { status, codigoRastreio, freteCusto } = await corpoJson<{
       status?: unknown;
       codigoRastreio?: unknown;
+      freteCusto?: unknown;
     }>(req);
 
     // Os dois campos são independentes na tela (status muda no select,
@@ -24,6 +30,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (codigoRastreio !== undefined) {
       const pedido = await definirCodigoRastreio(id, codigoRastreio);
       return NextResponse.json({ id: pedido.id, codigoRastreio: pedido.codigoRastreio });
+    }
+    if (freteCusto !== undefined) {
+      const pedido = await definirFreteCusto(id, freteCusto);
+      return NextResponse.json({
+        id: pedido.id,
+        freteCusto: pedido.freteCusto ? Number(pedido.freteCusto) : null,
+      });
     }
     return NextResponse.json({ error: "Nada para atualizar." }, { status: 400 });
   } catch (e) {

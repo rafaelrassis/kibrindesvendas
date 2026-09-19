@@ -356,6 +356,13 @@ model Pedido {
   // Código de rastreio dos Correios, preenchido pelo admin ao marcar o pedido
   // como ENVIADO. Sem ele o cliente só vê o status, sem link de rastreamento.
   codigoRastreio  String?
+  // Custo real da etiqueta paga à transportadora (o `frete` acima é o que o
+  // cliente pagou). Lançado à mão no admin; null = ainda não informado. Usado
+  // só pelo DRE.
+  freteCusto      Decimal?     @db.Decimal(10, 2)
+  // Snapshot de ConfiguracaoLoja.taxaGatewayPct no momento da compra — mudar a
+  // taxa depois não reescreve o DRE de meses passados.
+  taxaGatewayPct  Decimal?     @db.Decimal(5, 2)
   itens           ItemPedido[]
   // Sem credencial do Mercado Pago configurada o checkout roda simulado; o
   // campo marca quais pedidos nasceram assim pra não confundir com venda real.
@@ -376,6 +383,9 @@ model ItemPedido {
   quantidade        Int             @default(1)
   precoUnitario     Decimal         @db.Decimal(10, 2)
   variacaoEscolhida Json?
+  // Snapshot do custo de material unitário na hora da compra. null nos itens
+  // anteriores a este campo: o DRE cai no custo atual do produto.
+  custoUnitario     Decimal?        @db.Decimal(10, 2)
   personalizacao    Personalizacao?
 }
 
@@ -516,7 +526,22 @@ model ConfiguracaoLoja {
   // próprio snapshot (ver VendaShopee.valoresShopee), imutável a mudanças
   // feitas aqui depois.
   camposMargemShopee Json?
+  // Taxa do Mercado Pago (%) sobre o valor cobrado do cliente. null = 0.
+  taxaGatewayPct   Decimal? @db.Decimal(5, 2)
   updatedAt        DateTime @updatedAt
+}
+
+// Despesa lançada à mão pro DRE (embalagem, anúncios, assinaturas...). Custo de
+// material e frete não entram aqui: já vêm dos pedidos.
+model DespesaOperacional {
+  id        String   @id @default(cuid())
+  data      DateTime
+  descricao String
+  categoria String
+  valor     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@index([data])
 }
 
 // Venda lançada manualmente pelo admin quando o mesmo produto é vendido fora

@@ -41,7 +41,7 @@ function valorCalculadoDoCampo(campo: ValorMargemShopee, valorVenda: number): nu
   return campo.tipo === "percentual" ? valorVenda * (campo.valor / 100) : campo.valor;
 }
 
-function toVendaShopee(v: VendaShopeeDb): VendaShopee {
+export function toVendaShopee(v: VendaShopeeDb): VendaShopee {
   const valorVenda = Number(v.valorVenda);
   const custoTotal = Number(v.custoTotal);
   const valoresShopee = (v.valoresShopee as ValorMargemShopee[]) ?? [];

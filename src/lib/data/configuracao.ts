@@ -42,6 +42,8 @@ export type ConfiguracaoLoja = {
   // Template dos campos do pedido Shopee usado ao lançar venda em
   // /admin/vendas-shopee. [] até configurar.
   camposMargemShopee: CampoMargemShopee[];
+  // Taxa do Mercado Pago (%) usada no DRE. null = não configurada (conta 0).
+  taxaGatewayPct: number | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -59,6 +61,7 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     freteGratisAcimaDe:
       config?.freteGratisAcimaDe != null ? Number(config.freteGratisAcimaDe) : null,
     camposMargemShopee: (config?.camposMargemShopee as CampoMargemShopee[] | null) ?? [],
+    taxaGatewayPct: config?.taxaGatewayPct != null ? Number(config.taxaGatewayPct) : null,
   };
 }
 
@@ -96,6 +99,8 @@ export async function atualizarConfiguracaoLoja(dados: {
   freteAchataFaixaPeso?: boolean;
   // Substitui o template inteiro; undefined deixa como está.
   camposMargemShopee?: CampoMargemShopee[];
+  // null apaga; undefined deixa como está.
+  taxaGatewayPct?: number | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -105,6 +110,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     freteGratisAcimaDe?: number | null;
     freteAchataFaixaPeso?: boolean;
     camposMargemShopee?: Prisma.InputJsonValue;
+    taxaGatewayPct?: number | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -145,6 +151,14 @@ export async function atualizarConfiguracaoLoja(dados: {
     ) as unknown as Prisma.InputJsonValue;
   }
 
+  if (dados.taxaGatewayPct !== undefined) {
+    const taxa = dados.taxaGatewayPct;
+    if (taxa !== null && !(Number.isFinite(taxa) && taxa >= 0 && taxa <= 100)) {
+      throw new ErroDeNegocio("A taxa do gateway precisa estar entre 0 e 100.");
+    }
+    data.taxaGatewayPct = taxa;
+  }
+
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
     create: {
@@ -156,6 +170,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       freteGratisAcimaDe: data.freteGratisAcimaDe,
       freteAchataFaixaPeso: data.freteAchataFaixaPeso ?? true,
       camposMargemShopee: data.camposMargemShopee,
+      taxaGatewayPct: data.taxaGatewayPct,
     },
     update: data,
   });

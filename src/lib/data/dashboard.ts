@@ -55,7 +55,7 @@ const COR_NO_GRAFICO: Record<StatusPedido, string> = {
   CANCELADO: "#6b6470",
 };
 
-const STATUS_DE_VENDA = STATUS_PEDIDO.filter((s) => CONTA_COMO_VENDA[s]);
+export const STATUS_DE_VENDA = STATUS_PEDIDO.filter((s) => CONTA_COMO_VENDA[s]);
 const STATUS_DE_DEVOLUCAO: StatusPedido[] = ["DEVOLUCAO_SOLICITADA", "DEVOLVIDO"];
 
 export type VendaDoDia = { dia: string; total: number };

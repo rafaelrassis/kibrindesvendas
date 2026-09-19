@@ -22,6 +22,7 @@ import {
   validarCupom,
 } from "./cupons";
 import { getConfiguracaoLoja } from "./configuracao";
+import { custoUnitarioDoProduto } from "./custo-produto";
 import {
   decrementarEstoque,
   decrementarEstoqueVariacao,
@@ -60,7 +61,7 @@ export async function criarPedido(
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
     prisma.produto.findUnique({
       where: { id: item.produtoId },
-      include: { estoqueVariacoes: true, variacoes: true },
+      include: { estoqueVariacoes: true, variacoes: true, materiais: true },
     }),
     consultarEnderecoSalvo(
       usuarioId,
@@ -194,6 +195,7 @@ export async function criarPedido(
         // teria sido usado — fica null, igual já era antes deste campo existir.
         freteServico: freteGratis ? null : endereco.frete.servico,
         freteGratis,
+        taxaGatewayPct: config.taxaGatewayPct,
         desconto,
         cupomCodigo: cupom ? normalizarCodigo(cupom.codigo) : null,
         enderecoCep: endereco.cep,
@@ -208,6 +210,9 @@ export async function criarPedido(
               produtoId: produto.id,
               quantidade,
               precoUnitario,
+              // Snapshot: o DRE de hoje não pode mudar se o custo do produto
+              // for editado depois.
+              custoUnitario: custoUnitarioDoProduto(produto, item.variacoesEscolhidas ?? {}),
               variacaoEscolhida: item.variacoesEscolhidas ?? {},
               ...(item.personalizacao && {
                 personalizacao: {
@@ -659,6 +664,26 @@ export async function atualizarStatusPedido(id: string, statusBruto: unknown) {
 // fixo: a cotação (Melhor Envio) não é só Correios, e recusar um código
 // legítimo de outra transportadora custa mais do que aceitar um cadastrado
 // errado, que o admin corrige na mesma tela.
+// Custo real da etiqueta, lançado à mão. Vazio apaga (volta a "não informado").
+export async function definirFreteCusto(id: string, valorBruto: unknown) {
+  let valor: number | null = null;
+  if (typeof valorBruto === "number") valor = valorBruto;
+  else if (typeof valorBruto === "string" && valorBruto.trim()) {
+    valor = Number(valorBruto.trim().replace(",", "."));
+  }
+  if (valor !== null && (!Number.isFinite(valor) || valor < 0 || valor > 10_000)) {
+    throw new ErroDeNegocio("Custo de frete inválido.");
+  }
+
+  const pedido = await prisma.pedido.findUnique({ where: { id } });
+  if (!pedido) throw new ErroDeNegocio("Pedido não encontrado.", 404);
+
+  return prisma.pedido.update({
+    where: { id },
+    data: { freteCusto: valor === null ? null : Math.round(valor * 100) / 100 },
+  });
+}
+
 export async function definirCodigoRastreio(id: string, codigoBruto: unknown) {
   const codigo = typeof codigoBruto === "string" ? codigoBruto.trim().toUpperCase() : "";
   if (codigo.length > 40) {

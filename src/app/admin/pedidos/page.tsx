@@ -1,6 +1,7 @@
 import AdminNav from "@/components/AdminNav";
 import AdminPedidoStatus from "@/components/AdminPedidoStatus";
 import AdminPedidoRastreio from "@/components/AdminPedidoRastreio";
+import AdminPedidoFreteCusto from "@/components/AdminPedidoFreteCusto";
 import AdminPedidoRemover from "@/components/AdminPedidoRemover";
 import AdminPedidoReembolso from "@/components/AdminPedidoReembolso";
 import { getPedidosRecentes } from "@/lib/data/pedidos";
@@ -53,6 +54,10 @@ export default async function AdminPedidosPage() {
               {/* Mudar o status aqui avisa o cliente na tela de notificações */}
               <AdminPedidoStatus pedidoId={p.id} statusAtual={p.status} />
               <AdminPedidoRastreio pedidoId={p.id} codigoAtual={p.codigoRastreio} />
+              <AdminPedidoFreteCusto
+                pedidoId={p.id}
+                custoAtual={p.freteCusto ? Number(p.freteCusto) : null}
+              />
               <AdminPedidoReembolso
                 pedidoId={p.id}
                 valorJaReembolsado={p.valorReembolsado ? Number(p.valorReembolsado) : null}

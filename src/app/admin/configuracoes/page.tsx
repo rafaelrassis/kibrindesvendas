@@ -37,6 +37,7 @@ export default function AdminConfiguracoesPage() {
   const [tokenMelhorEnvio, setTokenMelhorEnvio] = useState("");
   const [tokenSuperFrete, setTokenSuperFrete] = useState("");
   const [achatarFaixaPeso, setAchatarFaixaPeso] = useState(true);
+  const [taxaGateway, setTaxaGateway] = useState("");
   const [campos, setCampos] = useState<CampoForm[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -51,6 +52,7 @@ export default function AdminConfiguracoesPage() {
         setCepOrigem(c.cepOrigem);
         setTransportadora(c.transportadoraAtiva);
         setAchatarFaixaPeso(c.freteAchataFaixaPeso);
+        setTaxaGateway(numParaTexto(c.taxaGatewayPct));
         setCampos(c.camposMargemShopee.map(paraCampoForm));
       })
       .finally(() => setCarregando(false));
@@ -68,11 +70,13 @@ export default function AdminConfiguracoesPage() {
       melhorEnvioToken?: string;
       superFreteToken?: string;
       freteAchataFaixaPeso: boolean;
+      taxaGatewayPct: number | null;
       camposMargemShopee: CampoMargemShopee[];
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
       freteAchataFaixaPeso: achatarFaixaPeso,
+      taxaGatewayPct: taxaGateway.trim() ? Number(taxaGateway.replace(",", ".")) : null,
       camposMargemShopee: campos
         .filter((c) => c.nome.trim())
         .map((c) => ({
@@ -208,6 +212,24 @@ export default function AdminConfiguracoesPage() {
                 pelo peso real, contínuo.
               </span>
             </span>
+          </label>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium mb-2">DRE — taxa do Mercado Pago</p>
+          <p className="text-xs text-ink/50 mb-3">
+            Percentual descontado de cada pedido do site. Cada pedido novo guarda a taxa
+            vigente na hora da compra; mudar aqui não altera pedidos antigos.
+          </p>
+          <label className="block">
+            <span className="text-sm text-ink/70">Taxa (%)</span>
+            <input
+              value={taxaGateway}
+              onChange={(e) => setTaxaGateway(comoDecimalBr(e.target.value))}
+              inputMode="decimal"
+              placeholder="0,00"
+              className="w-full border border-line rounded px-3 py-2 text-sm mt-1"
+            />
           </label>
         </div>
 
