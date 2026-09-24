@@ -77,6 +77,33 @@ if (!direta) {
   env.DATABASE_URL = direta.valor;
 }
 
+// Lock órfão. Mesmo pela conexão direta o build esbarra no lock que ficou
+// preso numa sessão do pooler (foi o que derrubou fc6f315 e 0354a4a): ela
+// fica ociosa segurando o lock até o Neon reciclar a conexão. O `migrate
+// deploy` de verdade nunca fica 1 min parado entre um comando e outro, então
+// sessão ociosa há mais que isso com o lock do Prisma é lixo e pode cair.
+// 72707369 é a chave fixa do lock do Prisma (ver o erro P1002 no log).
+const LIBERAR_LOCK_ORFAO = `
+SELECT pg_terminate_backend(l.pid)
+FROM pg_locks l
+JOIN pg_stat_activity a ON a.pid = l.pid
+WHERE l.locktype = 'advisory'
+  AND l.objid = 72707369
+  AND l.pid <> pg_backend_pid()
+  AND a.state = 'idle'
+  AND a.state_change < now() - interval '1 minute';
+`;
+
+const liberar = spawnSync("prisma", ["db", "execute", "--stdin", "--schema", "prisma/schema.prisma"], {
+  input: LIBERAR_LOCK_ORFAO,
+  stdio: ["pipe", "inherit", "inherit"],
+  encoding: "utf8",
+  env,
+});
+if (liberar.status !== 0) {
+  console.log("[migrate] Não deu pra checar lock órfão; seguindo com a migration.");
+}
+
 for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
   const { status, stderr } = spawnSync("prisma", ["migrate", "deploy"], {
     // stderr capturado pra reconhecer o código do erro; o resto segue direto
