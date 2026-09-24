@@ -43,11 +43,25 @@ function urlDireta() {
   return null;
 }
 
+// Sem URL direta configurada, a do Neon sai da própria URL de pool: é o mesmo
+// endereço sem o `-pooler` no host (ver neon.tech/docs/connect/connection-pooling).
+function urlDiretaDoNeon(url) {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith(".neon.tech") || !u.hostname.includes("-pooler.")) return null;
+    u.hostname = u.hostname.replace("-pooler.", ".");
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 function dormir(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-const direta = urlDireta();
+const neon = urlDiretaDoNeon(process.env.DATABASE_URL ?? "");
+const direta = urlDireta() ?? (neon && { nome: "DATABASE_URL sem -pooler", valor: neon });
 const env = { ...process.env };
 
 if (!direta) {
