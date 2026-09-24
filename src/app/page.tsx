@@ -17,8 +17,8 @@ export default async function Home() {
 
   return (
     <div>
-
-      <div className="-mt-4">
+      {/* Espaço abaixo do cabeçalho: margem negativa aqui escondia o topo do banner. */}
+      <div className="pt-4">
         <PromoBanner banners={banners} />
       </div>
 
