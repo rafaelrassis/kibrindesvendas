@@ -105,6 +105,7 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
 
   return (
     <form onSubmit={enviar} className="space-y-4 max-w-xl">
+      {/* Uma aba por tela: cada uma mostra o preview e o upload daquela tela. */}
       <div className="flex gap-1 bg-ink/5 rounded-full p-1 w-fit text-sm">
         {(["mobile", "pc"] as const).map((alvo) => (
           <button
@@ -116,6 +117,7 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
             }`}
           >
             {alvo === "mobile" ? "📱 Celular" : "🖥️ PC"}
+            {imagens[alvo] && <span className="text-pine ml-1">✓</span>}
           </button>
         ))}
       </div>
@@ -143,44 +145,45 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
         </div>
       </div>
 
-      <p className="text-xs text-ink/50">
-        Imagens opcionais — sem nenhuma, o slide usa a cor de fundo. Sem imagem de celular, usa a
-        do PC (pode cortar).
-      </p>
-
-      {(["mobile", "pc"] as const).map((alvo) => (
-        <div key={alvo}>
-          <span className="block text-xs text-ink/50 mb-1.5">{ALVOS[alvo].rotulo}</span>
-          <label className="block border-2 border-dashed border-line rounded-md p-4 text-center cursor-pointer hover:border-mustard transition-colors">
-            <input
-              type="file"
-              accept="image/*,.heic,.heif"
-              className="hidden"
-              disabled={!!enviandoImagem}
-              onChange={(e) => {
-                selecionarImagemBruta(alvo, e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
-            <span className="text-sm text-ink/50">
-              {enviandoImagem === alvo
-                ? "Enviando..."
-                : imagens[alvo]
-                  ? "Trocar imagem"
-                  : "Clique pra escolher uma imagem (PNG, JPG ou WEBP, até 5MB)"}
-            </span>
-          </label>
-          {imagens[alvo] && (
-            <button
-              type="button"
-              onClick={() => setImagens((atual) => ({ ...atual, [alvo]: null }))}
-              className="text-berry text-xs hover:underline mt-2"
-            >
-              Remover
-            </button>
-          )}
-        </div>
-      ))}
+      <div>
+        <span className="block text-xs text-ink/50 mb-1.5">
+          {ALVOS[preview].rotulo} (opcional)
+        </span>
+        <label className="block border-2 border-dashed border-line rounded-md p-4 text-center cursor-pointer hover:border-mustard transition-colors">
+          <input
+            type="file"
+            accept="image/*,.heic,.heif"
+            className="hidden"
+            disabled={!!enviandoImagem}
+            onChange={(e) => {
+              selecionarImagemBruta(preview, e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <span className="text-sm text-ink/50">
+            {enviandoImagem === preview
+              ? "Enviando..."
+              : imagens[preview]
+                ? "Trocar imagem"
+                : "Clique pra escolher uma imagem (PNG, JPG ou WEBP, até 5MB)"}
+          </span>
+        </label>
+        {imagens[preview] ? (
+          <button
+            type="button"
+            onClick={() => setImagens((atual) => ({ ...atual, [preview]: null }))}
+            className="text-berry text-xs hover:underline mt-2"
+          >
+            Remover
+          </button>
+        ) : (
+          <p className="text-xs text-ink/50 mt-2">
+            {imagens[preview === "mobile" ? "pc" : "mobile"]
+              ? `Sem imagem própria, usa a do ${preview === "mobile" ? "PC" : "celular"} (pode cortar).`
+              : "Sem nenhuma imagem, o slide usa a cor de fundo."}
+          </p>
+        )}
+      </div>
 
       <Campo label="Eyebrow (texto pequeno acima do título)">
         <input
