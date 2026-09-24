@@ -5,10 +5,33 @@ import { useEffect, useRef, useState } from "react";
 import type { Banner } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+type Tela = "mobile" | "pc";
+
 // Os slides vêm do banco (cadastrados em /admin/banners) — sem nenhum ativo, a
 // home simplesmente não mostra o carrossel, em vez de exibir promoção fixa que
 // a loja não controla.
+//
+// Imagem de celular só aparece no celular e a de PC só no PC: são dois
+// carrosséis, um escondido em cada breakpoint, cada um só com os slides que
+// têm imagem daquela tela (slide sem imagem nenhuma, só cor, entra nos dois).
+// Assim setas, dots e auto-advance contam só os slides visíveis.
 export default function PromoBanner({ banners }: { banners: Banner[] }) {
+  const mobile = banners.filter((b) => b.imagemUrlMobile || !b.imagemUrl);
+  const pc = banners.filter((b) => b.imagemUrl || !b.imagemUrlMobile);
+
+  return (
+    <>
+      <div className="md:hidden">
+        <Carrossel banners={mobile} tela="mobile" />
+      </div>
+      <div className="hidden md:block">
+        <Carrossel banners={pc} tela="pc" />
+      </div>
+    </>
+  );
+}
+
+function Carrossel({ banners, tela }: { banners: Banner[]; tela: Tela }) {
   const [ativo, setAtivo] = useState(0);
   const trilhoRef = useRef<HTMLDivElement>(null);
   const interagindoRef = useRef(false);
@@ -66,23 +89,21 @@ export default function PromoBanner({ banners }: { banners: Banner[] }) {
         }}
       >
         {banners.map((s, i) => {
-          // Celular e PC têm imagem própria; faltando uma, usa a outra.
-          const mobile = s.imagemUrlMobile ?? s.imagemUrl;
-          const pc = s.imagemUrl ?? s.imagemUrlMobile;
-          const estilo = {
-            backgroundColor: s.corFundo,
-            "--bg-m": mobile ? `url(${mobile})` : "none",
-            "--bg-d": pc ? `url(${pc})` : "none",
-          } as React.CSSProperties;
+          const imagem = tela === "mobile" ? s.imagemUrlMobile : s.imagemUrl;
           return (
             <Link
               key={s.id}
               href={s.ctaHref}
-              className="snap-start shrink-0 w-full rounded-xl overflow-hidden relative aspect-[5/2] md:aspect-[98/25] bg-cover bg-center bg-[image:var(--bg-m)] md:bg-[image:var(--bg-d)]"
-              style={estilo}
+              className={`snap-start shrink-0 w-full rounded-xl overflow-hidden relative bg-cover bg-center ${
+                tela === "mobile" ? "aspect-[5/2]" : "aspect-[98/25]"
+              }`}
+              style={{
+                backgroundColor: s.corFundo,
+                backgroundImage: imagem ? `url(${imagem})` : undefined,
+              }}
               onClick={() => setAtivo(i)}
             >
-              {(mobile || pc) && <div className="absolute inset-0 bg-black/25" />}
+              {imagem && <div className="absolute inset-0 bg-black/25" />}
             </Link>
           );
         })}

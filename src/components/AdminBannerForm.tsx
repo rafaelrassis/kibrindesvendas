@@ -64,9 +64,8 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
     }
   }
 
-  // Mesmo fallback da home: cada tela usa a própria imagem ou, sem ela, a da outra.
-  const imagemPreview =
-    preview === "mobile" ? (imagens.mobile ?? imagens.pc) : (imagens.pc ?? imagens.mobile);
+  // Como na home: cada tela mostra só a própria imagem.
+  const imagemPreview = imagens[preview];
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -179,7 +178,7 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
         ) : (
           <p className="text-xs text-ink/50 mt-2">
             {imagens[preview === "mobile" ? "pc" : "mobile"]
-              ? `Sem imagem própria, usa a do ${preview === "mobile" ? "PC" : "celular"} (pode cortar).`
+              ? `Sem imagem aqui, o banner não aparece no ${preview === "mobile" ? "celular" : "PC"}.`
               : "Sem nenhuma imagem, o slide usa a cor de fundo."}
           </p>
         )}

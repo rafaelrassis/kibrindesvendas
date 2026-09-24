@@ -199,10 +199,12 @@ as telas:
 - **PC** (`imagemUrl`): 2224×416 px;
 - **celular** (`imagemUrlMobile`): 620×320 px.
 
-Faltando uma, a tela usa a outra (a do PC no celular pode cortar). O
-`PromoBanner` passa as duas como variáveis CSS (`--bg-m`/`--bg-d`) e o
-breakpoint `md` escolhe qual aparece — sem JS, sem piscar na hidratação. No
-formulário, o alternador 📱/🖥️ troca o preview e o editor de corte usa a
+Imagem de celular só aparece no celular e a de PC só no PC: o `PromoBanner`
+monta dois carrosséis, um escondido em cada lado do breakpoint `md`, cada um
+só com os slides que têm imagem daquela tela — então um slide com só a imagem
+do PC some do celular (e vice-versa), e setas/dots contam só o que aparece.
+Slide sem imagem nenhuma (só cor) entra nos dois. No formulário, as abas 📱/🖥️
+trocam o preview e o upload; o editor de corte usa a
 proporção de cada alvo; na lista, a miniatura é a do PC e o selo 📱 marca quem
 tem imagem de celular.
 

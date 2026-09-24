@@ -192,8 +192,8 @@ model Banner {
   precoTexto String
   ctaHref    String
   // Sem imagem o slide usa só `corFundo` — é assim que a loja nasce no seed.
-  // `imagemUrl` é a do PC; sem `imagemUrlMobile`, o celular usa a do PC (e
-  // vice-versa).
+  // `imagemUrl` é a do PC e `imagemUrlMobile` a do celular; cada uma só
+  // aparece na própria tela.
   imagemUrl       String?
   imagemUrlMobile String?
   corFundo   String   @default("#3F6B4C")
