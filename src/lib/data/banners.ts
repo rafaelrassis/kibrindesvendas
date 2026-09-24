@@ -14,6 +14,7 @@ type DadosBanner = {
   precoTexto?: string;
   ctaHref?: string;
   imagemUrl?: string | null;
+  imagemUrlMobile?: string | null;
   corFundo?: string;
   ativo?: boolean;
 };
@@ -26,6 +27,7 @@ function paraBanner(b: BannerDb): Banner {
     precoTexto: b.precoTexto,
     ctaHref: b.ctaHref,
     imagemUrl: b.imagemUrl,
+    imagemUrlMobile: b.imagemUrlMobile,
     corFundo: b.corFundo,
   };
 }
@@ -67,6 +69,7 @@ function limpar(dados: DadosBanner, exigirObrigatorios: boolean) {
     precoTexto?: string;
     ctaHref?: string;
     imagemUrl?: string | null;
+    imagemUrlMobile?: string | null;
     corFundo?: string;
     ativo?: boolean;
   } = {};
@@ -98,12 +101,13 @@ function limpar(dados: DadosBanner, exigirObrigatorios: boolean) {
     data.corFundo = corFundo;
   }
 
-  if (dados.imagemUrl !== undefined) {
-    const imagemUrl = dados.imagemUrl?.trim() || null;
-    if (imagemUrl && !ehUrlDeImagem(imagemUrl)) {
+  for (const campo of ["imagemUrl", "imagemUrlMobile"] as const) {
+    if (dados[campo] === undefined) continue;
+    const url = dados[campo]?.trim() || null;
+    if (url && !ehUrlDeImagem(url)) {
       throw new ErroDeNegocio("Imagem inválida: envie o arquivo pelo próprio formulário.");
     }
-    data.imagemUrl = imagemUrl;
+    data[campo] = url;
   }
 
   return data;
@@ -122,6 +126,7 @@ export async function criarBanner(dados: DadosBanner): Promise<BannerAdmin> {
       eyebrow: data.eyebrow ?? "",
       precoTexto: data.precoTexto ?? "",
       imagemUrl: data.imagemUrl ?? null,
+      imagemUrlMobile: data.imagemUrlMobile ?? null,
       corFundo: data.corFundo ?? COR_PADRAO,
       ativo: data.ativo ?? true,
       ordem: (ultimo._max.ordem ?? -1) + 1,

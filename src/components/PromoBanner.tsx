@@ -65,18 +65,27 @@ export default function PromoBanner({ banners }: { banners: Banner[] }) {
           interagindoRef.current = false;
         }}
       >
-        {banners.map((s, i) => (
-          <Link
-            key={s.id}
-            href={s.ctaHref}
-            className="snap-start shrink-0 w-full rounded-xl overflow-hidden relative aspect-[5/2] md:aspect-[98/25] bg-cover bg-center"
-            style={{
-              backgroundColor: s.corFundo,
-              backgroundImage: s.imagemUrl ? `url(${s.imagemUrl})` : undefined,
-            }}
-            onClick={() => setAtivo(i)}
-          />
-        ))}
+        {banners.map((s, i) => {
+          // Celular e PC têm imagem própria; faltando uma, usa a outra.
+          const mobile = s.imagemUrlMobile ?? s.imagemUrl;
+          const pc = s.imagemUrl ?? s.imagemUrlMobile;
+          const estilo = {
+            backgroundColor: s.corFundo,
+            "--bg-m": mobile ? `url(${mobile})` : "none",
+            "--bg-d": pc ? `url(${pc})` : "none",
+          } as React.CSSProperties;
+          return (
+            <Link
+              key={s.id}
+              href={s.ctaHref}
+              className="snap-start shrink-0 w-full rounded-xl overflow-hidden relative aspect-[5/2] md:aspect-[98/25] bg-cover bg-center bg-[image:var(--bg-m)] md:bg-[image:var(--bg-d)]"
+              style={estilo}
+              onClick={() => setAtivo(i)}
+            >
+              {(mobile || pc) && <div className="absolute inset-0 bg-black/25" />}
+            </Link>
+          );
+        })}
       </div>
 
       {temVarios && (

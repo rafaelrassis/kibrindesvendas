@@ -152,6 +152,7 @@ export type Banner = {
   precoTexto: string;
   ctaHref: string;
   imagemUrl: string | null;
+  imagemUrlMobile: string | null;
   corFundo: string;
 };
 

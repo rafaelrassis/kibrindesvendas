@@ -100,13 +100,21 @@ export default function AdminBannersPage() {
             }`}
           >
             <div
-              className="w-20 h-14 rounded-md shrink-0 bg-cover bg-center flex items-center justify-center text-white/70 text-[10px] text-center px-1"
+              className="relative w-20 h-14 rounded-md shrink-0 bg-cover bg-center flex items-center justify-center text-white/70 text-[10px] text-center px-1"
               style={{
                 backgroundColor: b.corFundo,
                 backgroundImage: b.imagemUrl ? `url(${b.imagemUrl})` : undefined,
               }}
             >
               {!b.imagemUrl && "sem imagem"}
+              {b.imagemUrlMobile && (
+                <span
+                  title="Tem imagem própria pro celular"
+                  className="absolute -top-1.5 -right-1.5 bg-white rounded-full w-5 h-5 text-[11px] flex items-center justify-center shadow"
+                >
+                  📱
+                </span>
+              )}
             </div>
 
             <div className="flex-1 min-w-0">

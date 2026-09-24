@@ -193,13 +193,26 @@ O carrossel do topo da loja sai do banco (`model Banner`), não do código:
 remove os slides. Cada slide é um título com eyebrow, selo de preço e link de
 destino, sobre uma imagem ou uma cor lisa.
 
+Cada slide tem duas imagens opcionais, porque o banner muda de proporção entre
+as telas:
+
+- **PC** (`imagemUrl`): 2224×416 px;
+- **celular** (`imagemUrlMobile`): 620×320 px.
+
+Faltando uma, a tela usa a outra (a do PC no celular pode cortar). O
+`PromoBanner` passa as duas como variáveis CSS (`--bg-m`/`--bg-d`) e o
+breakpoint `md` escolhe qual aparece — sem JS, sem piscar na hidratação. No
+formulário, o alternador 📱/🖥️ troca o preview e o editor de corte usa a
+proporção de cada alvo; na lista, a miniatura é a do PC e o selo 📱 marca quem
+tem imagem de celular.
+
 Três coisas são validadas no servidor, em `src/lib/data/banners.ts`, e não só
 no formulário — as três vão parar dentro do HTML da home:
 
 - **link de destino**: só caminho da loja (começa com `/`), pra um banner não
   virar redirecionamento pra fora;
 - **cor de fundo**: `#RRGGBB`;
-- **imagem**: só URL que o próprio upload devolveu (ver abaixo).
+- **imagens** (PC e celular): só URL que o próprio upload devolveu (ver abaixo).
 
 A ordem é gravada de uma vez (`PUT /api/admin/banners` com a lista de ids na
 ordem nova), então nenhuma gravação pela metade deixa dois slides na mesma

@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import type { BannerAdmin } from "@/lib/types";
 import EditorFoto from "@/components/EditorFoto";
 
+type Alvo = "mobile" | "pc";
+
+// Proporção do slide em cada tela e o tamanho em que a imagem sai do editor
+// (o dobro do tamanho exibido, pra ficar nítida em tela retina).
+const ALVOS: Record<Alvo, { rotulo: string; aspecto: number; ladoSaida: number }> = {
+  mobile: { rotulo: "Imagem do celular — 620×320 px", aspecto: 308 / 160, ladoSaida: 620 },
+  pc: { rotulo: "Imagem do PC — 2224×416 px", aspecto: 1112 / 208, ladoSaida: 2224 },
+};
+
 export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
   const router = useRouter();
   const editando = !!banner;
@@ -14,23 +23,31 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
   const [precoTexto, setPrecoTexto] = useState(banner?.precoTexto ?? "");
   const [ctaHref, setCtaHref] = useState(banner?.ctaHref ?? "/");
   const [corFundo, setCorFundo] = useState(banner?.corFundo ?? "#3F6B4C");
-  const [imagemUrl, setImagemUrl] = useState<string | null>(banner?.imagemUrl ?? null);
-  const [enviandoImagem, setEnviandoImagem] = useState(false);
+  const [imagens, setImagens] = useState<Record<Alvo, string | null>>({
+    mobile: banner?.imagemUrlMobile ?? null,
+    pc: banner?.imagemUrl ?? null,
+  });
+  const [preview, setPreview] = useState<Alvo>("mobile");
+  const [enviandoImagem, setEnviandoImagem] = useState<Alvo | null>(null);
   const [arquivoParaEditar, setArquivoParaEditar] = useState<File | null>(null);
+  const [alvoEditor, setAlvoEditor] = useState<Alvo>("pc");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   // A escolha abre o editor (zoom/arraste/rotação); o upload de verdade só
   // acontece depois de confirmar, sempre como JPEG.
-  function selecionarImagemBruta(arquivo: File | undefined) {
+  function selecionarImagemBruta(alvo: Alvo, arquivo: File | undefined) {
     if (!arquivo) return;
     setErro("");
+    setAlvoEditor(alvo);
+    setPreview(alvo);
     setArquivoParaEditar(arquivo);
   }
 
   async function enviarImagemEditada(arquivo: File) {
+    const alvo = alvoEditor;
     setArquivoParaEditar(null);
-    setEnviandoImagem(true);
+    setEnviandoImagem(alvo);
 
     const form = new FormData();
     form.append("arquivo", arquivo);
@@ -39,13 +56,17 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
       const r = await fetch("/api/admin/imagens", { method: "POST", body: form });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? "Não foi possível enviar a imagem.");
-      setImagemUrl(data.url);
+      setImagens((atual) => ({ ...atual, [alvo]: data.url }));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível enviar a imagem.");
     } finally {
-      setEnviandoImagem(false);
+      setEnviandoImagem(null);
     }
   }
+
+  // Mesmo fallback da home: cada tela usa a própria imagem ou, sem ela, a da outra.
+  const imagemPreview =
+    preview === "mobile" ? (imagens.mobile ?? imagens.pc) : (imagens.pc ?? imagens.mobile);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -60,7 +81,15 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
     const r = await fetch(editando ? `/api/admin/banners/${banner.id}` : "/api/admin/banners", {
       method: editando ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ titulo, eyebrow, precoTexto, ctaHref, imagemUrl, corFundo }),
+      body: JSON.stringify({
+        titulo,
+        eyebrow,
+        precoTexto,
+        ctaHref,
+        imagemUrl: imagens.pc,
+        imagemUrlMobile: imagens.mobile,
+        corFundo,
+      }),
     });
     const data = await r.json();
     setEnviando(false);
@@ -76,14 +105,31 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
 
   return (
     <form onSubmit={enviar} className="space-y-4 max-w-xl">
+      <div className="flex gap-1 bg-ink/5 rounded-full p-1 w-fit text-sm">
+        {(["mobile", "pc"] as const).map((alvo) => (
+          <button
+            key={alvo}
+            type="button"
+            onClick={() => setPreview(alvo)}
+            className={`px-4 py-1.5 rounded-full transition-colors ${
+              preview === alvo ? "bg-white shadow-sm text-ink" : "text-ink/50"
+            }`}
+          >
+            {alvo === "mobile" ? "📱 Celular" : "🖥️ PC"}
+          </button>
+        ))}
+      </div>
+
       <div
-        className="rounded-xl h-40 flex items-center bg-cover bg-center relative overflow-hidden"
+        className={`rounded-xl flex items-center bg-cover bg-center relative overflow-hidden ${
+          preview === "mobile" ? "w-[308px] h-40" : "w-full aspect-[1112/208]"
+        }`}
         style={{
           backgroundColor: corFundo,
-          backgroundImage: imagemUrl ? `url(${imagemUrl})` : undefined,
+          backgroundImage: imagemPreview ? `url(${imagemPreview})` : undefined,
         }}
       >
-        {imagemUrl && <div className="absolute inset-0 bg-black/25" />}
+        {imagemPreview && <div className="absolute inset-0 bg-black/25" />}
         <div className="px-6 text-white relative">
           <p className="uppercase text-[11px] tracking-widest text-white/70 mb-1">
             {eyebrow || "eyebrow"}
@@ -97,39 +143,44 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
         </div>
       </div>
 
-      <div>
-        <span className="block text-xs text-ink/50 mb-1.5">
-          Imagem (opcional — sem imagem, o slide usa a cor de fundo)
-        </span>
-        <label className="block border-2 border-dashed border-line rounded-md p-4 text-center cursor-pointer hover:border-mustard transition-colors">
-          <input
-            type="file"
-            accept="image/*,.heic,.heif"
-            className="hidden"
-            disabled={enviandoImagem}
-            onChange={(e) => {
-              selecionarImagemBruta(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-          <span className="text-sm text-ink/50">
-            {enviandoImagem
-              ? "Enviando..."
-              : imagemUrl
-                ? "Trocar imagem"
-                : "Clique pra escolher uma imagem (PNG, JPG ou WEBP, até 5MB)"}
-          </span>
-        </label>
-        {imagemUrl && (
-          <button
-            type="button"
-            onClick={() => setImagemUrl(null)}
-            className="text-berry text-xs hover:underline mt-2"
-          >
-            Remover imagem
-          </button>
-        )}
-      </div>
+      <p className="text-xs text-ink/50">
+        Imagens opcionais — sem nenhuma, o slide usa a cor de fundo. Sem imagem de celular, usa a
+        do PC (pode cortar).
+      </p>
+
+      {(["mobile", "pc"] as const).map((alvo) => (
+        <div key={alvo}>
+          <span className="block text-xs text-ink/50 mb-1.5">{ALVOS[alvo].rotulo}</span>
+          <label className="block border-2 border-dashed border-line rounded-md p-4 text-center cursor-pointer hover:border-mustard transition-colors">
+            <input
+              type="file"
+              accept="image/*,.heic,.heif"
+              className="hidden"
+              disabled={!!enviandoImagem}
+              onChange={(e) => {
+                selecionarImagemBruta(alvo, e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <span className="text-sm text-ink/50">
+              {enviandoImagem === alvo
+                ? "Enviando..."
+                : imagens[alvo]
+                  ? "Trocar imagem"
+                  : "Clique pra escolher uma imagem (PNG, JPG ou WEBP, até 5MB)"}
+            </span>
+          </label>
+          {imagens[alvo] && (
+            <button
+              type="button"
+              onClick={() => setImagens((atual) => ({ ...atual, [alvo]: null }))}
+              className="text-berry text-xs hover:underline mt-2"
+            >
+              Remover
+            </button>
+          )}
+        </div>
+      ))}
 
       <Campo label="Eyebrow (texto pequeno acima do título)">
         <input
@@ -181,7 +232,7 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
 
       <button
         type="submit"
-        disabled={enviando || enviandoImagem}
+        disabled={enviando || !!enviandoImagem}
         className="bg-pine text-white px-6 py-2.5 rounded-full text-sm disabled:opacity-50"
       >
         {enviando ? "Salvando..." : editando ? "Salvar alterações" : "Criar banner"}
@@ -189,7 +240,8 @@ export default function AdminBannerForm({ banner }: { banner?: BannerAdmin }) {
 
       <EditorFoto
         arquivo={arquivoParaEditar}
-        aspecto={21 / 9}
+        aspecto={ALVOS[alvoEditor].aspecto}
+        ladoSaida={ALVOS[alvoEditor].ladoSaida}
         onCancelar={() => setArquivoParaEditar(null)}
         onConfirmar={enviarImagemEditada}
       />
