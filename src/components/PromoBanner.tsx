@@ -90,12 +90,14 @@ function Carrossel({ banners, tela }: { banners: Banner[]; tela: Tela }) {
       >
         {banners.map((s, i) => {
           const imagem = tela === "mobile" ? s.imagemUrlMobile : s.imagemUrl;
+          // A proporção é a mesma do tamanho pedido no admin (620×320 e
+          // 2224×416): com bg-cover, qualquer diferença corta a arte.
           return (
             <Link
               key={s.id}
               href={s.ctaHref}
               className={`snap-start shrink-0 w-full rounded-xl overflow-hidden relative bg-cover bg-center ${
-                tela === "mobile" ? "aspect-[5/2]" : "aspect-[98/25]"
+                tela === "mobile" ? "aspect-[620/320]" : "aspect-[2224/416]"
               }`}
               style={{
                 backgroundColor: s.corFundo,
