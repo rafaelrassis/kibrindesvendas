@@ -322,6 +322,18 @@ export default function AdminConfiguracoesPage() {
           </p>
         </div>
 
+        <div>
+          <p className="text-sm font-medium mb-2">Tamanho dos banners da home</p>
+          <p className="text-xs text-ink/50 mb-3">
+            Pra criar a arte (Canva etc.). Milímetros convertidos a 96 dpi — os mesmos pixels
+            pedidos em Banners.
+          </p>
+          <ul className="text-sm text-ink/70 space-y-1">
+            <li>📱 Celular: <strong>164 × 85 mm</strong> (620 × 320 px)</li>
+            <li>🖥️ PC: <strong>588 × 110 mm</strong> (2224 × 416 px)</li>
+          </ul>
+        </div>
+
         {erro && <p className="text-sm text-berry">{erro}</p>}
         {sucesso && <p className="text-sm text-pine-2">{sucesso}</p>}
 
