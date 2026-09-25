@@ -192,3 +192,30 @@ export async function enviarEmailRedefinirSenha(destinatario: string, nome: stri
     )
   );
 }
+
+// Alerta pro admin quando a sincronização com o fornecedor falha em algum
+// produto (link quebrado, página mudou). Um e-mail por ciclo, com a lista.
+export async function enviarEmailAlertaFornecedor(
+  destinatario: string,
+  falhas: { nome: string; url: string; erro: string }[]
+) {
+  const itens = falhas
+    .map(
+      (f) => `
+        <li style="margin-bottom: 12px;">
+          <strong>${escaparHtml(f.nome)}</strong><br/>
+          <span style="color: #b42318;">${escaparHtml(f.erro)}</span><br/>
+          <a href="${escaparHtml(f.url)}" style="color: #3F6B4C; font-size: 12px;">${escaparHtml(f.url)}</a>
+        </li>`
+    )
+    .join("");
+  await enviar(
+    destinatario,
+    `⚠️ Sincronização com fornecedor falhou em ${falhas.length} produto(s)`,
+    layout(
+      "Falha na sincronização com o fornecedor",
+      `<p>O estoque destes produtos <strong>não foi atualizado</strong> — confira o link no cadastro:</p>
+       <ul style="padding-left: 18px;">${itens}</ul>`
+    )
+  );
+}

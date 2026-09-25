@@ -116,6 +116,11 @@ export type ProdutoAdmin = Produto & {
   // CEP de despacho deste produto, quando difere do CEP padrão da loja
   // (fornecedor terceirizado). null = usa o CEP padrão.
   cepOrigemOverride: string | null;
+  // Sincronização de estoque com o fornecedor — ver lib/data/sync-fornecedor.ts.
+  fornecedorUrl: string | null;
+  fornecedorVerificadoEm: string | null;
+  fornecedorErro: string | null;
+  fornecedorAviso: string | null;
 };
 
 export type Cupom = {

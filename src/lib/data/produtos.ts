@@ -5,6 +5,7 @@ import { ehUrlDeImagem } from "@/lib/imagens";
 import { ehUrlDeVideo } from "@/lib/video";
 import { normalizarCep } from "@/lib/frete";
 import { custoComumMateriais } from "@/lib/estoque-variacao";
+import { validarUrlFornecedor } from "@/lib/fornecedor";
 import type { DimensaoValor, Produto, ProdutoAdmin } from "@/lib/types";
 import type {
   Produto as ProdutoDb,
@@ -150,6 +151,10 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     lucro,
     margemPercentual: preco > 0 ? Math.round((lucro / preco) * 1000) / 10 : null,
     cepOrigemOverride: p.cepOrigemOverride,
+    fornecedorUrl: p.fornecedorUrl,
+    fornecedorVerificadoEm: p.fornecedorVerificadoEm?.toISOString() ?? null,
+    fornecedorErro: p.fornecedorErro,
+    fornecedorAviso: p.fornecedorAviso,
   };
 }
 
@@ -317,6 +322,9 @@ export type DadosProduto = {
   // CEP de despacho do fornecedor deste produto. null explícito volta a
   // usar o CEP padrão da loja; undefined deixa como está.
   cepOrigemOverride?: string | null;
+  // Link do produto no fornecedor (Nuvemshop), usado pela sincronização de
+  // estoque. null/"" desliga; undefined deixa como está.
+  fornecedorUrl?: string | null;
 };
 
 const EMOJI_PADRAO = "🎁";
@@ -422,6 +430,9 @@ function validar(dados: Partial<DadosProduto>) {
       }
     }
   }
+  if (dados.fornecedorUrl && !validarUrlFornecedor(dados.fornecedorUrl)) {
+    throw new ErroDeNegocio("Link do fornecedor inválido: cole o endereço completo, começando com https://.");
+  }
   if (dados.cepOrigemOverride != null && !normalizarCep(dados.cepOrigemOverride)) {
     throw new ErroDeNegocio("CEP de origem inválido: informe os 8 dígitos ou deixe em branco.");
   }
@@ -467,6 +478,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       larguraMm: dados.larguraMm ?? LARGURA_PADRAO_MM,
       comprimentoMm: dados.comprimentoMm ?? COMPRIMENTO_PADRAO_MM,
       cepOrigemOverride: dados.cepOrigemOverride ? normalizarCep(dados.cepOrigemOverride) : null,
+      fornecedorUrl: dados.fornecedorUrl ? validarUrlFornecedor(dados.fornecedorUrl) : null,
       variacoes: {
         create: (dados.variacoes ?? []).map((v) => ({
           tipo: v.tipo,
@@ -496,6 +508,23 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
     include: relacoesProduto,
   });
   return toProduto(produto);
+}
+
+// Trocar (ou tirar) o link zera o estado da sync — erro, aviso e preço eram
+// do link antigo. Mesmo link de antes não mexe em nada.
+function camposFornecedor(atual: string | null, novo: string | null | undefined) {
+  if (novo === undefined) return {};
+  const url = novo ? validarUrlFornecedor(novo) : null;
+  if (url === atual) return {};
+  return {
+    fornecedorUrl: url,
+    fornecedorVerificadoEm: null,
+    fornecedorErro: null,
+    fornecedorAviso: null,
+    fornecedorPreco: null,
+    fornecedorPrecoAnterior: null,
+    fornecedorPausouProduto: false,
+  };
 }
 
 export async function atualizarProduto(
@@ -565,6 +594,7 @@ export async function atualizarProduto(
               ? normalizarCep(dados.cepOrigemOverride)
               : null
             : undefined,
+        ...camposFornecedor(atual.fornecedorUrl, dados.fornecedorUrl),
         ...(dados.variacoes && {
           variacoes: {
             create: dados.variacoes.map((v) => ({

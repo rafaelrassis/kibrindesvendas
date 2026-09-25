@@ -28,6 +28,8 @@ function paraCampoForm(c: CampoMargemShopee): CampoForm {
   return { nome: c.nome, tipo: c.tipo, sinal: c.sinal, valorPadrao: numParaTexto(c.valorPadrao) };
 }
 
+const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
 const CAMPO_VAZIO: CampoForm = { nome: "", tipo: "percentual", sinal: "subtrai", valorPadrao: "" };
 
 export default function AdminConfiguracoesPage() {
@@ -39,6 +41,13 @@ export default function AdminConfiguracoesPage() {
   const [achatarFaixaPeso, setAchatarFaixaPeso] = useState(true);
   const [taxaGateway, setTaxaGateway] = useState("");
   const [campos, setCampos] = useState<CampoForm[]>([]);
+  const [syncAtivo, setSyncAtivo] = useState(false);
+  const [syncDias, setSyncDias] = useState<number[]>([]);
+  const [syncHorarios, setSyncHorarios] = useState<string[]>([]);
+  const [syncReposicao, setSyncReposicao] = useState("50");
+  const [syncPausar, setSyncPausar] = useState(true);
+  const [syncEmail, setSyncEmail] = useState("");
+  const [syncManual, setSyncManual] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -54,9 +63,48 @@ export default function AdminConfiguracoesPage() {
         setAchatarFaixaPeso(c.freteAchataFaixaPeso);
         setTaxaGateway(numParaTexto(c.taxaGatewayPct));
         setCampos(c.camposMargemShopee.map(paraCampoForm));
+        preencherSync(c);
       })
       .finally(() => setCarregando(false));
   }, []);
+
+  function preencherSync(c: ConfiguracaoLoja) {
+    setSyncAtivo(c.syncFornecedorAtivo);
+    setSyncDias(c.syncFornecedorDias);
+    setSyncHorarios(c.syncFornecedorHorarios);
+    setSyncReposicao(String(c.syncFornecedorEstoqueReposicao));
+    setSyncPausar(c.syncFornecedorPausarEsgotado);
+    setSyncEmail(c.syncFornecedorEmailAlerta ?? "");
+  }
+
+  // Processa todos os produtos com link, em lotes: cada chamada cabe no
+  // tempo da função serverless e devolve quantos ainda faltam.
+  async function sincronizarTudo() {
+    const desde = new Date().toISOString();
+    let processados = 0;
+    let erros = 0;
+    setSyncManual("Sincronizando…");
+    for (let i = 0; i < 50; i++) {
+      const r = await fetch("/api/admin/fornecedor/sincronizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ desde }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setSyncManual(data.error ?? "Falha ao sincronizar.");
+        return;
+      }
+      processados += data.resultados.length;
+      erros += data.resultados.filter((x: { ok: boolean }) => !x.ok).length;
+      if (data.pendentes === 0) break;
+      setSyncManual(`Sincronizando… ${processados} feitos, ${data.pendentes} faltando.`);
+    }
+    setSyncManual(
+      `Pronto: ${processados} produto(s) verificados${erros > 0 ? `, ${erros} com erro (veja o alerta no topo)` : ""}.`
+    );
+    window.dispatchEvent(new Event("alertas-fornecedor"));
+  }
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +120,12 @@ export default function AdminConfiguracoesPage() {
       freteAchataFaixaPeso: boolean;
       taxaGatewayPct: number | null;
       camposMargemShopee: CampoMargemShopee[];
+      syncFornecedorAtivo: boolean;
+      syncFornecedorDias: number[];
+      syncFornecedorHorarios: string[];
+      syncFornecedorEstoqueReposicao: number;
+      syncFornecedorPausarEsgotado: boolean;
+      syncFornecedorEmailAlerta: string | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -85,6 +139,12 @@ export default function AdminConfiguracoesPage() {
           sinal: c.sinal,
           valorPadrao: c.valorPadrao.trim() ? Number(c.valorPadrao.replace(",", ".")) : null,
         })),
+      syncFornecedorAtivo: syncAtivo,
+      syncFornecedorDias: syncDias,
+      syncFornecedorHorarios: syncHorarios.filter(Boolean),
+      syncFornecedorEstoqueReposicao: Math.round(Number(syncReposicao)),
+      syncFornecedorPausarEsgotado: syncPausar,
+      syncFornecedorEmailAlerta: syncEmail.trim() || null,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -104,6 +164,7 @@ export default function AdminConfiguracoesPage() {
       return;
     }
     setConfig(data);
+    preencherSync(data);
     setTokenMelhorEnvio("");
     setTokenSuperFrete("");
     setSucesso("Configurações salvas.");
@@ -320,6 +381,123 @@ export default function AdminConfiguracoesPage() {
             pedido</strong>, é o que esta tela chama de lucro líquido (calculado, não é um
             campo pra cadastrar).
           </p>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium mb-2">Sincronização com fornecedor</p>
+          <p className="text-xs text-ink/50 mb-3">
+            Nos dias e horários abaixo (horário de Brasília), o sistema abre o link do
+            fornecedor de cada produto, zera o estoque do que está indisponível lá e repõe o
+            que voltou. Se algum link falhar, aparece um alerta vermelho no topo do painel.
+          </p>
+          <label className="flex items-center gap-2 text-sm mb-3">
+            <input type="checkbox" checked={syncAtivo} onChange={(e) => setSyncAtivo(e.target.checked)} />
+            Sincronização automática ligada
+          </label>
+
+          <p className="text-xs text-ink/60 mb-1">Dias</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {DIAS_SEMANA.map((rotulo, dia) => {
+              const marcado = syncDias.includes(dia);
+              return (
+                <button
+                  key={dia}
+                  type="button"
+                  onClick={() =>
+                    setSyncDias((ds) => (marcado ? ds.filter((d) => d !== dia) : [...ds, dia]))
+                  }
+                  className={`px-3 py-1.5 text-sm rounded-full border ${
+                    marcado ? "bg-pine text-white border-pine" : "border-line"
+                  }`}
+                >
+                  {rotulo}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-xs text-ink/60 mb-1">Horários</p>
+          <div className="flex flex-wrap gap-2 mb-1">
+            {syncHorarios.map((h, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <input
+                  type="time"
+                  step={3600}
+                  value={h}
+                  onChange={(e) =>
+                    setSyncHorarios((hs) => hs.map((x, j) => (j === i ? e.target.value : x)))
+                  }
+                  className="border border-line rounded px-2 py-1.5 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSyncHorarios((hs) => hs.filter((_, j) => j !== i))}
+                  className="px-2 py-1.5 text-sm border border-line rounded text-berry"
+                  aria-label="Remover horário"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSyncHorarios((hs) => [...hs, "08:00"])}
+              className="text-sm border border-line rounded px-3 py-1.5"
+            >
+              + Horário
+            </button>
+          </div>
+          <p className="text-xs text-ink/50 mb-3">
+            O agendador passa de hora em hora — a sincronização pode começar até ~1h depois do
+            horário escolhido.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <label className="text-sm">
+              <span className="block text-xs text-ink/60 mb-1">
+                Estoque ao repor (quando o fornecedor não informa quantidade)
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={syncReposicao}
+                onChange={(e) => setSyncReposicao(e.target.value)}
+                className="w-full border border-line rounded px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="block text-xs text-ink/60 mb-1">E-mail pra alerta de falha (opcional)</span>
+              <input
+                type="email"
+                value={syncEmail}
+                onChange={(e) => setSyncEmail(e.target.value)}
+                placeholder="voce@exemplo.com"
+                className="w-full border border-line rounded px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-sm mb-3">
+            <input type="checkbox" checked={syncPausar} onChange={(e) => setSyncPausar(e.target.checked)} />
+            Pausar o produto quando tudo esgotar no fornecedor (e reativar quando voltar)
+          </label>
+
+          {config?.syncFornecedorUltimaExecucao && (
+            <p className="text-xs text-ink/50 mb-2">
+              Último ciclo agendado:{" "}
+              {new Date(config.syncFornecedorUltimaExecucao).toLocaleString("pt-BR")}
+              {config.syncFornecedorResumo &&
+                ` — ${config.syncFornecedorResumo.total} produto(s), ${config.syncFornecedorResumo.erros} com erro`}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={sincronizarTudo}
+            disabled={syncManual === "Sincronizando…" || !!syncManual?.includes("faltando")}
+            className="text-sm border border-line rounded px-3 py-1.5 disabled:opacity-50"
+          >
+            Sincronizar tudo agora
+          </button>
+          {syncManual && <p className="text-sm text-ink/70 mt-2">{syncManual}</p>}
         </div>
 
         <div>

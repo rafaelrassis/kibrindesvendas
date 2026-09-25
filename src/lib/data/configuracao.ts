@@ -2,6 +2,7 @@ import "server-only";
 import { TransportadoraFrete, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizarCep } from "@/lib/frete";
+import { horarioValido } from "@/lib/fornecedor";
 import { ErroDeNegocio } from "./erros";
 
 const CEP_ORIGEM_PADRAO = "01310100";
@@ -44,6 +45,15 @@ export type ConfiguracaoLoja = {
   camposMargemShopee: CampoMargemShopee[];
   // Taxa do Mercado Pago (%) usada no DRE. null = não configurada (conta 0).
   taxaGatewayPct: number | null;
+  // Sincronização de estoque com fornecedor — ver lib/data/sync-fornecedor.ts.
+  syncFornecedorAtivo: boolean;
+  syncFornecedorDias: number[];
+  syncFornecedorHorarios: string[];
+  syncFornecedorEstoqueReposicao: number;
+  syncFornecedorPausarEsgotado: boolean;
+  syncFornecedorEmailAlerta: string | null;
+  syncFornecedorUltimaExecucao: string | null;
+  syncFornecedorResumo: { total: number; erros: number } | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -62,6 +72,15 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
       config?.freteGratisAcimaDe != null ? Number(config.freteGratisAcimaDe) : null,
     camposMargemShopee: (config?.camposMargemShopee as CampoMargemShopee[] | null) ?? [],
     taxaGatewayPct: config?.taxaGatewayPct != null ? Number(config.taxaGatewayPct) : null,
+    syncFornecedorAtivo: config?.syncFornecedorAtivo ?? false,
+    syncFornecedorDias: config?.syncFornecedorDias ?? [0, 1, 2, 3, 4, 5, 6],
+    syncFornecedorHorarios: config?.syncFornecedorHorarios ?? ["08:00"],
+    syncFornecedorEstoqueReposicao: config?.syncFornecedorEstoqueReposicao ?? 50,
+    syncFornecedorPausarEsgotado: config?.syncFornecedorPausarEsgotado ?? true,
+    syncFornecedorEmailAlerta: config?.syncFornecedorEmailAlerta ?? null,
+    syncFornecedorUltimaExecucao: config?.syncFornecedorUltimaExecucao?.toISOString() ?? null,
+    syncFornecedorResumo:
+      (config?.syncFornecedorResumo as { total: number; erros: number } | null) ?? null,
   };
 }
 
@@ -101,6 +120,13 @@ export async function atualizarConfiguracaoLoja(dados: {
   camposMargemShopee?: CampoMargemShopee[];
   // null apaga; undefined deixa como está.
   taxaGatewayPct?: number | null;
+  syncFornecedorAtivo?: boolean;
+  syncFornecedorDias?: number[];
+  syncFornecedorHorarios?: string[];
+  syncFornecedorEstoqueReposicao?: number;
+  syncFornecedorPausarEsgotado?: boolean;
+  // null/"" apaga; undefined deixa como está.
+  syncFornecedorEmailAlerta?: string | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -111,6 +137,12 @@ export async function atualizarConfiguracaoLoja(dados: {
     freteAchataFaixaPeso?: boolean;
     camposMargemShopee?: Prisma.InputJsonValue;
     taxaGatewayPct?: number | null;
+    syncFornecedorAtivo?: boolean;
+    syncFornecedorDias?: number[];
+    syncFornecedorHorarios?: string[];
+    syncFornecedorEstoqueReposicao?: number;
+    syncFornecedorPausarEsgotado?: boolean;
+    syncFornecedorEmailAlerta?: string | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -159,6 +191,43 @@ export async function atualizarConfiguracaoLoja(dados: {
     data.taxaGatewayPct = taxa;
   }
 
+  if (dados.syncFornecedorAtivo !== undefined) data.syncFornecedorAtivo = dados.syncFornecedorAtivo;
+  if (dados.syncFornecedorPausarEsgotado !== undefined) {
+    data.syncFornecedorPausarEsgotado = dados.syncFornecedorPausarEsgotado;
+  }
+
+  if (dados.syncFornecedorDias !== undefined) {
+    const dias = [...new Set(dados.syncFornecedorDias)].sort();
+    if (dias.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+      throw new ErroDeNegocio("Dia da semana inválido.");
+    }
+    data.syncFornecedorDias = dias;
+  }
+
+  if (dados.syncFornecedorHorarios !== undefined) {
+    const horarios = [...new Set(dados.syncFornecedorHorarios.map((h) => h.trim()))].sort();
+    const invalido = horarios.find((h) => !horarioValido(h));
+    if (invalido !== undefined) throw new ErroDeNegocio(`Horário inválido: "${invalido}" (use HH:MM).`);
+    if (horarios.length > 24) throw new ErroDeNegocio("No máximo 24 horários por dia.");
+    data.syncFornecedorHorarios = horarios;
+  }
+
+  if (dados.syncFornecedorEstoqueReposicao !== undefined) {
+    const n = dados.syncFornecedorEstoqueReposicao;
+    if (!Number.isInteger(n) || n < 1 || n > 100000) {
+      throw new ErroDeNegocio("A quantidade de reposição precisa ser um número inteiro de 1 a 100000.");
+    }
+    data.syncFornecedorEstoqueReposicao = n;
+  }
+
+  if (dados.syncFornecedorEmailAlerta !== undefined) {
+    const email = dados.syncFornecedorEmailAlerta?.trim() || null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new ErroDeNegocio("E-mail de alerta inválido.");
+    }
+    data.syncFornecedorEmailAlerta = email;
+  }
+
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
     create: {
@@ -171,6 +240,12 @@ export async function atualizarConfiguracaoLoja(dados: {
       freteAchataFaixaPeso: data.freteAchataFaixaPeso ?? true,
       camposMargemShopee: data.camposMargemShopee,
       taxaGatewayPct: data.taxaGatewayPct,
+      syncFornecedorAtivo: data.syncFornecedorAtivo,
+      syncFornecedorDias: data.syncFornecedorDias,
+      syncFornecedorHorarios: data.syncFornecedorHorarios,
+      syncFornecedorEstoqueReposicao: data.syncFornecedorEstoqueReposicao,
+      syncFornecedorPausarEsgotado: data.syncFornecedorPausarEsgotado,
+      syncFornecedorEmailAlerta: data.syncFornecedorEmailAlerta,
     },
     update: data,
   });

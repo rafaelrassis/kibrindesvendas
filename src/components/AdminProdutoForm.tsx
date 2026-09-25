@@ -196,6 +196,9 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     produto?.cepOrigemOverride ? formatarCep(produto.cepOrigemOverride) : ""
   );
   const [materiais, setMateriais] = useState<MaterialForm[]>(paraMaterialForm(produto?.materiais));
+  const [fornecedorUrl, setFornecedorUrl] = useState(produto?.fornecedorUrl ?? "");
+  const [sincronizando, setSincronizando] = useState(false);
+  const [resultadoSync, setResultadoSync] = useState<{ ok: boolean; texto: string } | null>(null);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
@@ -572,6 +575,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       larguraMm: Number(larguraMm) || 110,
       comprimentoMm: Number(comprimentoMm) || 160,
       cepOrigemOverride: normalizarCep(cepOrigemOverride),
+      fornecedorUrl: fornecedorUrl.trim() || null,
       variacoes: variacoes
         .filter((v) => v.tipo.trim())
         .map((v) => ({
@@ -645,6 +649,34 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       return;
     }
     router.push("/admin/produtos");
+  }
+
+  // Sincroniza só este produto e recarrega a página pra grade de estoque
+  // mostrar o que mudou (o form guarda estado próprio, montado no início).
+  async function sincronizarAgora() {
+    if (!produto) return;
+    setSincronizando(true);
+    setResultadoSync(null);
+    const r = await fetch("/api/admin/fornecedor/sincronizar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ produtoId: produto.id }),
+    });
+    const data = await r.json();
+    setSincronizando(false);
+    if (!r.ok || !data.ok) {
+      setResultadoSync({ ok: false, texto: data.erro ?? data.error ?? "Não foi possível sincronizar." });
+      return;
+    }
+    const partes = [
+      data.zeradas.length > 0 && `Zeradas: ${data.zeradas.join(", ")}.`,
+      data.reativadas.length > 0 && `Repostas: ${data.reativadas.join(", ")}.`,
+    ].filter(Boolean);
+    setResultadoSync({
+      ok: true,
+      texto: partes.length > 0 ? `${partes.join(" ")} Recarregando…` : "Tudo certo — nada mudou.",
+    });
+    if (data.alterado) setTimeout(() => window.location.reload(), 1500);
   }
 
   return (
@@ -1391,6 +1423,63 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           </p>
         </div>
       </div>
+      </Secao>
+
+      <Secao
+        title="Fornecedor"
+        subtitle="Estoque sincronizado com a loja do fornecedor"
+        defaultOpen={!!produto?.fornecedorErro}
+      >
+        <Campo label="Link do produto no fornecedor">
+          <input
+            type="url"
+            value={fornecedorUrl}
+            onChange={(e) => setFornecedorUrl(e.target.value)}
+            placeholder="https://setemalhas.com/produtos/..."
+            className="w-full border border-line rounded px-3 py-2 text-sm"
+          />
+        </Campo>
+        <p className="text-xs text-ink/50 mt-1">
+          Nos horários de Configurações, o sistema abre este link, zera aqui as variações
+          indisponíveis lá e repõe as que voltaram. Os valores das variações (ex: cor
+          &quot;Azul Marinho&quot;, tamanho &quot;P&quot;) precisam ter o mesmo nome do
+          fornecedor — acento e maiúscula não importam.
+        </p>
+        {produto?.fornecedorErro && (
+          <p className="mt-3 text-sm text-white bg-berry rounded px-3 py-2">
+            Última sincronização falhou: {produto.fornecedorErro}
+          </p>
+        )}
+        {produto?.fornecedorAviso && !produto.fornecedorErro && (
+          <p className="mt-3 text-sm bg-amber-100 text-amber-900 rounded px-3 py-2">
+            {produto.fornecedorAviso}
+          </p>
+        )}
+        {produto?.fornecedorVerificadoEm && (
+          <p className="text-xs text-ink/50 mt-2">
+            Última verificação: {new Date(produto.fornecedorVerificadoEm).toLocaleString("pt-BR")}
+          </p>
+        )}
+        {editando && produto?.fornecedorUrl && (
+          <div className="mt-3">
+            <button
+              type="button"
+              disabled={sincronizando || fornecedorUrl.trim() !== produto.fornecedorUrl}
+              onClick={sincronizarAgora}
+              className="text-sm border border-line rounded px-3 py-1.5 disabled:opacity-50"
+            >
+              {sincronizando ? "Sincronizando…" : "Sincronizar agora"}
+            </button>
+            {fornecedorUrl.trim() !== produto.fornecedorUrl && (
+              <span className="text-xs text-ink/50 ml-2">Salve o link novo antes.</span>
+            )}
+            {resultadoSync && (
+              <p className={`text-sm mt-2 ${resultadoSync.ok ? "text-pine-2" : "text-berry"}`}>
+                {resultadoSync.texto}
+              </p>
+            )}
+          </div>
+        )}
       </Secao>
 
       {variacoes.some((v) => v.afetaDimensao && v.tipo.trim()) && (

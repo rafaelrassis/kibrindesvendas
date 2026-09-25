@@ -86,6 +86,26 @@ model Produto {
   // loja (config.cepOrigem) — ex: fornecedor terceirizado que despacha
   // direto pro cliente. null = usa o CEP padrão da loja.
   cepOrigemOverride    String?
+  // Sincronização com fornecedor (loja Nuvemshop que revende este produto) —
+  // ver lib/data/sync-fornecedor.ts. null = produto não sincroniza.
+  fornecedorUrl        String?
+  // Última tentativa de leitura do link, com sucesso ou não. É o que o ciclo
+  // agendado usa pra saber quem ainda falta processar.
+  fornecedorVerificadoEm DateTime?
+  // Erro da última tentativa (link quebrado, página mudou...). null = última
+  // leitura deu certo. Vira o alerta vermelho do painel.
+  fornecedorErro       String?
+  // Aviso que não impede a sync (ex: variação daqui sem correspondente lá).
+  fornecedorAviso      String?
+  // Menor preço visto no fornecedor na última leitura.
+  fornecedorPreco      Decimal?          @db.Decimal(10, 2)
+  // Preço anterior quando o do fornecedor mudou — alerta até o admin dar
+  // ciente (volta pra null).
+  fornecedorPrecoAnterior Decimal?       @db.Decimal(10, 2)
+  // true = foi a sync que pausou o produto (tudo esgotado no fornecedor), e
+  // só nesse caso ela reativa sozinha quando voltar. Pausa manual não é
+  // desfeita pela sync.
+  fornecedorPausouProduto Boolean        @default(false)
   variacoes            Variacao[]
   // Custo de material é dado interno (usado pra calcular lucro no admin) —
   // nunca sai pela API pública, só pela rota /api/admin.
@@ -531,6 +551,21 @@ model ConfiguracaoLoja {
   camposMargemShopee Json?
   // Taxa do Mercado Pago (%) sobre o valor cobrado do cliente. null = 0.
   taxaGatewayPct   Decimal? @db.Decimal(5, 2)
+  // Sincronização de estoque com o fornecedor — ver lib/data/sync-fornecedor.ts.
+  syncFornecedorAtivo  Boolean  @default(false)
+  // Dias da semana (0 = domingo) e horários "HH:MM" (horário de Brasília).
+  syncFornecedorDias   Int[]    @default([0, 1, 2, 3, 4, 5, 6])
+  syncFornecedorHorarios String[] @default(["08:00"])
+  // Quantidade que a variação volta a ter quando reaparece disponível no
+  // fornecedor sem número de estoque informado.
+  syncFornecedorEstoqueReposicao Int @default(50)
+  // Pausa o produto quando tudo esgota no fornecedor (e reativa na volta).
+  syncFornecedorPausarEsgotado Boolean @default(true)
+  // Pra onde vai o e-mail de alerta quando algum link falha. null = só painel.
+  syncFornecedorEmailAlerta String?
+  // Fim do último ciclo agendado completo e o resumo dele.
+  syncFornecedorUltimaExecucao DateTime?
+  syncFornecedorResumo Json?
   updatedAt        DateTime @updatedAt
 }
 
