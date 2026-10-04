@@ -197,6 +197,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
   );
   const [materiais, setMateriais] = useState<MaterialForm[]>(paraMaterialForm(produto?.materiais));
   const [fornecedorUrl, setFornecedorUrl] = useState(produto?.fornecedorUrl ?? "");
+  const [fornecedorEspelhar, setFornecedorEspelhar] = useState(produto?.fornecedorEspelhar ?? false);
   const [sincronizando, setSincronizando] = useState(false);
   const [resultadoSync, setResultadoSync] = useState<{ ok: boolean; texto: string } | null>(null);
   const [erro, setErro] = useState("");
@@ -576,6 +577,7 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
       comprimentoMm: Number(comprimentoMm) || 160,
       cepOrigemOverride: normalizarCep(cepOrigemOverride),
       fornecedorUrl: fornecedorUrl.trim() || null,
+      fornecedorEspelhar,
       variacoes: variacoes
         .filter((v) => v.tipo.trim())
         .map((v) => ({
@@ -1445,6 +1447,22 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           &quot;Azul Marinho&quot;, tamanho &quot;P&quot;) precisam ter o mesmo nome do
           fornecedor — acento e maiúscula não importam.
         </p>
+        <label className="flex items-start gap-2 mt-3 text-sm">
+          <input
+            type="checkbox"
+            checked={fornecedorEspelhar}
+            onChange={(e) => setFornecedorEspelhar(e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Espelhar variações do fornecedor
+            <span className="block text-xs text-ink/50">
+              Cria aqui as cores/tamanhos que só existem lá e <strong>apaga</strong> (com foto,
+              preço e estoque) os que sumiram de lá. Os nomes dos tipos já cadastrados são
+              mantidos.
+            </span>
+          </span>
+        </label>
         {produto?.fornecedorErro && (
           <p className="mt-3 text-sm text-white bg-berry rounded px-3 py-2">
             Última sincronização falhou: {produto.fornecedorErro}

@@ -157,6 +157,84 @@ function rotulo(combinacao: Record<string, string>) {
   return Object.values(combinacao).join(" / ");
 }
 
+export type VariacaoLocal = { tipo: string; valores: string[] };
+
+export type EspelhoVariacoes = {
+  // Variações já com os valores do fornecedor. `indice` = posição em
+  // `locais` (null = variação nova, criada a partir do fornecedor).
+  variacoes: { indice: number | null; tipo: string; valores: string[] }[];
+  adicionados: string[];
+  removidos: { indice: number; valor: string }[];
+  mudou: boolean;
+};
+
+const TIPOS_NOVOS = ["Cor", "Tamanho"];
+
+// Deixa as variações daqui iguais às do fornecedor: valor que só existe lá
+// é criado, valor que não existe mais lá é removido. O fornecedor não diz o
+// nome do tipo ("Cor"/"Tamanho"), então cada coluna de opção (option0,
+// option1...) é casada com a variação daqui que mais repete valores dela; se
+// nenhuma casa e a loja não tem variações, a coluna vira "Cor", "Tamanho" ou
+// "Opção N". Variação daqui sem coluna correspondente não é tocada. Valor
+// que já existe mantém a grafia daqui (a foto/preço dele ficam ligados a ela).
+export function espelharVariacoes(
+  locais: VariacaoLocal[],
+  variantes: VarianteFornecedor[]
+): EspelhoVariacoes {
+  const nColunas = Math.max(0, ...variantes.map((v) => v.opcoes.length));
+  const resultado: EspelhoVariacoes = { variacoes: [], adicionados: [], removidos: [], mudou: false };
+  // Variante sem opção (produto de variação única) não diz nada sobre grade.
+  if (nColunas === 0 || variantes.some((v) => v.opcoes.length !== nColunas)) return resultado;
+
+  const usadas = new Set<number>();
+  for (let col = 0; col < nColunas; col++) {
+    const valoresLa: string[] = [];
+    const vistos = new Set<string>();
+    for (const v of variantes) {
+      const n = normalizarOpcao(v.opcoes[col]);
+      if (!vistos.has(n)) {
+        vistos.add(n);
+        valoresLa.push(v.opcoes[col]);
+      }
+    }
+
+    let melhor = -1;
+    let acertos = 0;
+    locais.forEach((l, i) => {
+      if (usadas.has(i)) return;
+      const n = l.valores.filter((x) => vistos.has(normalizarOpcao(x))).length;
+      if (n > acertos) {
+        acertos = n;
+        melhor = i;
+      }
+    });
+    // Sem nenhum valor em comum: usa a variação da mesma posição, se existir
+    // e ainda estiver livre (ex: cadastro com valores todos diferentes).
+    if (melhor < 0 && col < locais.length && !usadas.has(col) && locais.length === nColunas) melhor = col;
+
+    if (melhor < 0) {
+      const tipo = TIPOS_NOVOS[col] ?? `Opção ${col + 1}`;
+      resultado.variacoes.push({ indice: null, tipo, valores: valoresLa });
+      resultado.adicionados.push(...valoresLa);
+      resultado.mudou = true;
+      continue;
+    }
+
+    usadas.add(melhor);
+    const local = locais[melhor];
+    const grafiaLocal = new Map(local.valores.map((x) => [normalizarOpcao(x), x]));
+    const valores = valoresLa.map((x) => grafiaLocal.get(normalizarOpcao(x)) ?? x);
+    for (const x of valoresLa) if (!grafiaLocal.has(normalizarOpcao(x))) resultado.adicionados.push(x);
+    for (const x of local.valores) {
+      if (!vistos.has(normalizarOpcao(x))) resultado.removidos.push({ indice: melhor, valor: x });
+    }
+    const igual = valores.length === local.valores.length && valores.every((x, i) => x === local.valores[i]);
+    if (!igual) resultado.mudou = true;
+    resultado.variacoes.push({ indice: melhor, tipo: local.tipo, valores });
+  }
+  return resultado;
+}
+
 // Calcula o que muda no produto daqui a partir das variantes do fornecedor.
 // Uma combinação daqui (ex: Cor=Preto, Tamanho=P) bate com toda variante do
 // fornecedor que tem todos os valores dela entre as opções — assim funciona

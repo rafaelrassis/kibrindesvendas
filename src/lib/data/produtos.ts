@@ -152,6 +152,7 @@ export function toProdutoAdmin(p: ProdutoComMateriais): ProdutoAdmin {
     margemPercentual: preco > 0 ? Math.round((lucro / preco) * 1000) / 10 : null,
     cepOrigemOverride: p.cepOrigemOverride,
     fornecedorUrl: p.fornecedorUrl,
+    fornecedorEspelhar: p.fornecedorEspelhar,
     fornecedorVerificadoEm: p.fornecedorVerificadoEm?.toISOString() ?? null,
     fornecedorErro: p.fornecedorErro,
     fornecedorAviso: p.fornecedorAviso,
@@ -325,6 +326,8 @@ export type DadosProduto = {
   // Link do produto no fornecedor (Nuvemshop), usado pela sincronização de
   // estoque. null/"" desliga; undefined deixa como está.
   fornecedorUrl?: string | null;
+  // Sync também espelha as variações do fornecedor (cria/apaga valores).
+  fornecedorEspelhar?: boolean;
 };
 
 const EMOJI_PADRAO = "🎁";
@@ -479,6 +482,7 @@ export async function criarProduto(dados: DadosProduto): Promise<Produto> {
       comprimentoMm: dados.comprimentoMm ?? COMPRIMENTO_PADRAO_MM,
       cepOrigemOverride: dados.cepOrigemOverride ? normalizarCep(dados.cepOrigemOverride) : null,
       fornecedorUrl: dados.fornecedorUrl ? validarUrlFornecedor(dados.fornecedorUrl) : null,
+      fornecedorEspelhar: dados.fornecedorEspelhar ?? false,
       variacoes: {
         create: (dados.variacoes ?? []).map((v) => ({
           tipo: v.tipo,
@@ -595,6 +599,7 @@ export async function atualizarProduto(
               : null
             : undefined,
         ...camposFornecedor(atual.fornecedorUrl, dados.fornecedorUrl),
+        ...(dados.fornecedorEspelhar !== undefined && { fornecedorEspelhar: dados.fornecedorEspelhar }),
         ...(dados.variacoes && {
           variacoes: {
             create: dados.variacoes.map((v) => ({

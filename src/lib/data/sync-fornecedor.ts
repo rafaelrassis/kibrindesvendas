@@ -1,8 +1,10 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { enviarEmailAlertaFornecedor } from "@/lib/email";
 import {
   calcularSync,
+  espelharVariacoes,
   extrairVariantesNuvemshop,
   ultimoHorarioAgendado,
   validarUrlFornecedor,
@@ -77,6 +79,14 @@ export type ResultadoProduto = {
   reativadas: string[];
 };
 
+// Json de "valor => dado" sem as chaves apagadas (Prisma pede JsonNull pra
+// limpar a coluna, e null/undefined pra deixar como está).
+function semChaves(json: Prisma.JsonValue | null, apagar: Set<string>) {
+  if (!json || typeof json !== "object" || Array.isArray(json) || apagar.size === 0) return undefined;
+  const restante = Object.fromEntries(Object.entries(json).filter(([k]) => !apagar.has(k)));
+  return restante as Prisma.InputJsonObject;
+}
+
 async function sincronizarUm(produtoId: string, config: Config): Promise<ResultadoProduto> {
   const produto = await prisma.produto.findUniqueOrThrow({
     where: { id: produtoId },
@@ -89,9 +99,18 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
     const url = produto.fornecedorUrl && validarUrlFornecedor(produto.fornecedorUrl);
     if (!url) throw new Error("Link do fornecedor inválido.");
     const variantes = extrairVariantesNuvemshop(await baixarPagina(url));
+    const espelho = produto.fornecedorEspelhar
+      ? espelharVariacoes(produto.variacoes, variantes)
+      : null;
+    const espelhar = espelho?.mudou ? espelho : null;
+    // Variações como ficam depois do espelho (a grade de estoque é calculada
+    // em cima delas).
+    const variacoesFinais = espelhar
+      ? espelhar.variacoes
+      : produto.variacoes.map((v) => ({ tipo: v.tipo, valores: v.valores }));
     const r = calcularSync(
       {
-        variacoes: produto.variacoes,
+        variacoes: variacoesFinais,
         estoque: produto.estoque,
         estoqueVariacoes: produto.estoqueVariacoes,
       },
@@ -113,6 +132,30 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
     }
 
     await prisma.$transaction(async (tx) => {
+      if (espelhar) {
+        for (const nova of espelhar.variacoes) {
+          if (nova.indice === null) {
+            await tx.variacao.create({
+              data: { produtoId, tipo: nova.tipo, valores: nova.valores },
+            });
+            continue;
+          }
+          const atual = produto.variacoes[nova.indice];
+          const apagados = new Set(
+            espelhar.removidos.filter((x) => x.indice === nova.indice).map((x) => x.valor)
+          );
+          await tx.variacao.update({
+            where: { id: atual.id },
+            data: {
+              valores: nova.valores,
+              imagensValores: semChaves(atual.imagensValores, apagados),
+              precosValores: semChaves(atual.precosValores, apagados),
+              custosValores: semChaves(atual.custosValores, apagados),
+              dimensoesValores: semChaves(atual.dimensoesValores, apagados),
+            },
+          });
+        }
+      }
       if (r.grade) {
         await tx.estoqueVariacao.deleteMany({ where: { produtoId } });
         await tx.estoqueVariacao.createMany({
@@ -143,7 +186,7 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
     return {
       ...base,
       ok: true,
-      alterado: r.grade !== undefined || r.estoque !== undefined || ativo !== undefined,
+      alterado: espelhar !== null || r.grade !== undefined || r.estoque !== undefined || ativo !== undefined,
       zeradas: r.zeradas,
       reativadas: r.reativadas,
     };

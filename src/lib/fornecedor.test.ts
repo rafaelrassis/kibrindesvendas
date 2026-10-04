@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   calcularSync,
+  espelharVariacoes,
   extrairVariantesNuvemshop,
   normalizarOpcao,
   ultimoHorarioAgendado,
@@ -204,5 +205,61 @@ describe("página real da Sete Malhas (fixture)", () => {
       expect(x.opcoes.length).toBe(2);
       expect(x.preco).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("espelharVariacoes", () => {
+  const v = (cor: string, tam: string): VarianteFornecedor => ({
+    opcoes: [cor, tam],
+    disponivel: true,
+    estoque: null,
+    preco: 10,
+  });
+  const lojaLa = [v("Preto", "P"), v("Preto", "M"), v("Azul Marinho", "P"), v("Azul Marinho", "M")];
+
+  it("cria o que só existe no fornecedor e apaga o que sumiu", () => {
+    const r = espelharVariacoes(
+      [
+        { tipo: "Cor", valores: ["Preto", "Verde"] },
+        { tipo: "Tamanho", valores: ["P"] },
+      ],
+      lojaLa
+    );
+    expect(r.mudou).toBe(true);
+    expect(r.variacoes).toEqual([
+      { indice: 0, tipo: "Cor", valores: ["Preto", "Azul Marinho"] },
+      { indice: 1, tipo: "Tamanho", valores: ["P", "M"] },
+    ]);
+    expect(r.removidos).toEqual([{ indice: 0, valor: "Verde" }]);
+    expect(r.adicionados).toEqual(["Azul Marinho", "M"]);
+  });
+
+  it("mantém a grafia daqui e não acusa mudança quando já está igual", () => {
+    const r = espelharVariacoes(
+      [
+        { tipo: "Cor", valores: ["preto", "Azul marinho"] },
+        { tipo: "Tamanho", valores: ["P", "M"] },
+      ],
+      lojaLa
+    );
+    expect(r.mudou).toBe(false);
+    expect(r.variacoes[0].valores).toEqual(["preto", "Azul marinho"]);
+  });
+
+  it("produto sem variações aqui nasce com Cor e Tamanho", () => {
+    const r = espelharVariacoes([], lojaLa);
+    expect(r.variacoes).toEqual([
+      { indice: null, tipo: "Cor", valores: ["Preto", "Azul Marinho"] },
+      { indice: null, tipo: "Tamanho", valores: ["P", "M"] },
+    ]);
+  });
+
+  it("não mexe quando o fornecedor não tem opções", () => {
+    const r = espelharVariacoes(
+      [{ tipo: "Cor", valores: ["Preto"] }],
+      [{ opcoes: [], disponivel: true, estoque: null, preco: 10 }]
+    );
+    expect(r.mudou).toBe(false);
+    expect(r.variacoes).toEqual([]);
   });
 });

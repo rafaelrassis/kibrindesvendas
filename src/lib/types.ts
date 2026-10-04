@@ -118,6 +118,7 @@ export type ProdutoAdmin = Produto & {
   cepOrigemOverride: string | null;
   // Sincronização de estoque com o fornecedor — ver lib/data/sync-fornecedor.ts.
   fornecedorUrl: string | null;
+  fornecedorEspelhar: boolean;
   fornecedorVerificadoEm: string | null;
   fornecedorErro: string | null;
   fornecedorAviso: string | null;

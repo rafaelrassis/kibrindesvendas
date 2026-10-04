@@ -106,6 +106,9 @@ model Produto {
   // só nesse caso ela reativa sozinha quando voltar. Pausa manual não é
   // desfeita pela sync.
   fornecedorPausouProduto Boolean        @default(false)
+  // true = a sync também deixa as variações (cor/tamanho) iguais às do
+  // fornecedor: cria as que só existem lá e apaga as que sumiram.
+  fornecedorEspelhar   Boolean           @default(false)
   variacoes            Variacao[]
   // Custo de material é dado interno (usado pra calcular lucro no admin) —
   // nunca sai pela API pública, só pela rota /api/admin.
