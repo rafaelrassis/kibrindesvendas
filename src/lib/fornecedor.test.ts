@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   calcularSync,
@@ -191,5 +192,17 @@ describe("validarUrlFornecedor", () => {
     expect(validarUrlFornecedor("https://127.0.0.1/x")).toBeNull();
     expect(validarUrlFornecedor("https://localhost/x")).toBeNull();
     expect(validarUrlFornecedor("https://[::1]/x")).toBeNull();
+  });
+});
+
+describe("página real da Sete Malhas (fixture)", () => {
+  it("lê cor, tamanho e preço de todas as variantes", () => {
+    const html = readFileSync(new URL("./fixtures/setemalhas-produto.html", import.meta.url), "utf8");
+    const v = extrairVariantesNuvemshop(html);
+    expect(v.length).toBeGreaterThan(0);
+    for (const x of v) {
+      expect(x.opcoes.length).toBe(2);
+      expect(x.preco).toBeGreaterThan(0);
+    }
   });
 });
