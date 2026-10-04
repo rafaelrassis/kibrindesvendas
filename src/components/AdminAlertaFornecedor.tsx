@@ -40,11 +40,26 @@ export default function AdminAlertaFornecedor() {
   }
 
   if (!alertas) return null;
-  const { erros, avisos, precos } = alertas;
-  if (erros.length + avisos.length + precos.length === 0) return null;
+  const { erros, avisos, precos, atraso } = alertas;
+  if (erros.length + avisos.length + precos.length === 0 && !atraso) return null;
 
   return (
     <div className="mx-auto max-w-4xl px-5 pt-6 space-y-3">
+      {atraso && (
+        <div role="alert" className="rounded-lg border-2 border-berry bg-berry text-white p-4 text-sm">
+          <p className="font-semibold">
+            ⚠️ A sincronização automática não rodou no horário de{" "}
+            {new Date(atraso.horario).toLocaleString("pt-BR")}
+          </p>
+          <p className="mt-1 opacity-90">
+            {atraso.ultimaExecucao
+              ? `Último ciclo completo: ${new Date(atraso.ultimaExecucao).toLocaleString("pt-BR")}. `
+              : "Nenhum ciclo completo até agora. "}
+            Confira o CRON_SECRET (Vercel e GitHub Actions) e o workflow sync-fornecedor.
+          </p>
+        </div>
+      )}
+
       {erros.length > 0 && (
         <div role="alert" className="rounded-lg border-2 border-berry bg-berry text-white p-4">
           <p className="font-semibold mb-2">

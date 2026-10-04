@@ -382,9 +382,29 @@ export type AlertasFornecedor = {
   erros: { produtoId: string; nome: string; url: string; erro: string; em: string | null }[];
   avisos: { produtoId: string; nome: string; aviso: string }[];
   precos: { produtoId: string; nome: string; de: number; para: number }[];
+  // Sync ligada mas o ciclo do horário agendado não terminou (cron parado,
+  // CRON_SECRET errado, função caindo por tempo...). null = em dia.
+  atraso: { horario: string; ultimaExecucao: string | null } | null;
 };
 
+// Tolerância antes de acusar atraso: o GitHub Actions bate de hora em hora e
+// um ciclo grande pode levar mais de uma chamada pra terminar.
+const TOLERANCIA_ATRASO_MS = 3 * 60 * 60 * 1000;
+
 export async function getAlertasFornecedor(): Promise<AlertasFornecedor> {
+  const config = await getConfigSync();
+  // Sincronização desligada: nada a cobrar, o painel fica limpo.
+  if (!config.ativo) return { erros: [], avisos: [], precos: [], atraso: null };
+
+  const horario = ultimoHorarioAgendado(new Date(), config.dias, config.horarios);
+  const atrasado =
+    horario !== null &&
+    Date.now() - horario.getTime() > TOLERANCIA_ATRASO_MS &&
+    (!config.ultimaExecucao || config.ultimaExecucao < horario);
+  const atraso = atrasado
+    ? { horario: horario.toISOString(), ultimaExecucao: config.ultimaExecucao?.toISOString() ?? null }
+    : null;
+
   const produtos = await prisma.produto.findMany({
     where: {
       fornecedorUrl: { not: null },
@@ -407,6 +427,7 @@ export async function getAlertasFornecedor(): Promise<AlertasFornecedor> {
     orderBy: { nome: "asc" },
   });
   return {
+    atraso,
     erros: produtos
       .filter((p) => p.fornecedorErro)
       .map((p) => ({
