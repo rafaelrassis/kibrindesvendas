@@ -10,6 +10,8 @@ export type VarianteFornecedor = {
   // null = o fornecedor não controla estoque dessa variante (vende sem limite).
   estoque: number | null;
   preco: number | null;
+  // Foto da variante no fornecedor (https, já normalizada); null = sem foto.
+  imagem?: string | null;
 };
 
 // --- Leitura da página (Nuvemshop) ------------------------------------------
@@ -92,6 +94,7 @@ export function extrairVariantesNuvemshop(html: string): VarianteFornecedor[] {
     }
     const estoque = typeof v.stock === "number" ? v.stock : null;
     const preco = typeof v.price_number === "number" ? v.price_number : null;
+    const imagem = urlImagemFornecedor(v.image_url);
     return {
       opcoes,
       // `available` já considera estoque 0; stock 0 sem o campo também conta
@@ -99,8 +102,34 @@ export function extrairVariantesNuvemshop(html: string): VarianteFornecedor[] {
       disponivel: v.available === true && estoque !== 0,
       estoque,
       preco,
+      imagem,
     };
   });
+}
+
+// Foto principal do produto (og:image da página), ou null.
+export function extrairImagemPrincipal(html: string): string | null {
+  const m =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  return m ? urlImagemFornecedor(decodificarEntidades(m[1])) : null;
+}
+
+// Só aceita foto servida pelo CDN da Nuvemshop: a URL é baixada pelo
+// servidor, então não pode apontar pra qualquer lugar (mesmo cuidado de
+// validarUrlFornecedor).
+export function urlImagemFornecedor(bruta: unknown): string | null {
+  if (typeof bruta !== "string" || !bruta.trim()) return null;
+  const url = bruta.trim().startsWith("//") ? `https:${bruta.trim()}` : bruta.trim();
+  try {
+    const u = new URL(url);
+    const ok = [".mitiendanube.com", ".nuvemshop.com.br", ".lojavirtualnuvem.com.br"].some((d) =>
+      u.hostname.endsWith(d)
+    );
+    return u.protocol === "https:" && ok ? u.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 // --- Casamento com o cadastro daqui -----------------------------------------
@@ -162,7 +191,8 @@ export type VariacaoLocal = { tipo: string; valores: string[] };
 export type EspelhoVariacoes = {
   // Variações já com os valores do fornecedor. `indice` = posição em
   // `locais` (null = variação nova, criada a partir do fornecedor).
-  variacoes: { indice: number | null; tipo: string; valores: string[] }[];
+  // `coluna` = qual option do fornecedor (0, 1...) alimenta esta variação.
+  variacoes: { indice: number | null; coluna: number; tipo: string; valores: string[] }[];
   adicionados: string[];
   removidos: { indice: number; valor: string }[];
   mudou: boolean;
@@ -214,7 +244,7 @@ export function espelharVariacoes(
 
     if (melhor < 0) {
       const tipo = TIPOS_NOVOS[col] ?? `Opção ${col + 1}`;
-      resultado.variacoes.push({ indice: null, tipo, valores: valoresLa });
+      resultado.variacoes.push({ indice: null, coluna: col, tipo, valores: valoresLa });
       resultado.adicionados.push(...valoresLa);
       resultado.mudou = true;
       continue;
@@ -230,7 +260,7 @@ export function espelharVariacoes(
     }
     const igual = valores.length === local.valores.length && valores.every((x, i) => x === local.valores[i]);
     if (!igual) resultado.mudou = true;
-    resultado.variacoes.push({ indice: melhor, tipo: local.tipo, valores });
+    resultado.variacoes.push({ indice: melhor, coluna: col, tipo: local.tipo, valores });
   }
   return resultado;
 }

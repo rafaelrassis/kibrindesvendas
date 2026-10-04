@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   calcularSync,
   espelharVariacoes,
+  extrairImagemPrincipal,
   extrairVariantesNuvemshop,
   normalizarOpcao,
   ultimoHorarioAgendado,
+  urlImagemFornecedor,
   validarUrlFornecedor,
   type VarianteFornecedor,
 } from "./fornecedor";
@@ -27,9 +29,9 @@ describe("extrairVariantesNuvemshop", () => {
       <div class="js-product-container js-item-product" data-variants="${JSON.stringify(relacionado).replace(/"/g, "&quot;")}"></div>
       <script>LS.variants = ${JSON.stringify(principal)}; LS.x = "]";</script>`;
     expect(extrairVariantesNuvemshop(html)).toEqual([
-      { opcoes: ["Preto", "P"], disponivel: false, estoque: 0, preco: 11.9 },
-      { opcoes: ["Branco", "P"], disponivel: true, estoque: null, preco: 11.9 },
-      { opcoes: ["Azul", "M"], disponivel: true, estoque: 12, preco: 12.5 },
+      { opcoes: ["Preto", "P"], disponivel: false, estoque: 0, preco: 11.9, imagem: null },
+      { opcoes: ["Branco", "P"], disponivel: true, estoque: null, preco: 11.9, imagem: null },
+      { opcoes: ["Azul", "M"], disponivel: true, estoque: 12, preco: 12.5, imagem: null },
     ]);
   });
 
@@ -227,8 +229,8 @@ describe("espelharVariacoes", () => {
     );
     expect(r.mudou).toBe(true);
     expect(r.variacoes).toEqual([
-      { indice: 0, tipo: "Cor", valores: ["Preto", "Azul Marinho"] },
-      { indice: 1, tipo: "Tamanho", valores: ["P", "M"] },
+      { indice: 0, coluna: 0, tipo: "Cor", valores: ["Preto", "Azul Marinho"] },
+      { indice: 1, coluna: 1, tipo: "Tamanho", valores: ["P", "M"] },
     ]);
     expect(r.removidos).toEqual([{ indice: 0, valor: "Verde" }]);
     expect(r.adicionados).toEqual(["Azul Marinho", "M"]);
@@ -249,8 +251,8 @@ describe("espelharVariacoes", () => {
   it("produto sem variações aqui nasce com Cor e Tamanho", () => {
     const r = espelharVariacoes([], lojaLa);
     expect(r.variacoes).toEqual([
-      { indice: null, tipo: "Cor", valores: ["Preto", "Azul Marinho"] },
-      { indice: null, tipo: "Tamanho", valores: ["P", "M"] },
+      { indice: null, coluna: 0, tipo: "Cor", valores: ["Preto", "Azul Marinho"] },
+      { indice: null, coluna: 1, tipo: "Tamanho", valores: ["P", "M"] },
     ]);
   });
 
@@ -261,5 +263,22 @@ describe("espelharVariacoes", () => {
     );
     expect(r.mudou).toBe(false);
     expect(r.variacoes).toEqual([]);
+  });
+});
+
+describe("imagens do fornecedor", () => {
+  it("normaliza e só aceita o CDN da Nuvemshop", () => {
+    expect(urlImagemFornecedor("//acdn-us.mitiendanube.com/a.webp")).toBe("https://acdn-us.mitiendanube.com/a.webp");
+    expect(urlImagemFornecedor("https://evil.com/a.png")).toBeNull();
+    expect(urlImagemFornecedor("http://x.mitiendanube.com/a.png")).toBeNull();
+    expect(urlImagemFornecedor(null)).toBeNull();
+  });
+
+  it("lê a foto de cada variante e a og:image", () => {
+    const html = readFileSync(new URL("./fixtures/setemalhas-produto.html", import.meta.url), "utf8");
+    expect(extrairVariantesNuvemshop(html).every((v) => v.imagem?.startsWith("https://"))).toBe(true);
+    expect(
+      extrairImagemPrincipal('<meta property="og:image" content="//a.mitiendanube.com/p.jpg" />')
+    ).toBe("https://a.mitiendanube.com/p.jpg");
   });
 });

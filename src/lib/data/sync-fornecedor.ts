@@ -5,10 +5,14 @@ import { enviarEmailAlertaFornecedor } from "@/lib/email";
 import {
   calcularSync,
   espelharVariacoes,
+  extrairImagemPrincipal,
   extrairVariantesNuvemshop,
+  normalizarOpcao,
   ultimoHorarioAgendado,
   validarUrlFornecedor,
 } from "@/lib/fornecedor";
+import { tipoTemFotoPorValor } from "@/lib/estoque-variacao";
+import { formatoDeImagem, salvarImagem } from "@/lib/imagens";
 import { ErroDeNegocio } from "./erros";
 
 // Sincronização de estoque com o fornecedor: lê a página do produto no site
@@ -90,22 +94,103 @@ function semChaves(json: Prisma.JsonValue | null, apagar: Set<string>) {
   return restante as Prisma.InputJsonObject;
 }
 
-async function sincronizarUm(produtoId: string, config: Config): Promise<ResultadoProduto> {
-  const produto = await prisma.produto.findUniqueOrThrow({
+const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024;
+const MAX_FOTOS_POR_CICLO = 25;
+
+// Baixa uma foto do CDN do fornecedor e guarda no depósito da loja. Devolve a
+// URL daqui, ou null se não deu (fora do ar, grande demais, não é imagem).
+async function trazerFoto(urlFornecedor: string): Promise<string | null> {
+  try {
+    const res = await fetch(urlFornecedor, {
+      signal: AbortSignal.timeout(TIMEOUT_FETCH_MS),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > TAMANHO_MAXIMO_FOTO) return null;
+    const formato = formatoDeImagem(bytes);
+    if (!formato) return null;
+    return (await salvarImagem(bytes, formato.extensao)).url;
+  } catch {
+    return null;
+  }
+}
+
+type ProdutoComVariacoes = Awaited<ReturnType<typeof carregarProduto>>;
+async function carregarProduto(produtoId: string) {
+  return prisma.produto.findUniqueOrThrow({
     where: { id: produtoId },
     include: { variacoes: true, estoqueVariacoes: true, categoria: true },
   });
+}
+
+// Fotos que faltam: uma por valor de cor (variação com foto por valor) sem
+// foto cadastrada e, se a galeria do produto está vazia, a foto principal.
+// Nunca troca foto que já existe. null = nada a trazer.
+async function trazerFotos(
+  produto: ProdutoComVariacoes,
+  espelho: ReturnType<typeof espelharVariacoes>,
+  variantes: ReturnType<typeof extrairVariantesNuvemshop>,
+  html: string
+) {
+  let restante = MAX_FOTOS_POR_CICLO;
+  const porVariacao = new Map<number, Record<string, string[]>>();
+  for (const v of espelho.variacoes) {
+    if (!tipoTemFotoPorValor(v.tipo)) continue;
+    const existentes = (
+      v.indice !== null ? produto.variacoes[v.indice].imagensValores : null
+    ) as Record<string, string[]> | null;
+    const novas: Record<string, string[]> = {};
+    for (const valor of v.valores) {
+      if (restante <= 0) break;
+      if ((existentes?.[valor] ?? []).length > 0) continue;
+      const alvo = normalizarOpcao(valor);
+      const url = variantes.find(
+        (x) => x.imagem && normalizarOpcao(x.opcoes[v.coluna] ?? "") === alvo
+      )?.imagem;
+      if (!url) continue;
+      restante--;
+      const nossa = await trazerFoto(url);
+      if (nossa) novas[valor] = [nossa];
+    }
+    if (Object.keys(novas).length > 0) porVariacao.set(v.coluna, novas);
+  }
+
+  let galeria: string[] | undefined;
+  if (produto.imagens.length === 0 && restante > 0) {
+    const principal = extrairImagemPrincipal(html);
+    const nossa = principal ? await trazerFoto(principal) : null;
+    if (nossa) galeria = [nossa];
+  }
+
+  return porVariacao.size > 0 || galeria ? { porVariacao, galeria } : null;
+}
+
+function comFotos(
+  atual: unknown,
+  novas: Record<string, string[]> | undefined
+) {
+  if (!novas) return atual == null ? undefined : (atual as Prisma.InputJsonObject);
+  const base = atual && typeof atual === "object" && !Array.isArray(atual) ? atual : {};
+  return { ...base, ...novas } as Prisma.InputJsonObject;
+}
+
+async function sincronizarUm(produtoId: string, config: Config): Promise<ResultadoProduto> {
+  const produto = await carregarProduto(produtoId);
   const base = { produtoId, nome: produto.nome, categoria: produto.categoria.slug };
   const agora = new Date();
 
   try {
     const url = produto.fornecedorUrl && validarUrlFornecedor(produto.fornecedorUrl);
     if (!url) throw new Error("Link do fornecedor inválido.");
-    const variantes = extrairVariantesNuvemshop(await baixarPagina(url));
+    const html = await baixarPagina(url);
+    const variantes = extrairVariantesNuvemshop(html);
     const espelho = produto.fornecedorEspelhar
       ? espelharVariacoes(produto.variacoes, variantes)
       : null;
-    const espelhar = espelho?.mudou ? espelho : null;
+    // Fotos que faltam aqui (cor sem foto, galeria vazia) vêm do fornecedor.
+    const fotos = espelho ? await trazerFotos(produto, espelho, variantes, html) : null;
+    const espelhar = espelho && (espelho.mudou || fotos) ? espelho : null;
     // Variações como ficam depois do espelho (a grade de estoque é calculada
     // em cima delas).
     const variacoesFinais = espelhar
@@ -139,7 +224,12 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
         for (const nova of espelhar.variacoes) {
           if (nova.indice === null) {
             await tx.variacao.create({
-              data: { produtoId, tipo: nova.tipo, valores: nova.valores },
+              data: {
+                produtoId,
+                tipo: nova.tipo,
+                valores: nova.valores,
+                imagensValores: comFotos(null, fotos?.porVariacao.get(nova.coluna)),
+              },
             });
             continue;
           }
@@ -151,7 +241,10 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
             where: { id: atual.id },
             data: {
               valores: nova.valores,
-              imagensValores: semChaves(atual.imagensValores, apagados),
+              imagensValores: comFotos(
+                semChaves(atual.imagensValores, apagados) ?? atual.imagensValores,
+                fotos?.porVariacao.get(nova.coluna)
+              ),
               precosValores: semChaves(atual.precosValores, apagados),
               custosValores: semChaves(atual.custosValores, apagados),
               dimensoesValores: semChaves(atual.dimensoesValores, apagados),
@@ -168,6 +261,7 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
       await tx.produto.update({
         where: { id: produtoId },
         data: {
+          imagens: fotos?.galeria,
           estoque: r.estoque,
           ativo,
           fornecedorPausouProduto: pausou,
@@ -189,7 +283,7 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
     return {
       ...base,
       ok: true,
-      alterado: espelhar !== null || r.grade !== undefined || r.estoque !== undefined || ativo !== undefined,
+      alterado: espelhar !== null || fotos !== null || r.grade !== undefined || r.estoque !== undefined || ativo !== undefined,
       zeradas: r.zeradas,
       reativadas: r.reativadas,
       criadas: espelhar?.adicionados,
