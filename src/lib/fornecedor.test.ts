@@ -274,7 +274,8 @@ describe("imagens do fornecedor", () => {
   it("normaliza e só aceita o CDN da Nuvemshop", () => {
     expect(urlImagemFornecedor("//acdn-us.mitiendanube.com/a.webp")).toBe("https://acdn-us.mitiendanube.com/a.webp");
     expect(urlImagemFornecedor("https://evil.com/a.png")).toBeNull();
-    expect(urlImagemFornecedor("http://x.mitiendanube.com/a.png")).toBeNull();
+    expect(urlImagemFornecedor("http://x.mitiendanube.com/a.png")).toBe("https://x.mitiendanube.com/a.png");
+    expect(urlImagemFornecedor("ftp://x.mitiendanube.com/a.png")).toBeNull();
     expect(urlImagemFornecedor(null)).toBeNull();
   });
 

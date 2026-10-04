@@ -110,6 +110,7 @@ export function extrairVariantesNuvemshop(html: string): VarianteFornecedor[] {
 // Foto principal do produto (og:image da página), ou null.
 export function extrairImagemPrincipal(html: string): string | null {
   const m =
+    html.match(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i) ??
     html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
   return m ? urlImagemFornecedor(decodificarEntidades(m[1])) : null;
@@ -126,7 +127,10 @@ export function urlImagemFornecedor(bruta: unknown): string | null {
     const ok = [".mitiendanube.com", ".nuvemshop.com.br", ".lojavirtualnuvem.com.br"].some((d) =>
       u.hostname.endsWith(d)
     );
-    return u.protocol === "https:" && ok ? u.toString() : null;
+    if (!ok || (u.protocol !== "https:" && u.protocol !== "http:")) return null;
+    // O og:image da Nuvemshop vem em http://, mas o CDN atende em https.
+    u.protocol = "https:";
+    return u.toString();
   } catch {
     return null;
   }

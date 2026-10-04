@@ -129,13 +129,13 @@ async function carregarProduto(produtoId: string) {
 // Nunca troca foto que já existe. null = nada a trazer.
 async function trazerFotos(
   produto: ProdutoComVariacoes,
-  espelho: ReturnType<typeof espelharVariacoes>,
+  espelho: ReturnType<typeof espelharVariacoes> | null,
   variantes: ReturnType<typeof extrairVariantesNuvemshop>,
   html: string
 ) {
   let restante = MAX_FOTOS_POR_CICLO;
   const porVariacao = new Map<number, Record<string, string[]>>();
-  for (const v of espelho.variacoes) {
+  for (const v of espelho?.variacoes ?? []) {
     if (!tipoTemFotoPorValor(v.tipo)) continue;
     const existentes = (
       v.indice !== null ? produto.variacoes[v.indice].imagensValores : null
@@ -157,8 +157,11 @@ async function trazerFotos(
   }
 
   let galeria: string[] | undefined;
-  if (produto.imagens.length === 0 && restante > 0) {
-    const principal = extrairImagemPrincipal(html);
+  if (produto.imagens.length === 0) {
+    // Primeira foto que achar: a principal da página (og:image) ou, na falta
+    // dela, a da primeira variante com foto.
+    const principal =
+      extrairImagemPrincipal(html) ?? variantes.find((x) => x.imagem)?.imagem ?? null;
     const nossa = principal ? await trazerFoto(principal) : null;
     if (nossa) galeria = [nossa];
   }
@@ -189,8 +192,10 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
       ? espelharVariacoes(produto.variacoes, variantes)
       : null;
     // Fotos que faltam aqui (cor sem foto, galeria vazia) vêm do fornecedor.
-    const fotos = espelho ? await trazerFotos(produto, espelho, variantes, html) : null;
-    const espelhar = espelho && (espelho.mudou || fotos) ? espelho : null;
+    // A foto geral do produto vem mesmo sem espelhamento (só se a galeria está
+    // vazia); as fotos por cor só com o espelhamento ligado.
+    const fotos = await trazerFotos(produto, espelho, variantes, html);
+    const espelhar = espelho && (espelho.mudou || fotos?.porVariacao.size) ? espelho : null;
     // Variações como ficam depois do espelho (a grade de estoque é calculada
     // em cima delas).
     const variacoesFinais = espelhar
