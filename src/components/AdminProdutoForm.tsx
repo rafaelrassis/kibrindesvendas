@@ -673,6 +673,8 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
     const partes = [
       data.zeradas.length > 0 && `Zeradas: ${data.zeradas.join(", ")}.`,
       data.reativadas.length > 0 && `Repostas: ${data.reativadas.join(", ")}.`,
+      data.criadas?.length > 0 && `Criadas: ${data.criadas.join(", ")}.`,
+      data.apagadas?.length > 0 && `Apagadas: ${data.apagadas.join(", ")}.`,
     ].filter(Boolean);
     setResultadoSync({
       ok: true,
@@ -1482,14 +1484,14 @@ export default function AdminProdutoForm({ produto }: { produto?: ProdutoAdmin }
           <div className="mt-3">
             <button
               type="button"
-              disabled={sincronizando || fornecedorUrl.trim() !== produto.fornecedorUrl}
+              disabled={sincronizando || fornecedorUrl.trim() !== produto.fornecedorUrl || fornecedorEspelhar !== produto.fornecedorEspelhar}
               onClick={sincronizarAgora}
               className="text-sm border border-line rounded px-3 py-1.5 disabled:opacity-50"
             >
               {sincronizando ? "Sincronizando…" : "Sincronizar agora"}
             </button>
-            {fornecedorUrl.trim() !== produto.fornecedorUrl && (
-              <span className="text-xs text-ink/50 ml-2">Salve o link novo antes.</span>
+            {(fornecedorUrl.trim() !== produto.fornecedorUrl || fornecedorEspelhar !== produto.fornecedorEspelhar) && (
+              <span className="text-xs text-ink/50 ml-2">Salve as alterações antes.</span>
             )}
             {resultadoSync && (
               <p className={`text-sm mt-2 ${resultadoSync.ok ? "text-pine-2" : "text-berry"}`}>

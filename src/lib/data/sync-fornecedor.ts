@@ -77,6 +77,9 @@ export type ResultadoProduto = {
   alterado: boolean;
   zeradas: string[];
   reativadas: string[];
+  // Valores de variação criados/apagados pelo espelhamento.
+  criadas?: string[];
+  apagadas?: string[];
 };
 
 // Json de "valor => dado" sem as chaves apagadas (Prisma pede JsonNull pra
@@ -189,6 +192,8 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
       alterado: espelhar !== null || r.grade !== undefined || r.estoque !== undefined || ativo !== undefined,
       zeradas: r.zeradas,
       reativadas: r.reativadas,
+      criadas: espelhar?.adicionados,
+      apagadas: espelhar?.removidos.map((x) => x.valor),
     };
   } catch (e) {
     const erro = e instanceof Error ? e.message : "Erro desconhecido.";
