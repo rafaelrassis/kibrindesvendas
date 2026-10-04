@@ -104,9 +104,8 @@ function Carrossel({ banners, tela }: { banners: Banner[]; tela: Tela }) {
                 backgroundImage: imagem ? `url(${imagem})` : undefined,
               }}
               onClick={() => setAtivo(i)}
-            >
-              {imagem && <div className="absolute inset-0 bg-black/25" />}
-            </Link>
+            />
+
           );
         })}
       </div>
