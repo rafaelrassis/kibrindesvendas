@@ -385,3 +385,54 @@ export function validarUrlFornecedor(url: string): string | null {
   }
   return u.toString();
 }
+
+// --- Importação de produtos novos -------------------------------------------
+
+// Links de produto (/produtos/<slug>/) do sitemap.xml de uma loja Nuvemshop.
+// A página de listagem (/produtos/) não conta.
+export function extrairUrlsProdutos(sitemapXml: string): string[] {
+  const urls = new Set<string>();
+  for (const m of sitemapXml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)) {
+    try {
+      const u = new URL(decodificarEntidades(m[1]));
+      if (u.protocol !== "https:") continue;
+      const partes = u.pathname.split("/").filter(Boolean);
+      if (partes.length === 2 && partes[0] === "produtos") {
+        urls.add(`${u.origin}/produtos/${partes[1]}/`);
+      }
+    } catch {
+      // loc inválido: ignora
+    }
+  }
+  return [...urls];
+}
+
+// Mesma página, com ou sem barra final, www ou não: vira a mesma chave.
+export function chaveUrlFornecedor(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
+}
+
+function textoLimpo(s: string) {
+  return decodificarEntidades(s.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+}
+
+// Nome e descrição curta da página de produto Nuvemshop.
+export function extrairDadosProduto(html: string): { nome: string; descricao: string } {
+  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  const titulo = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+  const desc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["']/i);
+  return {
+    nome: textoLimpo(h1?.[1] ?? titulo?.[1] ?? ""),
+    descricao: desc ? textoLimpo(desc[1]) : "",
+  };
+}
+
+// Preço daqui a partir do preço do fornecedor + margem em %.
+export function precoComMargem(precoFornecedor: number, margemPct: number): number {
+  return Math.round(precoFornecedor * (1 + margemPct / 100) * 100) / 100;
+}

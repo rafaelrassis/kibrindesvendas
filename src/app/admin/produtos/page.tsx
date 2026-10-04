@@ -110,6 +110,12 @@ export default function AdminProdutosPage() {
       >
         + Novo produto
       </Link>
+      <Link
+        href="/admin/produtos/importar"
+        className="inline-block border border-line px-5 py-2.5 rounded-full text-sm mb-6 ml-2 hover:bg-paper-2 transition"
+      >
+        Importar do fornecedor
+      </Link>
 
       <div className="bg-white border border-line rounded-lg overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">

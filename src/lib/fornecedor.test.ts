@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   calcularSync,
+  chaveUrlFornecedor,
   espelharVariacoes,
+  extrairDadosProduto,
+  extrairUrlsProdutos,
+  precoComMargem,
   extrairImagemPrincipal,
   extrairVariantesNuvemshop,
   normalizarOpcao,
@@ -280,5 +284,33 @@ describe("imagens do fornecedor", () => {
     expect(
       extrairImagemPrincipal('<meta property="og:image" content="//a.mitiendanube.com/p.jpg" />')
     ).toBe("https://a.mitiendanube.com/p.jpg");
+  });
+});
+
+describe("importação do fornecedor", () => {
+  it("pega só links de produto do sitemap", () => {
+    const xml = `<urlset><url><loc>https://setemalhas.com/</loc></url>
+      <url><loc>https://setemalhas.com/produtos/</loc></url>
+      <url><loc>https://setemalhas.com/produtos/short-tactel/</loc></url>
+      <url><loc>https://setemalhas.com/produtos/short-tactel/</loc></url>
+      <url><loc>https://setemalhas.com/produtos/categoria/x/</loc></url>
+      <url><loc>http://setemalhas.com/produtos/inseguro/</loc></url></urlset>`;
+    expect(extrairUrlsProdutos(xml)).toEqual(["https://setemalhas.com/produtos/short-tactel/"]);
+  });
+
+  it("compara links ignorando barra final e www", () => {
+    expect(chaveUrlFornecedor("https://www.setemalhas.com/produtos/a/")).toBe(
+      chaveUrlFornecedor("https://setemalhas.com/produtos/a")
+    );
+  });
+
+  it("lê nome e descrição", () => {
+    const html = '<meta property="og:description" content="Leve &amp; macio"><h1 class="x"> Short <b>Tactel</b> </h1>';
+    expect(extrairDadosProduto(html)).toEqual({ nome: "Short Tactel", descricao: "Leve & macio" });
+  });
+
+  it("aplica a margem", () => {
+    expect(precoComMargem(11.9, 100)).toBe(23.8);
+    expect(precoComMargem(11.9, 0)).toBe(11.9);
   });
 });

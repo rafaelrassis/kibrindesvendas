@@ -27,7 +27,7 @@ import { ErroDeNegocio } from "./erros";
 const TIMEOUT_FETCH_MS = 15_000;
 const PARALELO = 3;
 
-async function baixarPagina(url: string): Promise<string> {
+export async function baixarPagina(url: string): Promise<string> {
   let res: Response;
   try {
     res = await fetch(url, {
