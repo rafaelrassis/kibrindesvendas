@@ -594,6 +594,10 @@ model ConfiguracaoLoja {
   cupomCarrinhoAtivo Boolean @default(false)
   cupomCarrinhoPercentual Int @default(5)
   cupomCarrinhoValidadeDias Int @default(7)
+  // Teste A/B: variante B usa este desconto (null = sem teste). assuntoVencedor
+  // trava todo mundo numa variante ("A"/"B"; null = continua dividindo).
+  cupomCarrinhoPercentualB Int?
+  assuntoVencedor String?
   updatedAt        DateTime @updatedAt
 }
 

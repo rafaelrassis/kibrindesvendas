@@ -17,6 +17,7 @@ import {
   tipoTemFotoPorValor,
 } from "@/lib/estoque-variacao";
 import FavoritoButton from "@/components/FavoritoButton";
+import AvisarQuandoVoltar from "@/components/AvisarQuandoVoltar";
 import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 import Lightbox from "@/components/Lightbox";
 import ReactMarkdown from "react-markdown";
@@ -347,7 +348,10 @@ export default function ProdutoPageClient() {
               </div>
               <p className="text-sm text-ink/50 mt-2">no Pix ou em até 3x sem juros</p>
               {esgotado && (
-                <p className="text-sm text-berry font-medium mt-3">Produto esgotado no momento</p>
+                <div className="mt-3">
+                  <p className="text-sm text-berry font-medium">Produto esgotado no momento</p>
+                  <AvisarQuandoVoltar produto={produto} />
+                </div>
               )}
               {estoqueBaixo && (
                 <p className="text-sm text-mustard font-medium mt-3">

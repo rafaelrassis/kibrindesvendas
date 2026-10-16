@@ -53,6 +53,8 @@ export default function AdminConfiguracoesPage() {
   const [cupomAtivo, setCupomAtivo] = useState(false);
   const [cupomPct, setCupomPct] = useState("5");
   const [cupomDias, setCupomDias] = useState("7");
+  const [cupomPctB, setCupomPctB] = useState("");
+  const [vencedor, setVencedor] = useState<"" | "A" | "B">("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -79,6 +81,8 @@ export default function AdminConfiguracoesPage() {
     setCupomAtivo(c.cupomCarrinhoAtivo);
     setCupomPct(String(c.cupomCarrinhoPercentual));
     setCupomDias(String(c.cupomCarrinhoValidadeDias));
+    setCupomPctB(c.cupomCarrinhoPercentualB != null ? String(c.cupomCarrinhoPercentualB) : "");
+    setVencedor(c.assuntoVencedor ?? "");
   }
 
   function preencherSync(c: ConfiguracaoLoja) {
@@ -143,6 +147,8 @@ export default function AdminConfiguracoesPage() {
       cupomCarrinhoAtivo: boolean;
       cupomCarrinhoPercentual: number;
       cupomCarrinhoValidadeDias: number;
+      cupomCarrinhoPercentualB: number | null;
+      assuntoVencedor: "A" | "B" | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -166,6 +172,8 @@ export default function AdminConfiguracoesPage() {
       cupomCarrinhoAtivo: cupomAtivo,
       cupomCarrinhoPercentual: Math.round(Number(cupomPct)),
       cupomCarrinhoValidadeDias: Math.round(Number(cupomDias)),
+      cupomCarrinhoPercentualB: cupomPctB.trim() ? Math.round(Number(cupomPctB)) : null,
+      assuntoVencedor: vencedor || null,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -573,7 +581,36 @@ export default function AdminConfiguracoesPage() {
                   className="w-full border border-line rounded px-3 py-2 text-sm"
                 />
               </label>
+              <label className="text-sm">
+                <span className="block text-xs text-ink/60 mb-1">
+                  Desconto da variante B (%) — vazio = sem teste
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={cupomPctB}
+                  onChange={(e) => setCupomPctB(e.target.value)}
+                  className="w-full border border-line rounded px-3 py-2 text-sm"
+                />
+              </label>
             </div>
+          )}
+          {lembreteAtivo && (
+            <label className="text-sm block mb-3">
+              <span className="block text-xs text-ink/60 mb-1">
+                Teste A/B do assunto — variante vencedora
+              </span>
+              <select
+                value={vencedor}
+                onChange={(e) => setVencedor(e.target.value as "" | "A" | "B")}
+                className="w-full sm:w-64 border border-line rounded px-3 py-2 text-sm bg-white"
+              >
+                <option value="">Dividir 50/50 (testando)</option>
+                <option value="A">Todos recebem A</option>
+                <option value="B">Todos recebem B</option>
+              </select>
+            </label>
           )}
           <p className="text-xs text-ink/50">
             Cada cupom é gerado com código próprio e vale uma única vez.

@@ -73,6 +73,9 @@ type Etapa = {
 // novo pode avisar de novo. Cada envio fica em LembreteCarrinho (painel).
 async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
   percentual: number;
+  // Desconto da variante B (null = mesma % nas duas) e variante travada pelo admin.
+  percentualB: number | null;
+  vencedor: "A" | "B" | null;
   validadeDias: number;
 }) {
   const resultado = { lembrete1: { enviados: 0 } as Etapa, lembrete2: { enviados: 0 } as Etapa };
@@ -98,7 +101,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     await prisma.usuario.update({ where: { id: usuario.id }, data: { carrinhoLembreteEm: agora } });
     if (itens.length === 0) continue;
 
-    const variante = varianteDoAssunto(usuario.id);
+    const variante = cupomCfg.vencedor ?? varianteDoAssunto(usuario.id);
     await enviarEmailCarrinhoEsquecido(
       usuario.email,
       usuario.nome,
@@ -147,20 +150,17 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     await prisma.usuario.update({ where: { id: usuario.id }, data: { carrinhoLembrete2Em: agora } });
     if (itens.length === 0) continue;
 
-    const cupom = await criarCupomDeCarrinho(
-      usuario.id,
-      cupomCfg.percentual,
-      cupomCfg.validadeDias,
-      agora
-    );
-    const variante = varianteDoAssunto(usuario.id);
+    const variante = cupomCfg.vencedor ?? varianteDoAssunto(usuario.id);
+    const percentual =
+      variante === "B" && cupomCfg.percentualB ? cupomCfg.percentualB : cupomCfg.percentual;
+    const cupom = await criarCupomDeCarrinho(usuario.id, percentual, cupomCfg.validadeDias, agora);
     await enviarEmailCarrinhoEsquecido(
       usuario.email,
       usuario.nome,
       itens,
       `${baseUrl()}/carrinho`,
-      assuntoDoLembrete(2, variante, cupomCfg.percentual),
-      { codigo: cupom.codigo, percentual: cupomCfg.percentual, validoAte: cupom.validoAte }
+      assuntoDoLembrete(2, variante, percentual),
+      { codigo: cupom.codigo, percentual, validoAte: cupom.validoAte }
     );
     await prisma.lembreteCarrinho.create({
       data: {
@@ -238,6 +238,8 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
 
   const clientes = await lembretesDeClientes(agora, config.cupomCarrinhoAtivo, {
     percentual: config.cupomCarrinhoPercentual,
+    percentualB: config.cupomCarrinhoPercentualB,
+    vencedor: config.assuntoVencedor,
     validadeDias: config.cupomCarrinhoValidadeDias,
   });
   const visitantes = await lembretesDeVisitantes(agora);

@@ -59,6 +59,8 @@ export type ConfiguracaoLoja = {
   cupomCarrinhoAtivo: boolean;
   cupomCarrinhoPercentual: number;
   cupomCarrinhoValidadeDias: number;
+  cupomCarrinhoPercentualB: number | null;
+  assuntoVencedor: "A" | "B" | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -90,6 +92,9 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     cupomCarrinhoAtivo: config?.cupomCarrinhoAtivo ?? false,
     cupomCarrinhoPercentual: config?.cupomCarrinhoPercentual ?? 5,
     cupomCarrinhoValidadeDias: config?.cupomCarrinhoValidadeDias ?? 7,
+    cupomCarrinhoPercentualB: config?.cupomCarrinhoPercentualB ?? null,
+    assuntoVencedor:
+      config?.assuntoVencedor === "A" || config?.assuntoVencedor === "B" ? config.assuntoVencedor : null,
   };
 }
 
@@ -140,6 +145,9 @@ export async function atualizarConfiguracaoLoja(dados: {
   cupomCarrinhoAtivo?: boolean;
   cupomCarrinhoPercentual?: number;
   cupomCarrinhoValidadeDias?: number;
+  // null desliga o teste / destrava a variante.
+  cupomCarrinhoPercentualB?: number | null;
+  assuntoVencedor?: "A" | "B" | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -160,6 +168,8 @@ export async function atualizarConfiguracaoLoja(dados: {
     cupomCarrinhoAtivo?: boolean;
     cupomCarrinhoPercentual?: number;
     cupomCarrinhoValidadeDias?: number;
+    cupomCarrinhoPercentualB?: number | null;
+    assuntoVencedor?: string | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -261,6 +271,18 @@ export async function atualizarConfiguracaoLoja(dados: {
     }
     data.cupomCarrinhoValidadeDias = n;
   }
+  if (dados.cupomCarrinhoPercentualB !== undefined) {
+    const n = dados.cupomCarrinhoPercentualB;
+    if (n !== null && (!Number.isInteger(n) || n < 1 || n > 50)) {
+      throw new ErroDeNegocio("O desconto B do cupom precisa ser um inteiro de 1 a 50%.");
+    }
+    data.cupomCarrinhoPercentualB = n;
+  }
+  if (dados.assuntoVencedor !== undefined) {
+    const v = dados.assuntoVencedor;
+    if (v !== null && v !== "A" && v !== "B") throw new ErroDeNegocio("Variante inválida.");
+    data.assuntoVencedor = v;
+  }
 
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
@@ -284,6 +306,8 @@ export async function atualizarConfiguracaoLoja(dados: {
       cupomCarrinhoAtivo: data.cupomCarrinhoAtivo,
       cupomCarrinhoPercentual: data.cupomCarrinhoPercentual,
       cupomCarrinhoValidadeDias: data.cupomCarrinhoValidadeDias,
+      cupomCarrinhoPercentualB: data.cupomCarrinhoPercentualB,
+      assuntoVencedor: data.assuntoVencedor,
     },
     update: data,
   });
