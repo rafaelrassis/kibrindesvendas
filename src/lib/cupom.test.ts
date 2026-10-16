@@ -241,3 +241,23 @@ describe("checarDisponibilidade — combinação de travas", () => {
     ).toEqual({ mensagem: "Este cupom já atingiu o limite de usos.", status: 400 });
   });
 });
+
+describe("cupom pessoal (usuarioId)", () => {
+  it("vale pra conta dona do cupom", () => {
+    expect(checarDisponibilidade(cupom({ usuarioId: "u1" }), 100, { usuarioId: "u1" })).toBeNull();
+  });
+
+  it("recusa outra conta", () => {
+    expect(checarDisponibilidade(cupom({ usuarioId: "u1" }), 100, { usuarioId: "u2" })).toMatchObject({
+      mensagem: expect.stringMatching(/esta conta/i),
+    });
+  });
+
+  it("recusa quando não se sabe quem compra", () => {
+    expect(checarDisponibilidade(cupom({ usuarioId: "u1" }), 100)).not.toBeNull();
+  });
+
+  it("cupom sem dono vale pra qualquer conta", () => {
+    expect(checarDisponibilidade(cupom(), 100, { usuarioId: "u9" })).toBeNull();
+  });
+});

@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { baseUrl } from "@/lib/mercadopago";
 import { enviarEmailCarrinhoEsquecido, enviarEmailCarrinhoVisitante } from "@/lib/email";
+import { assuntoDoLembrete, varianteDoAssunto } from "@/lib/assuntos-carrinho";
 import { getConfiguracaoLoja } from "./configuracao";
 import { valorDasLinhas } from "./carrinho-valor";
 
@@ -31,7 +32,12 @@ function codigoAleatorio() {
   return c;
 }
 
-async function criarCupomDeCarrinho(percentual: number, validadeDias: number, agora: Date) {
+async function criarCupomDeCarrinho(
+  usuarioId: string,
+  percentual: number,
+  validadeDias: number,
+  agora: Date
+) {
   const validoAte = new Date(agora.getTime() + validadeDias * DIA);
   for (let tentativa = 0; tentativa < 5; tentativa++) {
     const codigo = codigoAleatorio();
@@ -43,6 +49,8 @@ async function criarCupomDeCarrinho(percentual: number, validadeDias: number, ag
           valor: percentual,
           usoMaximo: 1,
           validoAte,
+          // Pessoal: o código não funciona em outra conta, mesmo repassado.
+          usuarioId,
         },
       });
       return { codigo, validoAte };
@@ -90,11 +98,19 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     await prisma.usuario.update({ where: { id: usuario.id }, data: { carrinhoLembreteEm: agora } });
     if (itens.length === 0) continue;
 
-    await enviarEmailCarrinhoEsquecido(usuario.email, usuario.nome, itens, `${baseUrl()}/carrinho`);
+    const variante = varianteDoAssunto(usuario.id);
+    await enviarEmailCarrinhoEsquecido(
+      usuario.email,
+      usuario.nome,
+      itens,
+      `${baseUrl()}/carrinho`,
+      assuntoDoLembrete(1, variante)
+    );
     await prisma.lembreteCarrinho.create({
       data: {
         usuarioId: usuario.id,
         tipo: 1,
+        variante,
         enviadoEm: agora,
         valorCarrinho: await valorDasLinhas(
           usuario.carrinho.map((l) => ({
@@ -131,16 +147,26 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     await prisma.usuario.update({ where: { id: usuario.id }, data: { carrinhoLembrete2Em: agora } });
     if (itens.length === 0) continue;
 
-    const cupom = await criarCupomDeCarrinho(cupomCfg.percentual, cupomCfg.validadeDias, agora);
-    await enviarEmailCarrinhoEsquecido(usuario.email, usuario.nome, itens, `${baseUrl()}/carrinho`, {
-      codigo: cupom.codigo,
-      percentual: cupomCfg.percentual,
-      validoAte: cupom.validoAte,
-    });
+    const cupom = await criarCupomDeCarrinho(
+      usuario.id,
+      cupomCfg.percentual,
+      cupomCfg.validadeDias,
+      agora
+    );
+    const variante = varianteDoAssunto(usuario.id);
+    await enviarEmailCarrinhoEsquecido(
+      usuario.email,
+      usuario.nome,
+      itens,
+      `${baseUrl()}/carrinho`,
+      assuntoDoLembrete(2, variante, cupomCfg.percentual),
+      { codigo: cupom.codigo, percentual: cupomCfg.percentual, validoAte: cupom.validoAte }
+    );
     await prisma.lembreteCarrinho.create({
       data: {
         usuarioId: usuario.id,
         tipo: 2,
+        variante,
         enviadoEm: agora,
         cupomCodigo: cupom.codigo,
         valorCarrinho: await valorDasLinhas(

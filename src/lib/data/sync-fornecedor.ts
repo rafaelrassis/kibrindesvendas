@@ -11,6 +11,7 @@ import {
   ultimoHorarioAgendado,
   validarUrlFornecedor,
 } from "@/lib/fornecedor";
+import { avisarSeVoltouAoEstoque, estaIndisponivel } from "./favoritos-estoque";
 import { tipoTemFotoPorValor } from "@/lib/estoque-variacao";
 import { formatoDeImagem, salvarImagem } from "@/lib/imagens";
 import { ErroDeNegocio } from "./erros";
@@ -224,6 +225,7 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
       pausou = false;
     }
 
+    const estavaIndisponivel = estaIndisponivel(produto);
     await prisma.$transaction(async (tx) => {
       if (espelhar) {
         for (const nova of espelhar.variacoes) {
@@ -284,6 +286,8 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
         },
       });
     });
+
+    await avisarSeVoltouAoEstoque(produtoId, estavaIndisponivel);
 
     return {
       ...base,

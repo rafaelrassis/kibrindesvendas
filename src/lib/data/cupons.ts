@@ -105,9 +105,10 @@ export async function validarCupom(
       valorMinimoPedido: Number(cupom.valorMinimoPedido),
       produtoId: cupom.produtoId,
       primeiraCompra: cupom.primeiraCompra,
+      usuarioId: cupom.usuarioId,
     },
     valorBase,
-    { produtoId: produtoIdContexto, jaComprou }
+    { produtoId: produtoIdContexto, jaComprou, usuarioId: contexto.usuarioId }
   );
   if (indisponivel) throw new ErroDeNegocio(indisponivel.mensagem, indisponivel.status);
 
@@ -145,7 +146,8 @@ export async function registrarUsoCupom(
   cupomId: string,
   tx: Prisma.TransactionClient,
   valorPedido?: number,
-  produtoId?: string | null
+  produtoId?: string | null,
+  usuarioId?: string
 ) {
   // Prisma não compara duas colunas em `updateMany` (`usos < "usoMaximo"`),
   // então a condição vai em SQL cru mesmo. Prisma.sql com "TRUE" no lugar de
@@ -160,6 +162,12 @@ export async function registrarUsoCupom(
       ? Prisma.sql`TRUE`
       : Prisma.sql`("produtoId" IS NULL OR "produtoId" = ${produtoId})`;
 
+  // Cupom pessoal: reconferido no próprio UPDATE, igual ao produto.
+  const condicaoUsuario =
+    usuarioId === undefined
+      ? Prisma.sql`TRUE`
+      : Prisma.sql`("usuarioId" IS NULL OR "usuarioId" = ${usuarioId})`;
+
   const linhas = await tx.$executeRaw`
     UPDATE "Cupom"
     SET usos = usos + 1, "updatedAt" = NOW()
@@ -169,9 +177,10 @@ export async function registrarUsoCupom(
       AND ("validoAte" IS NULL OR "validoAte" >= NOW())
       AND ${condicaoValorMinimo}
       AND ${condicaoProduto}
+      AND ${condicaoUsuario}
   `;
   if (linhas === 0) {
-    throw new ErroDeNegocio(await motivoFalhaRegistro(tx, cupomId, valorPedido, produtoId), 409);
+    throw new ErroDeNegocio(await motivoFalhaRegistro(tx, cupomId, valorPedido, produtoId, usuarioId), 409);
   }
 }
 
@@ -183,7 +192,8 @@ async function motivoFalhaRegistro(
   tx: Prisma.TransactionClient,
   cupomId: string,
   valorPedido?: number,
-  produtoId?: string | null
+  produtoId?: string | null,
+  usuarioId?: string
 ): Promise<string> {
   const cupom = await tx.cupom.findUnique({ where: { id: cupomId } });
   if (!cupom || !cupom.ativo) return "Cupom inválido ou inativo.";
@@ -196,6 +206,9 @@ async function motivoFalhaRegistro(
   }
   if (produtoId !== undefined && cupom.produtoId && cupom.produtoId !== produtoId) {
     return "Este cupom não vale para este produto.";
+  }
+  if (usuarioId !== undefined && cupom.usuarioId && cupom.usuarioId !== usuarioId) {
+    return "Este cupom não vale para esta conta.";
   }
   return "Este cupom não está mais disponível para este pedido.";
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { atribuirRecuperacao } from "@/lib/recuperacao-carrinho";
+import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { valorDasLinhas } from "./carrinho-valor";
 
 const HORA = 60 * 60 * 1000;
@@ -15,6 +16,9 @@ export type CarrinhoEsquecido = {
   valor: number;
   paradoHaHoras: number;
   lembretes: number;
+  // Link wa.me com a mensagem pronta — só quando o cliente aceita WhatsApp e tem
+  // telefone válido.
+  whatsapp: string | null;
 };
 
 export type PainelCarrinhos = {
@@ -27,6 +31,14 @@ export type PainelCarrinhos = {
     taxa: number | null; // 0–100
     receita: number;
     porTipo: { tipo: 1 | 2; enviados: number; recuperados: number; receita: number }[];
+    // Teste A/B do assunto: por tipo e variante.
+    porVariante: {
+      tipo: 1 | 2;
+      variante: "A" | "B";
+      enviados: number;
+      recuperados: number;
+      receita: number;
+    }[];
     cuponsEmitidos: number;
     cuponsUsados: number;
   };
@@ -42,7 +54,11 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
 
   // --- Carrinhos de clientes parados no banco agora ---
   const linhas = await prisma.carrinhoItem.findMany({
-    include: { usuario: { select: { id: true, nome: true, email: true } } },
+    include: {
+      usuario: {
+        select: { id: true, nome: true, email: true, telefone: true, prefWhatsapp: true },
+      },
+    },
   });
   const porUsuario = new Map<string, typeof linhas>();
   for (const l of linhas) porUsuario.set(l.usuarioId, [...(porUsuario.get(l.usuarioId) ?? []), l]);
@@ -85,6 +101,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
         valor: await valorDasLinhas(paraLinhaValor(c.ls)),
         paradoHaHoras: Math.floor((agora.getTime() - c.ultimaMudanca) / HORA),
         lembretes: contagemLembretes.find((g) => g.usuarioId === usuario.id)?._count._all ?? 0,
+        whatsapp: usuario.prefWhatsapp ? linkWhatsappCliente(usuario.telefone, usuario.nome) : null,
       };
     })
   );
@@ -120,6 +137,19 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       receita: rec.reduce((soma, e) => soma + (recuperadoPor.get(e.id) ?? 0), 0),
     };
   });
+  const porVariante = ([1, 2] as const).flatMap((tipo) =>
+    (['A', 'B'] as const).map((variante) => {
+      const grupo = enviados.filter((e) => e.tipo === tipo && e.variante === variante);
+      const rec = grupo.filter((e) => recuperadoPor.has(e.id));
+      return {
+        tipo,
+        variante,
+        enviados: grupo.length,
+        recuperados: rec.length,
+        receita: rec.reduce((soma, e) => soma + (recuperadoPor.get(e.id) ?? 0), 0),
+      };
+    })
+  );
   const recuperados = porTipo.reduce((s, t) => s + t.recuperados, 0);
 
   const codigos = enviados.flatMap((e) => (e.cupomCodigo ? [e.cupomCodigo] : []));
@@ -145,6 +175,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       taxa: enviados.length > 0 ? (recuperados / enviados.length) * 100 : null,
       receita: porTipo.reduce((s, t) => s + t.receita, 0),
       porTipo,
+      porVariante,
       cuponsEmitidos: codigos.length,
       cuponsUsados: cupons.filter((c) => c.usos > 0).length,
     },

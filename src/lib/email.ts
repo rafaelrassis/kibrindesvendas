@@ -244,14 +244,13 @@ export async function enviarEmailCarrinhoEsquecido(
   nome: string,
   itens: { nome: string; quantidade: number }[],
   link: string,
+  assunto: string,
   cupom?: { codigo: string; percentual: number; validoAte: Date }
 ) {
   const validade = cupom?.validoAte.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   await enviar(
     destinatario,
-    cupom
-      ? `${cupom.percentual}% de desconto no seu carrinho — LeoKibrindes`
-      : "Você esqueceu itens no carrinho — LeoKibrindes",
+    assunto,
     layout(
       cupom ? `${cupom.percentual}% de desconto só pra você` : "Seus itens ainda estão te esperando",
       `<p>Olá, ${escaparHtml(nome)}!</p>
@@ -290,6 +289,25 @@ export async function enviarEmailCarrinhoVisitante(
        <p style="font-size: 12px; color: #888; text-align: center;">
          Não quer mais receber isso? <a href="${linkCancelar}" style="color: #888;">Apagar meu carrinho e e-mail</a>
        </p>`
+    )
+  );
+}
+
+// Aviso pra quem favoritou um produto que estava esgotado e voltou ao estoque.
+export async function enviarEmailVoltouAoEstoque(
+  destinatario: string,
+  nome: string,
+  produto: string,
+  link: string
+) {
+  await enviar(
+    destinatario,
+    `${produto} voltou ao estoque — LeoKibrindes`,
+    layout(
+      "Voltou ao estoque!",
+      `<p>Olá, ${escaparHtml(nome)}!</p>
+       <p><strong>${escaparHtml(produto)}</strong>, que está nos seus favoritos, voltou a ficar disponível. As unidades costumam acabar rápido.</p>
+       ${botaoEmail("Ver produto", link)}`
     )
   );
 }

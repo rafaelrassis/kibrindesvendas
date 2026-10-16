@@ -478,6 +478,10 @@ model Cupom {
   // usuário (pg_advisory_xact_lock), pra duas compras simultâneas do mesmo
   // cliente novo não passarem as duas pela checagem.
   primeiraCompra    Boolean    @default(false)
+  // Cupom pessoal: só esta conta pode usar (ex.: cupom do lembrete de carrinho,
+  // que não deve circular). null = qualquer conta. Sem FK de propósito: apagar a
+  // conta não pode transformar o cupom em cupom de todo mundo.
+  usuarioId         String?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -605,6 +609,8 @@ model LembreteCarrinho {
   enviadoEm     DateTime @default(now())
   valorCarrinho Decimal  @db.Decimal(10, 2)
   cupomCodigo   String?
+  // Variante do assunto do e-mail (teste A/B): "A" ou "B".
+  variante      String?
 
   @@index([enviadoEm])
   @@index([usuarioId])

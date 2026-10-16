@@ -64,6 +64,8 @@ export type EstadoCupom = {
   produtoId: string | null;
   // true = só vale se o cliente nunca teve um pedido antes.
   primeiraCompra: boolean;
+  // Cupom pessoal: só esta conta usa. null/ausente = qualquer conta.
+  usuarioId?: string | null;
 };
 
 // O que muda pedido a pedido (e cliente a cliente), diferente de `EstadoCupom`
@@ -73,6 +75,8 @@ export type EstadoCupom = {
 export type ContextoPedidoCupom = {
   produtoId?: string | null;
   jaComprou?: boolean;
+  // Quem está comprando — comparado com `usuarioId` de cupom pessoal.
+  usuarioId?: string | null;
 };
 
 export type Indisponibilidade = { mensagem: string; status: number };
@@ -103,6 +107,9 @@ export function checarDisponibilidade(
   }
   if (cupom.produtoId && cupom.produtoId !== contexto.produtoId) {
     return { mensagem: "Este cupom não vale para este produto.", status: 400 };
+  }
+  if (cupom.usuarioId && cupom.usuarioId !== contexto.usuarioId) {
+    return { mensagem: "Este cupom não vale para esta conta.", status: 400 };
   }
   if (cupom.primeiraCompra && contexto.jaComprou) {
     return { mensagem: "Este cupom vale só na primeira compra.", status: 400 };

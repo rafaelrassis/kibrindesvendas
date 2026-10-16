@@ -101,6 +101,18 @@ export default async function AdminCarrinhosPage({
                 <td className="px-4 py-2 text-right font-mono">{reais(t.receita)}</td>
               </tr>
             ))}
+            {p.lembretes.porVariante
+              .filter((v) => v.enviados > 0)
+              .map((v) => (
+                <tr key={`${v.tipo}${v.variante}`} className="border-t border-line text-ink/70">
+                  <td className="px-4 py-2 pl-8 text-xs">
+                    {v.tipo === 1 ? "24h" : "72h"} · assunto {v.variante}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono">{v.enviados}</td>
+                  <td className="px-4 py-2 text-right font-mono">{v.recuperados}</td>
+                  <td className="px-4 py-2 text-right font-mono">{reais(v.receita)}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
         <p className="text-xs text-ink/50 px-4 py-2 border-t border-line">
@@ -129,6 +141,7 @@ export default async function AdminCarrinhosPage({
                 <th className="px-4 py-2 font-normal text-right">Valor</th>
                 <th className="px-4 py-2 font-normal text-right">Parado</th>
                 <th className="px-4 py-2 font-normal text-right">Lembretes</th>
+                <th className="px-4 py-2 font-normal text-right">WhatsApp</th>
               </tr>
             </thead>
             <tbody>
@@ -142,6 +155,20 @@ export default async function AdminCarrinhosPage({
                   <td className="px-4 py-2 text-right font-mono">{reais(c.valor)}</td>
                   <td className="px-4 py-2 text-right font-mono">{horas(c.paradoHaHoras)}</td>
                   <td className="px-4 py-2 text-right font-mono">{c.lembretes}</td>
+                  <td className="px-4 py-2 text-right">
+                    {c.whatsapp ? (
+                      <a
+                        href={c.whatsapp}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline text-xs"
+                      >
+                        Chamar
+                      </a>
+                    ) : (
+                      <span className="text-ink/30">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

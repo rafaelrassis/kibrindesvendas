@@ -16,6 +16,7 @@ import type {
   Prisma,
 } from "@prisma/client";
 import { ErroDeNegocio } from "./erros";
+import { avisarSeVoltouAoEstoque, estaIndisponivel } from "./favoritos-estoque";
 
 type ProdutoComRelacoes = ProdutoDb & {
   categoria: CategoriaDb;
@@ -573,9 +574,13 @@ export async function atualizarProduto(
   id: string,
   dados: Partial<DadosProduto>
 ): Promise<Produto> {
-  const atual = await prisma.produto.findUnique({ where: { id } });
+  const atual = await prisma.produto.findUnique({
+    where: { id },
+    include: { estoqueVariacoes: true },
+  });
   if (!atual) throw new ErroDeNegocio("Produto não encontrado.", 404);
   validar(dados);
+  const estavaIndisponivel = estaIndisponivel(atual);
 
   const categoriaId = dados.categoriaSlug
     ? await categoriaIdPorSlug(dados.categoriaSlug)
@@ -673,6 +678,8 @@ export async function atualizarProduto(
       include: relacoesProduto,
     });
   });
+  // Quem favoritou um produto que estava indisponível e voltou é avisado.
+  await avisarSeVoltouAoEstoque(id, estavaIndisponivel);
   return toProduto(produto);
 }
 
