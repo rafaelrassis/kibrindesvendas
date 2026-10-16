@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import { cpfValidoAleatorio } from "./helpers";
 
 // Fluxo completo de compra, de ponta a ponta, contra o Postgres seedado
 // (mesmo produto do mock-data: "Camiseta Básica Algodão", sem
@@ -7,32 +8,6 @@ import { PrismaClient } from "@prisma/client";
 // pagamento é simulado — o pedido nasce PAGO na hora, sem depender do
 // Mercado Pago nem do webhook.
 const PRODUTO_ID = "camiseta-basica-01";
-
-// Dígito verificador do CPF (mesmo algoritmo de src/lib/cpf.ts), pra gerar um
-// número válido por execução sem colidir com o de uma execução anterior — o
-// campo é único por conta.
-function digitoVerificador(base: string): number {
-  let soma = 0;
-  let peso = base.length + 1;
-  for (const c of base) {
-    soma += Number(c) * peso;
-    peso--;
-  }
-  const resto = soma % 11;
-  return resto < 2 ? 0 : 11 - resto;
-}
-
-function cpfValidoAleatorio(): string {
-  // 111111111 (e outras sequências repetidas) é rejeitado de propósito pela
-  // validação — soma um índice crescente aos 9 primeiros dígitos evita cair
-  // numa sequência dessas.
-  const base = Array.from({ length: 9 }, (_, i) => (i + Math.floor(Math.random() * 8) + 1) % 10).join(
-    ""
-  );
-  const d1 = digitoVerificador(base);
-  const d2 = digitoVerificador(base + d1);
-  return `${base}${d1}${d2}`;
-}
 
 const prisma = new PrismaClient();
 
@@ -55,6 +30,7 @@ test.describe("compra de ponta a ponta", () => {
     await page.goto("/cadastro");
     await page.getByLabel("Nome").fill("Cliente E2E");
     await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Telefone / WhatsApp").fill("(11) 91234-5678");
     await page.getByLabel("CPF").fill(cpf);
     await page.getByLabel("Senha").fill("senha123456");
     await page.getByRole("button", { name: "Criar conta" }).click();
