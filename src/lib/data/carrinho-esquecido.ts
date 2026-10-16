@@ -1,5 +1,5 @@
 import "server-only";
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { baseUrl } from "@/lib/mercadopago";
 import {
@@ -165,16 +165,19 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     const percentual =
       varianteCupom === "B" && cupomCfg.percentualB ? cupomCfg.percentualB : cupomCfg.percentual;
     const cupom = await criarCupomDeCarrinho(usuario.id, percentual, cupomCfg.validadeDias, agora);
+    const lembreteId = randomUUID();
     await enviarEmailCarrinhoEsquecido(
       usuario.email,
       usuario.nome,
       itens,
       `${baseUrl()}/carrinho`,
       assuntoDoLembrete(2, variante, percentual),
-      { codigo: cupom.codigo, percentual, validoAte: cupom.validoAte }
+      { codigo: cupom.codigo, percentual, validoAte: cupom.validoAte },
+      `${baseUrl()}/carrinho/motivo?l=${lembreteId}`
     );
     await prisma.lembreteCarrinho.create({
       data: {
+        id: lembreteId,
         usuarioId: usuario.id,
         tipo: 2,
         variante,
@@ -269,6 +272,9 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
   }
   const visitantes = await lembretesDeVisitantes(agora);
   await avisarResultadoAB(config.syncFornecedorEmailAlerta, agora);
+  await prisma.eventoFunil.deleteMany({
+    where: { criadoEm: { lt: new Date(agora.getTime() - 120 * DIA) } },
+  });
 
   return { ativo: true as const, ...clientes, visitantes };
 }

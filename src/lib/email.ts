@@ -245,7 +245,8 @@ export async function enviarEmailCarrinhoEsquecido(
   itens: { nome: string; quantidade: number }[],
   link: string,
   assunto: string,
-  cupom?: { codigo: string; percentual: number; validoAte: Date }
+  cupom?: { codigo: string; percentual: number; validoAte: Date },
+  linkMotivo?: string
 ) {
   const validade = cupom?.validoAte.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   await enviar(
@@ -264,7 +265,12 @@ export async function enviarEmailCarrinhoEsquecido(
               </div>`
            : ""
        }
-       ${botaoEmail("Voltar ao carrinho", link)}`
+       ${botaoEmail("Voltar ao carrinho", link)}
+       ${
+         linkMotivo
+           ? `<p style="font-size: 12px; color: #666;">Não finalizou? <a href="${linkMotivo}">Conta pra gente o que te impediu</a> (1 toque).</p>`
+           : ""
+       }`
     )
   );
 }

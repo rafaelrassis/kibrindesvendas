@@ -1,4 +1,5 @@
 import CheckoutResumo from "@/components/CheckoutResumo";
+import RegistrarEvento from "@/components/RegistrarEvento";
 import { pagamentoRealConfigurado } from "@/lib/mercadopago";
 import { getConfiguracaoLoja } from "@/lib/data/configuracao";
 
@@ -16,10 +17,13 @@ export default async function CheckoutPage({
     erro === "pagamento" ? "Pagamento não concluído. Você pode tentar de novo." : "";
 
   return (
-    <CheckoutResumo
-      pagamentoReal={pagamentoRealConfigurado()}
-      erroInicial={erroInicial}
-      freteGratisAcimaDe={freteGratisAcimaDe}
-    />
+    <>
+      <RegistrarEvento tipo="checkout_iniciado" />
+      <CheckoutResumo
+        pagamentoReal={pagamentoRealConfigurado()}
+        erroInicial={erroInicial}
+        freteGratisAcimaDe={freteGratisAcimaDe}
+      />
+    </>
   );
 }

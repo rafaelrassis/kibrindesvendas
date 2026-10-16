@@ -17,6 +17,7 @@ import {
   tipoTemFotoPorValor,
 } from "@/lib/estoque-variacao";
 import FavoritoButton from "@/components/FavoritoButton";
+import { registrarEvento } from "@/lib/funil-client";
 import AvisarQuandoVoltar from "@/components/AvisarQuandoVoltar";
 import AvaliacoesProduto from "@/components/AvaliacoesProduto";
 import Lightbox from "@/components/Lightbox";
@@ -79,6 +80,10 @@ export default function ProdutoPageClient() {
 
   // A barra fixa no topo some enquanto o bloco de preço original está visível
   // e aparece assim que ele sai da tela rolando pra cima — como no Magalu.
+  useEffect(() => {
+    if (produto?.id) registrarEvento("produto_visto");
+  }, [produto?.id]);
+
   const precoRef = useRef<HTMLDivElement>(null);
   const [mostrarBarraFixa, setMostrarBarraFixa] = useState(false);
   useEffect(() => {

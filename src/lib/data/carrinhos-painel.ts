@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { atribuirRecuperacao } from "@/lib/recuperacao-carrinho";
 import { leituraAB, type LeituraAB } from "@/lib/assuntos-carrinho";
+import { MOTIVOS_ABANDONO } from "@/lib/motivo-abandono";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { valorDasLinhas } from "./carrinho-valor";
 import { getConfiguracaoLoja } from "./configuracao";
@@ -9,6 +10,7 @@ import { getConfiguracaoLoja } from "./configuracao";
 const HORA = 60 * 60 * 1000;
 const DIA = 24 * HORA;
 const LIMITE_LISTA = 30;
+const ESTOQUE_BAIXO = 5;
 
 export type CarrinhoEsquecido = {
   usuarioId: string;
@@ -30,7 +32,9 @@ export type PainelCarrinhos = {
   ativos: { carrinhos: number; valor: number };
   esquecidos: { carrinhos: number; valor: number; lista: CarrinhoEsquecido[] };
   // Produtos que mais aparecem nos carrinhos parados (nº de carrinhos).
-  produtosParados: { produtoId: string; nome: string; carrinhos: number }[];
+  produtosParados: { produtoId: string; nome: string; carrinhos: number; estoqueBaixo: boolean }[];
+  // Funil anônimo no período: sessões distintas por passo + pedidos.
+  funil: { visitas: number; carrinho: number; checkout: number; pedidos: number };
   lembretes: {
     enviados: number;
     recuperados: number;
@@ -46,6 +50,8 @@ export type PainelCarrinhos = {
       receita: number;
     }[];
     // Teste do desconto (só tipo 2), sorteado separado do assunto.
+    // Respostas "o que te impediu de finalizar?" (e-mail de 72h).
+    motivos: { motivo: string; rotulo: string; total: number }[];
     porVarianteCupom: { variante: "A" | "B"; enviados: number; recuperados: number; receita: number }[];
     // Leitura estatística de cada teste: "já dá pra decidir?"
     leituras: { assunto24h: LeituraAB; assunto72h: LeituraAB; desconto: LeituraAB };
@@ -131,12 +137,17 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
   const nomesTop = topIds.length
     ? await prisma.produto.findMany({
         where: { id: { in: topIds.map(([id]) => id) } },
-        select: { id: true, nome: true },
+        select: { id: true, nome: true, estoque: true, estoqueVariacoes: { select: { estoque: true } } },
       })
     : [];
   const produtosParados = topIds.flatMap(([id, carrinhos]) => {
-    const nome = nomesTop.find((p) => p.id === id)?.nome;
-    return nome ? [{ produtoId: id, nome, carrinhos }] : [];
+    const p = nomesTop.find((x) => x.id === id);
+    if (!p) return [];
+    // Sem controle de estoque (null) nunca é "baixo".
+    const total = p.estoqueVariacoes.length > 0
+      ? p.estoqueVariacoes.reduce((s, e) => s + e.estoque, 0)
+      : p.estoque;
+    return [{ produtoId: id, nome: p.nome, carrinhos, estoqueBaixo: total !== null && total <= ESTOQUE_BAIXO }];
   });
   const contagemLembretes = await prisma.lembreteCarrinho.groupBy({
     by: ["usuarioId"],
@@ -242,6 +253,11 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     assunto72h: dupla(2),
     desconto: leituraAB(porVarianteCupom[0], porVarianteCupom[1]),
   };
+  const motivos = MOTIVOS_ABANDONO.map((m) => ({
+    motivo: m.valor as string,
+    rotulo: m.rotulo as string,
+    total: enviados.filter((e) => e.motivo === m.valor).length,
+  })).filter((m) => m.total > 0);
   const recuperados = porTipo.reduce((s, t) => s + t.recuperados, 0);
 
   const codigos = enviados.flatMap((e) => (e.cupomCodigo ? [e.cupomCodigo] : []));
@@ -304,8 +320,24 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     }))
   );
 
+  const sessoes = await prisma.$queryRaw<{ tipo: string; total: bigint }[]>`
+    SELECT "tipo", COUNT(DISTINCT "sessao") AS total
+    FROM "EventoFunil"
+    WHERE "criadoEm" >= ${desde}
+    GROUP BY "tipo"`;
+  const sessoesDe = (tipo: string) => Number(sessoes.find((s) => s.tipo === tipo)?.total ?? 0);
+  const pedidosPeriodo = await prisma.pedido.count({
+    where: { createdAt: { gte: desde }, status: { not: "CANCELADO" } },
+  });
+
   return {
     dias,
+    funil: {
+      visitas: sessoesDe("produto_visto"),
+      carrinho: sessoesDe("carrinho_add"),
+      checkout: sessoesDe("checkout_iniciado"),
+      pedidos: pedidosPeriodo,
+    },
     whatsapp: {
       contatos: contatos.length,
       clientes: contatosClientes.length,
@@ -323,6 +355,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       porTipo,
       porVariante,
       porVarianteCupom,
+      motivos,
       leituras,
       cuponsEmitidos: codigos.length,
       cuponsUsados: cupons.filter((c) => c.usos > 0).length,

@@ -128,6 +128,12 @@ export default async function AdminCarrinhosPage({
               {reais(v.receita)}
             </p>
           ))}
+        {p.lembretes.motivos.length > 0 && (
+          <p className="text-xs text-ink/70 px-4 py-2 border-t border-line">
+            Por que não finalizaram:{" "}
+            {p.lembretes.motivos.map((m) => `${m.rotulo} (${m.total})`).join(" · ")}
+          </p>
+        )}
         <div className="text-xs text-ink/60 px-4 py-2 border-t border-line space-y-1">
           <p>Assunto 24h: {p.lembretes.leituras.assunto24h.texto}</p>
           <p>Assunto 72h: {p.lembretes.leituras.assunto72h.texto}</p>
@@ -137,6 +143,30 @@ export default async function AdminCarrinhosPage({
           Cupons emitidos: {p.lembretes.cuponsEmitidos} — usados: {p.lembretes.cuponsUsados}
         </p>
       </div>
+
+      <h2 className="font-display text-xl mb-3">Funil ({dias} dias)</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+        <Cartao titulo="Viram um produto" valor={String(p.funil.visitas)} />
+        <Cartao
+          titulo="Foram pro carrinho"
+          valor={String(p.funil.carrinho)}
+          detalhe={p.funil.visitas > 0 ? pct((p.funil.carrinho / p.funil.visitas) * 100) : undefined}
+        />
+        <Cartao
+          titulo="Abriram o checkout"
+          valor={String(p.funil.checkout)}
+          detalhe={p.funil.carrinho > 0 ? pct((p.funil.checkout / p.funil.carrinho) * 100) : undefined}
+        />
+        <Cartao
+          titulo="Pedidos"
+          valor={String(p.funil.pedidos)}
+          detalhe={p.funil.checkout > 0 ? pct((p.funil.pedidos / p.funil.checkout) * 100) : undefined}
+        />
+      </div>
+      <p className="text-xs text-ink/50 mb-8">
+        Sessões distintas por passo (anônimas, 1 por dia). Só conta quem navegou depois da
+        ativação; pedidos incluem todos os canais.
+      </p>
 
       <h2 className="font-display text-xl mb-3">WhatsApp</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
@@ -195,7 +225,12 @@ export default async function AdminCarrinhosPage({
             {p.produtosParados.map((x) => (
               <li key={x.produtoId} className="flex justify-between px-4 py-2">
                 <span>{x.nome}</span>
-                <span className="font-mono text-ink/60">{x.carrinhos} carrinho(s)</span>
+                <span className="font-mono text-ink/60">
+                  {x.estoqueBaixo && (
+                    <span className="mr-2 text-berry text-xs font-sans">estoque baixo</span>
+                  )}
+                  {x.carrinhos} carrinho(s)
+                </span>
               </li>
             ))}
           </ul>

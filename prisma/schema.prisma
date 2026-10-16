@@ -625,6 +625,8 @@ model LembreteCarrinho {
   variante      String?
   // Variante do desconto (teste independente do assunto); só no tipo 2.
   varianteCupom String?
+  // Resposta do cliente a "o que te impediu de finalizar?" (e-mail de 72h).
+  motivo        String?
 
   @@index([enviadoEm])
   @@index([usuarioId])
@@ -653,6 +655,18 @@ model ResolvidoCarrinho {
 
   @@index([usuarioId])
   @@index([email])
+}
+
+// Passo anônimo do funil (visita, carrinho, checkout). 1 por sessão/tipo/dia.
+model EventoFunil {
+  id       String   @id @default(cuid())
+  sessao   String
+  tipo     String
+  dia      String
+  criadoEm DateTime @default(now())
+
+  @@unique([sessao, tipo, dia])
+  @@index([criadoEm])
 }
 
 model CarrinhoVisitante {

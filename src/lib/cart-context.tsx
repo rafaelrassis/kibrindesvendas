@@ -1,5 +1,6 @@
 "use client";
 
+import { registrarEvento } from "@/lib/funil-client";
 import {
   createContext,
   useCallback,
@@ -267,6 +268,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (novo: NovoItemCarrinho): string => {
       const { itens: proximos, id } = mesclarNovoItem(store.ler(), novo);
       aplicar(proximos);
+      registrarEvento("carrinho_add");
       return id;
     },
     [aplicar]
