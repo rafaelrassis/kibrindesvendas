@@ -63,6 +63,7 @@ type CartContextType = {
   atualizarPreco: (itemId: string, preco: number) => void;
   // Devolve o id da linha afetada (a nova, ou a existente que ganhou unidades).
   adicionarItem: (novo: NovoItemCarrinho) => string;
+  restaurarItens: (novos: NovoItemCarrinho[]) => void;
   definirPersonalizacao: (itemId: string, p: ItemCarrinho["personalizacao"]) => void;
   // Sempre arredonda pra inteiro e trava em 1 como piso — não existe pedido
   // de 0 ou fração de unidade. Pra tirar a linha, use `removerItem`.
@@ -117,6 +118,42 @@ function normalizarItem(bruto: unknown, posicao: number): ItemCarrinho | null {
     // vez de virar NaN no cálculo.
     quantidade: Math.max(1, Math.round(Number(item.quantidade)) || 1),
   };
+}
+
+// Junta um item novo ao carrinho: soma na linha igual (mesmo produto e
+// variações, sem arte) ou cria uma linha nova. Puro — quem chama persiste.
+function mesclarNovoItem(
+  atuais: ItemCarrinho[],
+  novo: NovoItemCarrinho
+): { itens: ItemCarrinho[]; id: string } {
+  const quantidade = Math.max(1, Math.round(Number(novo.quantidade)) || 1);
+  const candidata: Omit<ItemCarrinho, "id"> = {
+    produtoId: novo.produtoId,
+    variacoesEscolhidas: novo.variacoesEscolhidas,
+    quantidade,
+    ...(novo.cepInformado && { cepInformado: novo.cepInformado }),
+    ...(novo.precoAdicionado && { precoAdicionado: novo.precoAdicionado }),
+  };
+
+  const existente = novo.linhaUnica ? undefined : atuais.find((i) => mesmaLinha(i, candidata));
+  if (existente) {
+    return {
+      id: existente.id,
+      itens: atuais.map((i) =>
+        i.id === existente.id
+          ? {
+              ...i,
+              quantidade: i.quantidade + quantidade,
+              ...(novo.cepInformado && { cepInformado: novo.cepInformado }),
+              ...(novo.precoAdicionado && { precoAdicionado: novo.precoAdicionado }),
+            }
+          : i
+      ),
+    };
+  }
+
+  const id = novoId();
+  return { id, itens: [...atuais, { id, ...candidata }] };
 }
 
 const VAZIO: ItemCarrinho[] = [];
@@ -228,36 +265,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const adicionarItem = useCallback(
     (novo: NovoItemCarrinho): string => {
-      const atuais = store.ler();
-      const quantidade = Math.max(1, Math.round(Number(novo.quantidade)) || 1);
-      const candidata: Omit<ItemCarrinho, "id"> = {
-        produtoId: novo.produtoId,
-        variacoesEscolhidas: novo.variacoesEscolhidas,
-        quantidade,
-        ...(novo.cepInformado && { cepInformado: novo.cepInformado }),
-        ...(novo.precoAdicionado && { precoAdicionado: novo.precoAdicionado }),
-      };
-
-      const existente = novo.linhaUnica ? undefined : atuais.find((i) => mesmaLinha(i, candidata));
-      if (existente) {
-        aplicar(
-          atuais.map((i) =>
-            i.id === existente.id
-              ? {
-                  ...i,
-                  quantidade: i.quantidade + quantidade,
-                  ...(novo.cepInformado && { cepInformado: novo.cepInformado }),
-                  ...(novo.precoAdicionado && { precoAdicionado: novo.precoAdicionado }),
-                }
-              : i
-          )
-        );
-        return existente.id;
-      }
-
-      const id = novoId();
-      aplicar([...atuais, { id, ...candidata }]);
+      const { itens: proximos, id } = mesclarNovoItem(store.ler(), novo);
+      aplicar(proximos);
       return id;
+    },
+    [aplicar]
+  );
+
+  // Devolve ao carrinho linhas guardadas fora dele (carrinho de visitante
+  // recuperado por e-mail): soma nas linhas iguais e acrescenta o resto.
+  const restaurarItens = useCallback(
+    (novos: NovoItemCarrinho[]) => {
+      let atuais = store.ler();
+      for (const novo of novos) atuais = mesclarNovoItem(atuais, novo).itens;
+      aplicar(atuais);
     },
     [aplicar]
   );
@@ -322,6 +343,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       fecharDrawer,
       atualizarPreco,
       adicionarItem,
+      restaurarItens,
       definirPersonalizacao,
       definirQuantidade,
       removerItem,
@@ -335,6 +357,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       fecharDrawer,
       atualizarPreco,
       adicionarItem,
+      restaurarItens,
       definirPersonalizacao,
       definirQuantidade,
       removerItem,

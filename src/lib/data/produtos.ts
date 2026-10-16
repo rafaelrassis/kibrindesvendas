@@ -4,7 +4,7 @@ import { slugify } from "@/lib/slug";
 import { ehUrlDeImagem } from "@/lib/imagens";
 import { ehUrlDeVideo } from "@/lib/video";
 import { normalizarCep } from "@/lib/frete";
-import { custoComumMateriais } from "@/lib/estoque-variacao";
+import { custoComumMateriais, produtoEsgotado } from "@/lib/estoque-variacao";
 import { validarUrlFornecedor } from "@/lib/fornecedor";
 import type { DimensaoValor, Produto, ProdutoAdmin } from "@/lib/types";
 import type {
@@ -187,6 +187,44 @@ export async function getDestaques(): Promise<Produto[]> {
     orderBy: { nome: "asc" },
   });
   return produtos.map(toProduto);
+}
+
+// "Compre junto" do carrinho: produtos ativos e com estoque das mesmas categorias
+// dos itens que já estão lá, fora os próprios itens. Os que dá pra comprar com
+// um clique (sem variação nem personalização) vêm primeiro; destaques completam
+// quando a categoria não tem o bastante. Só ids vindos do navegador — nada daqui
+// é sensível, é o mesmo catálogo público.
+export async function getSugestoesCompreJunto(idsNoCarrinho: string[], limite = 4): Promise<Produto[]> {
+  const ids = [...new Set(idsNoCarrinho)].slice(0, 30);
+  if (ids.length === 0) return [];
+
+  const doCarrinho = await prisma.produto.findMany({
+    where: { id: { in: ids } },
+    select: { categoriaId: true },
+  });
+  const categorias = [...new Set(doCarrinho.map((p) => p.categoriaId))];
+
+  const buscar = (where: Prisma.ProdutoWhereInput) =>
+    prisma.produto.findMany({
+      where: { ativo: true, id: { notIn: ids }, ...where },
+      include: relacoesProduto,
+      orderBy: [{ destaque: "desc" }, { nome: "asc" }],
+      take: 24,
+    });
+
+  const [mesmaCategoria, destaques] = await Promise.all([
+    categorias.length > 0 ? buscar({ categoriaId: { in: categorias } }) : Promise.resolve([]),
+    buscar({ destaque: true }),
+  ]);
+
+  const vistos = new Set<string>();
+  const candidatos = [...mesmaCategoria, ...destaques]
+    .filter((p) => (vistos.has(p.id) ? false : (vistos.add(p.id), true)))
+    .map(toProduto)
+    .filter((p) => !produtoEsgotado(p));
+
+  const umClique = (p: Produto) => p.variacoes.length === 0 && !p.requerPersonalizacao;
+  return [...candidatos.filter(umClique), ...candidatos.filter((p) => !umClique(p))].slice(0, limite);
 }
 
 // Usado só pela loja (página pública e /api/produtos): produto pausado some

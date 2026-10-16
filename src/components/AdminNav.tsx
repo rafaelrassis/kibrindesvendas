@@ -7,6 +7,7 @@ const links = [
   { href: "/admin/cupons", label: "Cupons" },
   { href: "/admin/avaliacoes", label: "Avaliações" },
   { href: "/admin/pedidos", label: "Pedidos" },
+  { href: "/admin/carrinhos", label: "Carrinhos" },
   { href: "/admin/vendas-shopee", label: "Vendas Shopee" },
   { href: "/admin/dre", label: "DRE" },
   { href: "/admin/banners", label: "Banners" },

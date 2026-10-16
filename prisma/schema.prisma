@@ -263,6 +263,8 @@ model Usuario {
   // Quando o lembrete de carrinho esquecido foi enviado. Volta a null sempre que
   // o carrinho muda (ver salvarCarrinho), pra um carrinho novo poder avisar de novo.
   carrinhoLembreteEm DateTime?
+  carrinhoLembrete2Em DateTime?
+  lembretesCarrinho LembreteCarrinho[]
   pedidos      Pedido[]
   favoritos    Favorito[]
   notificacoes Notificacao[]
@@ -582,7 +584,44 @@ model ConfiguracaoLoja {
   // Fim do último ciclo agendado completo e o resumo dele.
   syncFornecedorUltimaExecucao DateTime?
   syncFornecedorResumo Json?
+  // Recuperação de carrinho: e-mail de lembrete após 24h parado (liga/desliga).
+  lembreteCarrinhoAtivo Boolean @default(true)
+  // Segundo e-mail (após 72h) com cupom único de desconto. Desligado por padrão.
+  cupomCarrinhoAtivo Boolean @default(false)
+  cupomCarrinhoPercentual Int @default(5)
+  cupomCarrinhoValidadeDias Int @default(7)
   updatedAt        DateTime @updatedAt
+}
+
+// Registro de cada lembrete de carrinho enviado — base do painel de
+// recuperação em /admin/carrinhos (o marcador em Usuario zera quando o
+// carrinho muda; este histórico fica).
+model LembreteCarrinho {
+  id            String   @id @default(cuid())
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // 1 = lembrete simples, 2 = lembrete com cupom.
+  tipo          Int
+  enviadoEm     DateTime @default(now())
+  valorCarrinho Decimal  @db.Decimal(10, 2)
+  cupomCodigo   String?
+
+  @@index([enviadoEm])
+  @@index([usuarioId])
+}
+
+// Carrinho de visitante (sem conta) que deixou o e-mail pra receber o lembrete.
+// `token` é o segredo do link de recuperação/descadastro enviado por e-mail.
+model CarrinhoVisitante {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  token        String    @unique
+  itens        Json
+  valorCarrinho Decimal  @default(0) @db.Decimal(10, 2)
+  lembreteEm   DateTime?
+  restauradoEm DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // Despesa lançada à mão pro DRE (embalagem, anúncios, assinaturas...). Custo de

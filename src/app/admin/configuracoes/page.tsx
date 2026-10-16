@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import type { TransportadoraFrete } from "@prisma/client";
 import type { ConfiguracaoLoja, CampoMargemShopee } from "@/lib/data/configuracao";
@@ -48,6 +49,10 @@ export default function AdminConfiguracoesPage() {
   const [syncPausar, setSyncPausar] = useState(true);
   const [syncEmail, setSyncEmail] = useState("");
   const [syncManual, setSyncManual] = useState<string | null>(null);
+  const [lembreteAtivo, setLembreteAtivo] = useState(true);
+  const [cupomAtivo, setCupomAtivo] = useState(false);
+  const [cupomPct, setCupomPct] = useState("5");
+  const [cupomDias, setCupomDias] = useState("7");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -64,9 +69,17 @@ export default function AdminConfiguracoesPage() {
         setTaxaGateway(numParaTexto(c.taxaGatewayPct));
         setCampos(c.camposMargemShopee.map(paraCampoForm));
         preencherSync(c);
+        preencherCarrinho(c);
       })
       .finally(() => setCarregando(false));
   }, []);
+
+  function preencherCarrinho(c: ConfiguracaoLoja) {
+    setLembreteAtivo(c.lembreteCarrinhoAtivo);
+    setCupomAtivo(c.cupomCarrinhoAtivo);
+    setCupomPct(String(c.cupomCarrinhoPercentual));
+    setCupomDias(String(c.cupomCarrinhoValidadeDias));
+  }
 
   function preencherSync(c: ConfiguracaoLoja) {
     setSyncAtivo(c.syncFornecedorAtivo);
@@ -126,6 +139,10 @@ export default function AdminConfiguracoesPage() {
       syncFornecedorEstoqueReposicao: number;
       syncFornecedorPausarEsgotado: boolean;
       syncFornecedorEmailAlerta: string | null;
+      lembreteCarrinhoAtivo: boolean;
+      cupomCarrinhoAtivo: boolean;
+      cupomCarrinhoPercentual: number;
+      cupomCarrinhoValidadeDias: number;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -145,6 +162,10 @@ export default function AdminConfiguracoesPage() {
       syncFornecedorEstoqueReposicao: Math.round(Number(syncReposicao)),
       syncFornecedorPausarEsgotado: syncPausar,
       syncFornecedorEmailAlerta: syncEmail.trim() || null,
+      lembreteCarrinhoAtivo: lembreteAtivo,
+      cupomCarrinhoAtivo: cupomAtivo,
+      cupomCarrinhoPercentual: Math.round(Number(cupomPct)),
+      cupomCarrinhoValidadeDias: Math.round(Number(cupomDias)),
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -165,6 +186,7 @@ export default function AdminConfiguracoesPage() {
     }
     setConfig(data);
     preencherSync(data);
+    preencherCarrinho(data);
     setTokenMelhorEnvio("");
     setTokenSuperFrete("");
     setSucesso("Configurações salvas.");
@@ -498,6 +520,64 @@ export default function AdminConfiguracoesPage() {
             Sincronizar tudo agora
           </button>
           {syncManual && <p className="text-sm text-ink/70 mt-2">{syncManual}</p>}
+        </div>
+
+        <div>
+          <p className="text-sm font-medium mb-2">Recuperação de carrinho</p>
+          <p className="text-xs text-ink/50 mb-3">
+            E-mails para quem deixou itens no carrinho. Só vão para quem aceita e-mails na conta.
+            Resultados em{" "}
+            <Link href="/admin/carrinhos" className="underline">
+              Carrinhos
+            </Link>
+            .
+          </p>
+          <label className="flex items-center gap-2 text-sm mb-3">
+            <input
+              type="checkbox"
+              checked={lembreteAtivo}
+              onChange={(e) => setLembreteAtivo(e.target.checked)}
+            />
+            Lembrete após 24h com o carrinho parado
+          </label>
+          <label className="flex items-center gap-2 text-sm mb-3">
+            <input
+              type="checkbox"
+              checked={cupomAtivo}
+              disabled={!lembreteAtivo}
+              onChange={(e) => setCupomAtivo(e.target.checked)}
+            />
+            Segundo e-mail após 72h com cupom único de desconto
+          </label>
+          {cupomAtivo && lembreteAtivo && (
+            <div className="grid sm:grid-cols-2 gap-3 mb-3">
+              <label className="text-sm">
+                <span className="block text-xs text-ink/60 mb-1">Desconto do cupom (%)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={cupomPct}
+                  onChange={(e) => setCupomPct(e.target.value)}
+                  className="w-full border border-line rounded px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs text-ink/60 mb-1">Validade do cupom (dias)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={cupomDias}
+                  onChange={(e) => setCupomDias(e.target.value)}
+                  className="w-full border border-line rounded px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+          )}
+          <p className="text-xs text-ink/50">
+            Cada cupom é gerado com código próprio e vale uma única vez.
+          </p>
         </div>
 
         <div>

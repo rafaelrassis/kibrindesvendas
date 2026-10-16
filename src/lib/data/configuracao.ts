@@ -54,6 +54,11 @@ export type ConfiguracaoLoja = {
   syncFornecedorEmailAlerta: string | null;
   syncFornecedorUltimaExecucao: string | null;
   syncFornecedorResumo: { total: number; erros: number } | null;
+  // Recuperação de carrinho (ver lib/data/carrinho-esquecido.ts).
+  lembreteCarrinhoAtivo: boolean;
+  cupomCarrinhoAtivo: boolean;
+  cupomCarrinhoPercentual: number;
+  cupomCarrinhoValidadeDias: number;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -81,6 +86,10 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     syncFornecedorUltimaExecucao: config?.syncFornecedorUltimaExecucao?.toISOString() ?? null,
     syncFornecedorResumo:
       (config?.syncFornecedorResumo as { total: number; erros: number } | null) ?? null,
+    lembreteCarrinhoAtivo: config?.lembreteCarrinhoAtivo ?? true,
+    cupomCarrinhoAtivo: config?.cupomCarrinhoAtivo ?? false,
+    cupomCarrinhoPercentual: config?.cupomCarrinhoPercentual ?? 5,
+    cupomCarrinhoValidadeDias: config?.cupomCarrinhoValidadeDias ?? 7,
   };
 }
 
@@ -127,6 +136,10 @@ export async function atualizarConfiguracaoLoja(dados: {
   syncFornecedorPausarEsgotado?: boolean;
   // null/"" apaga; undefined deixa como está.
   syncFornecedorEmailAlerta?: string | null;
+  lembreteCarrinhoAtivo?: boolean;
+  cupomCarrinhoAtivo?: boolean;
+  cupomCarrinhoPercentual?: number;
+  cupomCarrinhoValidadeDias?: number;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -143,6 +156,10 @@ export async function atualizarConfiguracaoLoja(dados: {
     syncFornecedorEstoqueReposicao?: number;
     syncFornecedorPausarEsgotado?: boolean;
     syncFornecedorEmailAlerta?: string | null;
+    lembreteCarrinhoAtivo?: boolean;
+    cupomCarrinhoAtivo?: boolean;
+    cupomCarrinhoPercentual?: number;
+    cupomCarrinhoValidadeDias?: number;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -228,6 +245,23 @@ export async function atualizarConfiguracaoLoja(dados: {
     data.syncFornecedorEmailAlerta = email;
   }
 
+  if (dados.lembreteCarrinhoAtivo !== undefined) data.lembreteCarrinhoAtivo = dados.lembreteCarrinhoAtivo;
+  if (dados.cupomCarrinhoAtivo !== undefined) data.cupomCarrinhoAtivo = dados.cupomCarrinhoAtivo;
+  if (dados.cupomCarrinhoPercentual !== undefined) {
+    const n = dados.cupomCarrinhoPercentual;
+    if (!Number.isInteger(n) || n < 1 || n > 50) {
+      throw new ErroDeNegocio("O desconto do cupom de carrinho precisa ser um inteiro de 1 a 50%.");
+    }
+    data.cupomCarrinhoPercentual = n;
+  }
+  if (dados.cupomCarrinhoValidadeDias !== undefined) {
+    const n = dados.cupomCarrinhoValidadeDias;
+    if (!Number.isInteger(n) || n < 1 || n > 60) {
+      throw new ErroDeNegocio("A validade do cupom de carrinho precisa ser de 1 a 60 dias.");
+    }
+    data.cupomCarrinhoValidadeDias = n;
+  }
+
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
     create: {
@@ -246,6 +280,10 @@ export async function atualizarConfiguracaoLoja(dados: {
       syncFornecedorEstoqueReposicao: data.syncFornecedorEstoqueReposicao,
       syncFornecedorPausarEsgotado: data.syncFornecedorPausarEsgotado,
       syncFornecedorEmailAlerta: data.syncFornecedorEmailAlerta,
+      lembreteCarrinhoAtivo: data.lembreteCarrinhoAtivo,
+      cupomCarrinhoAtivo: data.cupomCarrinhoAtivo,
+      cupomCarrinhoPercentual: data.cupomCarrinhoPercentual,
+      cupomCarrinhoValidadeDias: data.cupomCarrinhoValidadeDias,
     },
     update: data,
   });

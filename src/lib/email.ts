@@ -220,31 +220,75 @@ export async function enviarEmailAlertaFornecedor(
   );
 }
 
-// Lembrete de carrinho esquecido (ver enviarLembretesCarrinho). Só nomes e
-// quantidades: preço e estoque mudam, e o link leva o cliente pro carrinho
-// com os valores de hoje.
-export async function enviarEmailCarrinhoEsquecido(
-  destinatario: string,
-  nome: string,
-  itens: { nome: string; quantidade: number }[],
-  link: string
-) {
+function listaItensEmail(itens: { nome: string; quantidade: number }[]) {
   const lista = itens
     .map(
       (i) =>
         `<li style="margin-bottom: 6px;">${escaparHtml(i.nome)}${i.quantidade > 1 ? ` (${i.quantidade}x)` : ""}</li>`
     )
     .join("");
+  return `<ul style="padding-left: 18px;">${lista}</ul>`;
+}
+
+function botaoEmail(texto: string, link: string) {
+  return `<p style="text-align: center; margin-top: 20px;">
+    <a href="${link}" style="display: inline-block; background: #3F6B4C; color: #fff; text-decoration: none; font-weight: 600; padding: 12px 24px; border-radius: 999px;">${texto}</a>
+  </p>`;
+}
+
+// Lembrete de carrinho esquecido (ver enviarLembretesCarrinho). Só nomes e
+// quantidades: preço e estoque mudam, e o link leva o cliente pro carrinho
+// com os valores de hoje. Com `cupom`, é o segundo lembrete, com o desconto.
+export async function enviarEmailCarrinhoEsquecido(
+  destinatario: string,
+  nome: string,
+  itens: { nome: string; quantidade: number }[],
+  link: string,
+  cupom?: { codigo: string; percentual: number; validoAte: Date }
+) {
+  const validade = cupom?.validoAte.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   await enviar(
     destinatario,
-    "Você esqueceu itens no carrinho — LeoKibrindes",
+    cupom
+      ? `${cupom.percentual}% de desconto no seu carrinho — LeoKibrindes`
+      : "Você esqueceu itens no carrinho — LeoKibrindes",
     layout(
-      "Seus itens ainda estão te esperando",
+      cupom ? `${cupom.percentual}% de desconto só pra você` : "Seus itens ainda estão te esperando",
       `<p>Olá, ${escaparHtml(nome)}!</p>
        <p>Você deixou isto no carrinho:</p>
-       <ul style="padding-left: 18px;">${lista}</ul>
-       <p style="text-align: center; margin-top: 20px;">
-         <a href="${link}" style="display: inline-block; background: #3F6B4C; color: #fff; text-decoration: none; font-weight: 600; padding: 12px 24px; border-radius: 999px;">Voltar ao carrinho</a>
+       ${listaItensEmail(itens)}
+       ${
+         cupom
+           ? `<div style="margin: 16px 0; padding: 16px; background: #f4f7f5; border-radius: 8px; text-align: center;">
+                <p style="margin: 0 0 6px; font-size: 13px; color: #444;">Use o cupom no checkout (vale 1 vez, até ${validade}):</p>
+                <p style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: #3F6B4C;">${escaparHtml(cupom.codigo)}</p>
+              </div>`
+           : ""
+       }
+       ${botaoEmail("Voltar ao carrinho", link)}`
+    )
+  );
+}
+
+// Lembrete pra visitante (sem conta) que deixou o e-mail no carrinho. O link de
+// recuperação devolve os itens ao navegador; o de cancelar apaga o registro.
+export async function enviarEmailCarrinhoVisitante(
+  destinatario: string,
+  itens: { nome: string; quantidade: number }[],
+  linkRecuperar: string,
+  linkCancelar: string
+) {
+  await enviar(
+    destinatario,
+    "Seu carrinho está te esperando — LeoKibrindes",
+    layout(
+      "Seus itens ainda estão te esperando",
+      `<p>Olá!</p>
+       <p>Você pediu pra guardarmos seu carrinho:</p>
+       ${listaItensEmail(itens)}
+       ${botaoEmail("Recuperar meu carrinho", linkRecuperar)}
+       <p style="font-size: 12px; color: #888; text-align: center;">
+         Não quer mais receber isso? <a href="${linkCancelar}" style="color: #888;">Apagar meu carrinho e e-mail</a>
        </p>`
     )
   );

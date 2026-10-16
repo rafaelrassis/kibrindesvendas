@@ -94,7 +94,7 @@ export async function salvarCarrinho(usuarioId: string, entrada: unknown): Promi
     prisma.carrinhoItem.deleteMany({ where: { usuarioId } }),
     prisma.carrinhoItem.createMany({ data: linhas }),
     // Carrinho mexido: o lembrete de esquecido recomeça do zero.
-    prisma.usuario.update({ where: { id: usuarioId }, data: { carrinhoLembreteEm: null } }),
+    prisma.usuario.update({ where: { id: usuarioId }, data: { carrinhoLembreteEm: null, carrinhoLembrete2Em: null } }),
   ]);
 
   return getCarrinho(usuarioId);

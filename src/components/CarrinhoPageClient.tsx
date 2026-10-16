@@ -6,6 +6,8 @@ import { useCart } from "@/lib/cart-context";
 import { useProdutos } from "@/lib/use-produtos";
 import { precoEfetivo } from "@/lib/estoque-variacao";
 import QuantidadeItem from "@/components/QuantidadeItem";
+import SugestoesCarrinho from "@/components/SugestoesCarrinho";
+import SalvarCarrinhoPorEmail from "@/components/SalvarCarrinhoPorEmail";
 import { avisosDaLinha, faltaParaFreteGratis } from "@/lib/carrinho-avisos";
 
 function reais(valor: number) {
@@ -258,6 +260,11 @@ export default function CarrinhoPageClient({
       <Link href="/" className="block text-center text-sm text-pine-2 hover:underline">
         Continuar comprando
       </Link>
+
+      <div className="mt-10">
+        <SugestoesCarrinho />
+        <SalvarCarrinhoPorEmail />
+      </div>
     </div>
   );
 }
