@@ -53,7 +53,10 @@ export default async function AdminCarrinhosPage({
             {d} dias
           </Link>
         ))}
-        <Link href="/admin/configuracoes" className="ml-auto text-xs underline text-ink/60">
+        <a href={`/api/admin/carrinhos/exportar?dias=${dias}`} className="ml-auto text-xs underline text-ink/60">
+          Exportar CSV
+        </a>
+        <Link href="/admin/configuracoes" className=" text-xs underline text-ink/60">
           Ligar / desligar e-mails
         </Link>
       </div>

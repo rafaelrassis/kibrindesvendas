@@ -4,6 +4,7 @@ import { atribuirRecuperacao } from "@/lib/recuperacao-carrinho";
 import { leituraAB, type LeituraAB } from "@/lib/assuntos-carrinho";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { valorDasLinhas } from "./carrinho-valor";
+import { getConfiguracaoLoja } from "./configuracao";
 
 const HORA = 60 * 60 * 1000;
 const DIA = 24 * HORA;
@@ -65,6 +66,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
   const desde = new Date(agora.getTime() - dias * DIA);
 
   // --- Carrinhos de clientes parados no banco agora ---
+  const { freteGratisAcimaDe } = await getConfiguracaoLoja();
   const linhas = await prisma.carrinhoItem.findMany({
     include: {
       usuario: {
@@ -105,15 +107,17 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
   const lista: CarrinhoEsquecido[] = await Promise.all(
     maisRecentes.map(async (c) => {
       const { usuario } = c.ls[0];
+      const valor = await valorDasLinhas(paraLinhaValor(c.ls));
       return {
         usuarioId: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
         itens: c.ls.reduce((soma, l) => soma + l.quantidade, 0),
-        valor: await valorDasLinhas(paraLinhaValor(c.ls)),
+        valor,
         paradoHaHoras: Math.floor((agora.getTime() - c.ultimaMudanca) / HORA),
         lembretes: contagemLembretes.find((g) => g.usuarioId === usuario.id)?._count._all ?? 0,
-        whatsapp: usuario.prefWhatsapp ? linkWhatsappCliente(usuario.telefone, usuario.nome) : null,
+        whatsapp: usuario.prefWhatsapp ? linkWhatsappCliente(usuario.telefone, usuario.nome, valor, freteGratisAcimaDe)
+          : null,
       };
     })
   );
@@ -204,7 +208,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     select: { email: true, telefone: true, valorCarrinho: true },
   });
   const comTelefone = comTelefoneBruto.flatMap((v) => {
-    const whatsapp = linkWhatsappCliente(v.telefone, "");
+    const whatsapp = linkWhatsappCliente(v.telefone, "", Number(v.valorCarrinho), freteGratisAcimaDe);
     return whatsapp ? [{ email: v.email, valor: Number(v.valorCarrinho), whatsapp }] : [];
   });
 
