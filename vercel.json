@@ -2,6 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     { "path": "/api/cron/sync-fornecedor", "schedule": "0 12 * * *" },
-    { "path": "/api/cron/carrinho-esquecido", "schedule": "0 14 * * *" }
+    { "path": "/api/cron/carrinho-esquecido", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/carrinho-esquecido", "schedule": "0 23 * * *" },
+    { "path": "/api/cron/resumo-carrinhos", "schedule": "0 11 * * 1" }
   ]
 }

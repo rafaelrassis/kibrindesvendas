@@ -347,3 +347,20 @@ export async function enviarEmailCarrinhosAltoValor(
     )
   );
 }
+
+// Resumo semanal da recuperação de carrinho pro admin.
+export async function enviarEmailResumoCarrinhos(
+  destinatario: string,
+  linhas: string[],
+  link: string
+) {
+  await enviar(
+    destinatario,
+    "Resumo semanal dos carrinhos — LeoKibrindes",
+    layout(
+      "Carrinhos: últimos 7 dias",
+      `<ul>${linhas.map((l) => `<li>${escaparHtml(l)}</li>`).join("")}</ul>
+       ${botaoEmail("Abrir painel", link)}`
+    )
+  );
+}

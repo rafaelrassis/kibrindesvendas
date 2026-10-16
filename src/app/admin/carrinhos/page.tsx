@@ -169,7 +169,10 @@ export default async function AdminCarrinhosPage({
             <div key={v.email} className="flex items-center justify-between px-4 py-2 text-sm">
               <span>
                 {v.email}
-                <span className="block text-xs text-ink/50">{reais(v.valor)} no carrinho</span>
+                <span className="block text-xs text-ink/50">
+                  {reais(v.valor)} no carrinho
+                  {v.contatadoHaHoras !== null && ` · contatado há ${horas(v.contatadoHaHoras)}`}
+                </span>
               </span>
               <BotaoChamar href={v.whatsapp} contato={{ email: v.email }} />
             </div>
@@ -206,7 +209,14 @@ export default async function AdminCarrinhosPage({
                   <td className="px-4 py-2 text-right font-mono">{c.lembretes}</td>
                   <td className="px-4 py-2 text-right">
                     {c.whatsapp ? (
-                      <BotaoChamar href={c.whatsapp} contato={{ usuarioId: c.usuarioId }} />
+                      <>
+                        <BotaoChamar href={c.whatsapp} contato={{ usuarioId: c.usuarioId }} />
+                        {c.contatadoHaHoras !== null && (
+                          <span className="block text-[11px] text-ink/50">
+                            contatado há {horas(c.contatadoHaHoras)}
+                          </span>
+                        )}
+                      </>
                     ) : (
                       <span className="text-ink/30">—</span>
                     )}

@@ -21,6 +21,8 @@ export type CarrinhoEsquecido = {
   // Link wa.me com a mensagem pronta — só quando o cliente aceita WhatsApp e tem
   // telefone válido.
   whatsapp: string | null;
+  // Horas desde o último clique em "Chamar" (null = nunca contatado).
+  contatadoHaHoras: number | null;
 };
 
 export type PainelCarrinhos = {
@@ -57,7 +59,7 @@ export type PainelCarrinhos = {
     recuperados: number;
     ativos: number;
     // Quem deixou telefone: lista pra chamar no WhatsApp.
-    comTelefone: { email: string; valor: number; whatsapp: string }[];
+    comTelefone: { email: string; valor: number; whatsapp: string; contatadoHaHoras: number | null }[];
   };
 };
 
@@ -107,6 +109,21 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     where: { usuarioId: { in: maisRecentes.map((c) => c.ls[0].usuarioId) }, enviadoEm: { gte: desde } },
     _count: { _all: true },
   });
+  // Último contato por WhatsApp (cliente ou visitante) pra ninguém ser chamado em dobro.
+  const contatosRecentes = await prisma.contatoCarrinho.findMany({
+    where: { criadoEm: { gte: new Date(agora.getTime() - 7 * DIA) } },
+    orderBy: { criadoEm: "desc" },
+    select: { usuarioId: true, email: true, criadoEm: true },
+  });
+  const horasDesde = (d: Date) => Math.floor((agora.getTime() - d.getTime()) / HORA);
+  const ultimoContatoUsuario = (id: string) => {
+    const c = contatosRecentes.find((x) => x.usuarioId === id);
+    return c ? horasDesde(c.criadoEm) : null;
+  };
+  const ultimoContatoEmail = (email: string) => {
+    const c = contatosRecentes.find((x) => x.email === email);
+    return c ? horasDesde(c.criadoEm) : null;
+  };
   const lista: CarrinhoEsquecido[] = await Promise.all(
     maisRecentes.map(async (c) => {
       const { usuario } = c.ls[0];
@@ -121,6 +138,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
         lembretes: contagemLembretes.find((g) => g.usuarioId === usuario.id)?._count._all ?? 0,
         whatsapp: usuario.prefWhatsapp ? linkWhatsappCliente(usuario.telefone, usuario.nome, valor, freteGratisAcimaDe, whatsappModelo)
           : null,
+        contatadoHaHoras: ultimoContatoUsuario(usuario.id),
       };
     })
   );
@@ -212,7 +230,16 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
   });
   const comTelefone = comTelefoneBruto.flatMap((v) => {
     const whatsapp = linkWhatsappCliente(v.telefone, "", Number(v.valorCarrinho), freteGratisAcimaDe, whatsappModelo);
-    return whatsapp ? [{ email: v.email, valor: Number(v.valorCarrinho), whatsapp }] : [];
+    return whatsapp
+      ? [
+          {
+            email: v.email,
+            valor: Number(v.valorCarrinho),
+            whatsapp,
+            contatadoHaHoras: ultimoContatoEmail(v.email),
+          },
+        ]
+      : [];
   });
 
   const contatos = await prisma.contatoCarrinho.findMany({
