@@ -32,7 +32,7 @@ export default function ProdutoPageClient() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { produto, carregando } = useProduto(id);
-  const { adicionarItem } = useCart();
+  const { adicionarItem, abrirDrawer } = useCart();
   const { enderecos } = useConta();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
@@ -226,6 +226,7 @@ export default function ProdutoPageClient() {
       variacoesEscolhidas: selecoes,
       quantidade: quantidadeEfetiva,
       cepInformado: normalizarCep(cep) ?? undefined,
+      precoAdicionado: precoAtual,
       linhaUnica: true,
     });
     router.push(`/personalizar/${produto.id}`);
@@ -239,8 +240,12 @@ export default function ProdutoPageClient() {
       variacoesEscolhidas: selecoes,
       quantidade: quantidadeEfetiva,
       cepInformado: normalizarCep(cep) ?? undefined,
+      precoAdicionado: precoAtual,
     });
     setAdicionadoChave(JSON.stringify([selecoes, quantidadeEfetiva]));
+    // Desktop abre o mini-carrinho lateral; no mobile fica só a confirmação
+    // inline (o drawer não existe lá).
+    if (window.matchMedia("(min-width: 768px)").matches) abrirDrawer();
   }
 
   // Coloca no carrinho e já manda direto pro checkout — o CEP calculado aqui
@@ -252,6 +257,7 @@ export default function ProdutoPageClient() {
       variacoesEscolhidas: selecoes,
       quantidade: quantidadeEfetiva,
       cepInformado: normalizarCep(cep) ?? undefined,
+      precoAdicionado: precoAtual,
     });
     router.push("/checkout");
   }

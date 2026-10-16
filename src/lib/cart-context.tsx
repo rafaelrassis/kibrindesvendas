@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -28,6 +29,8 @@ export type ItemCarrinho = {
   // CEP que o cliente já digitou na página do produto, se algum — o
   // checkout começa com ele preenchido em vez de pedir de novo.
   cepInformado?: string;
+  // Preço unitário visto ao adicionar; o carrinho avisa se o preço atual difere.
+  precoAdicionado?: number;
   personalizacao?: {
     via: ViaPersonalizacao;
     resumo: string;
@@ -42,6 +45,7 @@ export type NovoItemCarrinho = {
   variacoesEscolhidas: Record<string, string>;
   quantidade?: number;
   cepInformado?: string;
+  precoAdicionado?: number;
   // Produto que exige personalização (1 arte por unidade) nunca se junta a
   // uma linha existente: cada adição é uma linha própria, com a sua arte.
   linhaUnica?: boolean;
@@ -51,6 +55,12 @@ type CartContextType = {
   itens: ItemCarrinho[];
   // Soma das quantidades — é o número do selo no ícone do carrinho.
   quantidadeTotal: number;
+  // Mini-carrinho lateral (desktop). Aberto ao adicionar um item.
+  drawerAberto: boolean;
+  abrirDrawer: () => void;
+  fecharDrawer: () => void;
+  // Aceita o preço atual de uma linha (some o aviso de preço alterado).
+  atualizarPreco: (itemId: string, preco: number) => void;
   // Devolve o id da linha afetada (a nova, ou a existente que ganhou unidades).
   adicionarItem: (novo: NovoItemCarrinho) => string;
   definirPersonalizacao: (itemId: string, p: ItemCarrinho["personalizacao"]) => void;
@@ -225,6 +235,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         variacoesEscolhidas: novo.variacoesEscolhidas,
         quantidade,
         ...(novo.cepInformado && { cepInformado: novo.cepInformado }),
+        ...(novo.precoAdicionado && { precoAdicionado: novo.precoAdicionado }),
       };
 
       const existente = novo.linhaUnica ? undefined : atuais.find((i) => mesmaLinha(i, candidata));
@@ -236,6 +247,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                   ...i,
                   quantidade: i.quantidade + quantidade,
                   ...(novo.cepInformado && { cepInformado: novo.cepInformado }),
+                  ...(novo.precoAdicionado && { precoAdicionado: novo.precoAdicionado }),
                 }
               : i
           )
@@ -269,6 +281,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [aplicar]
   );
 
+  const atualizarPreco = useCallback(
+    (itemId: string, preco: number) => {
+      const atuais = store.ler();
+      if (!atuais.some((i) => i.id === itemId)) return;
+      aplicar(atuais.map((i) => (i.id === itemId ? { ...i, precoAdicionado: preco } : i)));
+    },
+    [aplicar]
+  );
+
+  const [drawerAberto, setDrawerAberto] = useState(false);
+  const abrirDrawer = useCallback(() => setDrawerAberto(true), []);
+  const fecharDrawer = useCallback(() => setDrawerAberto(false), []);
+
   const removerItem = useCallback(
     (itemId: string) => {
       const atuais = store.ler();
@@ -292,13 +317,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     () => ({
       itens,
       quantidadeTotal,
+      drawerAberto,
+      abrirDrawer,
+      fecharDrawer,
+      atualizarPreco,
       adicionarItem,
       definirPersonalizacao,
       definirQuantidade,
       removerItem,
       limpar,
     }),
-    [itens, quantidadeTotal, adicionarItem, definirPersonalizacao, definirQuantidade, removerItem, limpar]
+    [
+      itens,
+      quantidadeTotal,
+      drawerAberto,
+      abrirDrawer,
+      fecharDrawer,
+      atualizarPreco,
+      adicionarItem,
+      definirPersonalizacao,
+      definirQuantidade,
+      removerItem,
+      limpar,
+    ]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -260,6 +260,9 @@ model Usuario {
   prefWhatsapp  Boolean      @default(true)
   prefSms       Boolean      @default(false)
   prefPromocoes Boolean      @default(false)
+  // Quando o lembrete de carrinho esquecido foi enviado. Volta a null sempre que
+  // o carrinho muda (ver salvarCarrinho), pra um carrinho novo poder avisar de novo.
+  carrinhoLembreteEm DateTime?
   pedidos      Pedido[]
   favoritos    Favorito[]
   notificacoes Notificacao[]
@@ -316,6 +319,8 @@ model CarrinhoItem {
   quantidade          Int      @default(1)
   cepInformado        String?
   personalizacao      Json?
+  // Preço unitário que o cliente viu ao adicionar — base do aviso "o preço mudou".
+  precoAdicionado     Decimal? @db.Decimal(10, 2)
   updatedAt           DateTime @updatedAt
 
   @@unique([usuarioId, chave])

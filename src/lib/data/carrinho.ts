@@ -20,6 +20,7 @@ function paraItemCarrinho(linha: {
   quantidade: number;
   cepInformado: string | null;
   personalizacao: unknown;
+  precoAdicionado: Prisma.Decimal | null;
 }): ItemCarrinho {
   const item: ItemCarrinho = {
     id: linha.chave,
@@ -28,6 +29,7 @@ function paraItemCarrinho(linha: {
     quantidade: linha.quantidade,
   };
   if (linha.cepInformado) item.cepInformado = linha.cepInformado;
+  if (linha.precoAdicionado != null) item.precoAdicionado = Number(linha.precoAdicionado);
   if (linha.personalizacao) {
     item.personalizacao = linha.personalizacao as ItemCarrinho["personalizacao"];
   }
@@ -76,6 +78,10 @@ export async function salvarCarrinho(usuarioId: string, entrada: unknown): Promi
       variacoesEscolhidas: (item.variacoesEscolhidas ?? {}) as Prisma.InputJsonValue,
       quantidade: Math.max(1, Math.round(Number(item.quantidade)) || 1),
       cepInformado: item.cepInformado ?? null,
+      precoAdicionado:
+        Number.isFinite(Number(item.precoAdicionado)) && Number(item.precoAdicionado) > 0
+          ? Math.round(Number(item.precoAdicionado) * 100) / 100
+          : null,
       // Json nullable do Prisma não aceita `null` cru pra "apagar o campo" —
       // pede o sentinela `Prisma.JsonNull`.
       personalizacao: item.personalizacao
@@ -87,6 +93,8 @@ export async function salvarCarrinho(usuarioId: string, entrada: unknown): Promi
   await prisma.$transaction([
     prisma.carrinhoItem.deleteMany({ where: { usuarioId } }),
     prisma.carrinhoItem.createMany({ data: linhas }),
+    // Carrinho mexido: o lembrete de esquecido recomeça do zero.
+    prisma.usuario.update({ where: { id: usuarioId }, data: { carrinhoLembreteEm: null } }),
   ]);
 
   return getCarrinho(usuarioId);

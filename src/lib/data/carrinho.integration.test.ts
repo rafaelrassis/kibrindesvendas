@@ -128,6 +128,28 @@ describe("carrinho persistido no banco", () => {
     expect(linha).toEqual(expect.not.objectContaining({ personalizacao: expect.anything() }));
   });
 
+  it("guarda o preço visto ao adicionar e devolve na leitura", async () => {
+    await salvarCarrinho(USUARIO_ID, [
+      { id: "a", produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1, precoAdicionado: 39.9 },
+      { id: "b", produtoId: "outro", variacoesEscolhidas: {}, quantidade: 1 },
+    ]);
+    const [a, b] = await getCarrinho(USUARIO_ID);
+    expect(a.precoAdicionado).toBe(39.9);
+    expect(b.precoAdicionado).toBeUndefined();
+  });
+
+  it("mexer no carrinho zera o marcador do lembrete de carrinho esquecido", async () => {
+    await prisma.usuario.update({
+      where: { id: USUARIO_ID },
+      data: { carrinhoLembreteEm: new Date() },
+    });
+    await salvarCarrinho(USUARIO_ID, [
+      { id: "a", produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 },
+    ]);
+    const usuario = await prisma.usuario.findUnique({ where: { id: USUARIO_ID } });
+    expect(usuario?.carrinhoLembreteEm).toBeNull();
+  });
+
   it("recusa linha sem produtoId", async () => {
     await expect(
       salvarCarrinho(USUARIO_ID, [{ variacoesEscolhidas: {}, quantidade: 1 }])

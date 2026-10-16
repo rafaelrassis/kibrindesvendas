@@ -10,6 +10,8 @@ import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import WhatsAppFloatButton from "@/components/WhatsAppFloatButton";
 import { getCategorias } from "@/lib/data/categorias";
+import { getConfiguracaoLoja } from "@/lib/data/configuracao";
+import MiniCarrinho from "@/components/MiniCarrinho";
 
 const baseUrl = process.env.BASE_URL ?? "http://localhost:3000";
 
@@ -29,7 +31,10 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const categorias = await getCategorias();
+  const [categorias, { freteGratisAcimaDe }] = await Promise.all([
+    getCategorias(),
+    getConfiguracaoLoja(),
+  ]);
 
   return (
     <html lang="pt-BR" className="h-full antialiased">
@@ -40,6 +45,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <FavoritosProvider>
                 <NotificacoesProvider>
                   <Header categorias={categorias} />
+                  <MiniCarrinho freteGratisAcimaDe={freteGratisAcimaDe} />
                   <main className="flex-1 pb-16 md:pb-0">{children}</main>
                   <Footer />
                   <BottomNav />

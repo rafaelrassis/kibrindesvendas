@@ -17,7 +17,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const home = pathname === "/";
   const { logado } = useAuth();
   const { naoLidas } = useNotificacoes();
-  const { quantidadeTotal } = useCart();
+  const { quantidadeTotal, abrirDrawer } = useCart();
 
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,8 +108,9 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
         </form>
 
         <div className="flex items-center gap-4 shrink-0 ml-auto">
-          <Link
-            href="/carrinho"
+          <button
+            type="button"
+            onClick={abrirDrawer}
             aria-label={
               quantidadeTotal > 0 ? `Carrinho, ${quantidadeTotal} item(ns)` : "Carrinho"
             }
@@ -121,7 +122,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
                 {quantidadeTotal > 9 ? "9+" : quantidadeTotal}
               </span>
             )}
-          </Link>
+          </button>
           <Link
             href="/notificacoes"
             aria-label="Notificações"

@@ -1,20 +1,7 @@
 "use client";
 
-import { controladoPorVariacao, estoqueDaCombinacao } from "@/lib/estoque-variacao";
+import { estoqueMaximoDaLinha } from "@/lib/carrinho-avisos";
 import type { Produto } from "@/lib/types";
-
-// Teto de quantidade pra uma linha do carrinho: estoque da combinação
-// escolhida (produto com variação) ou estoque geral. null = não controlado.
-export function estoqueMaximoDaLinha(
-  produto: Produto,
-  variacoesEscolhidas: Record<string, string>
-): number | null {
-  if (controladoPorVariacao(produto)) {
-    const completa = produto.variacoes.every((v) => variacoesEscolhidas[v.tipo]);
-    return completa ? estoqueDaCombinacao(produto, variacoesEscolhidas) : null;
-  }
-  return produto.estoque;
-}
 
 // Seletor de quantidade de uma linha do carrinho (usado na página do carrinho
 // e no checkout). Item que exige personalização fica travado em 1 — é uma

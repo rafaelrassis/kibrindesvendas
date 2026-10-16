@@ -219,3 +219,33 @@ export async function enviarEmailAlertaFornecedor(
     )
   );
 }
+
+// Lembrete de carrinho esquecido (ver enviarLembretesCarrinho). Só nomes e
+// quantidades: preço e estoque mudam, e o link leva o cliente pro carrinho
+// com os valores de hoje.
+export async function enviarEmailCarrinhoEsquecido(
+  destinatario: string,
+  nome: string,
+  itens: { nome: string; quantidade: number }[],
+  link: string
+) {
+  const lista = itens
+    .map(
+      (i) =>
+        `<li style="margin-bottom: 6px;">${escaparHtml(i.nome)}${i.quantidade > 1 ? ` (${i.quantidade}x)` : ""}</li>`
+    )
+    .join("");
+  await enviar(
+    destinatario,
+    "Você esqueceu itens no carrinho — LeoKibrindes",
+    layout(
+      "Seus itens ainda estão te esperando",
+      `<p>Olá, ${escaparHtml(nome)}!</p>
+       <p>Você deixou isto no carrinho:</p>
+       <ul style="padding-left: 18px;">${lista}</ul>
+       <p style="text-align: center; margin-top: 20px;">
+         <a href="${link}" style="display: inline-block; background: #3F6B4C; color: #fff; text-decoration: none; font-weight: 600; padding: 12px 24px; border-radius: 999px;">Voltar ao carrinho</a>
+       </p>`
+    )
+  );
+}
