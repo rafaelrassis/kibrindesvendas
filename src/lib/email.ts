@@ -246,7 +246,8 @@ export async function enviarEmailCarrinhoEsquecido(
   link: string,
   assunto: string,
   cupom?: { codigo: string; percentual: number; validoAte: Date },
-  linkMotivo?: string
+  linkMotivo?: string,
+  destaque?: string | null
 ) {
   const validade = cupom?.validoAte.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   await enviar(
@@ -265,6 +266,7 @@ export async function enviarEmailCarrinhoEsquecido(
               </div>`
            : ""
        }
+       ${destaque ? `<p><strong>${escaparHtml(destaque)}</strong></p>` : ""}
        ${botaoEmail("Voltar ao carrinho", link)}
        ${
          linkMotivo

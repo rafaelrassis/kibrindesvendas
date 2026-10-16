@@ -14,6 +14,8 @@ import {
   varianteDoAssunto,
   varianteDoCupom,
 } from "@/lib/assuntos-carrinho";
+import { destaqueDoEmail, motivoDominante } from "@/lib/motivo-dominante";
+import type { MotivoAbandono } from "@/lib/motivo-abandono";
 import { getConfiguracaoLoja } from "./configuracao";
 import { getPainelCarrinhos } from "./carrinhos-painel";
 import { valorDasLinhas } from "./carrinho-valor";
@@ -89,6 +91,8 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
   vencedor: "A" | "B" | null;
   vencedorCupom: "A" | "B" | null;
   validadeDias: number;
+  // Frase de destaque do e-mail de 72h (motivo de abandono mais comum).
+  destaque: string | null;
 }, altos: { limite: number | null; lista: { nome: string; email: string; valor: number }[] }) {
   const resultado = { lembrete1: { enviados: 0 } as Etapa, lembrete2: { enviados: 0 } as Etapa };
 
@@ -173,7 +177,8 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
       `${baseUrl()}/carrinho`,
       assuntoDoLembrete(2, variante, percentual),
       { codigo: cupom.codigo, percentual, validoAte: cupom.validoAte },
-      `${baseUrl()}/carrinho/motivo?l=${lembreteId}`
+      `${baseUrl()}/carrinho/motivo?l=${lembreteId}`,
+      cupomCfg.destaque
     );
     await prisma.lembreteCarrinho.create({
       data: {
@@ -252,12 +257,14 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
   if (!config.lembreteCarrinhoAtivo) return { ativo: false as const };
 
   const altos = { limite: config.carrinhoAltoValor, lista: [] as { nome: string; email: string; valor: number }[] };
+  const destaque = await destaqueMotivo(agora, config.freteGratisAcimaDe);
   const clientes = await lembretesDeClientes(agora, config.cupomCarrinhoAtivo, {
     percentual: config.cupomCarrinhoPercentual,
     percentualB: config.cupomCarrinhoPercentualB,
     vencedor: config.assuntoVencedor,
     vencedorCupom: config.cupomVencedor,
     validadeDias: config.cupomCarrinhoValidadeDias,
+    destaque,
   }, altos);
   if (altos.lista.length > 0 && config.syncFornecedorEmailAlerta) {
     try {
@@ -277,6 +284,18 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
   });
 
   return { ativo: true as const, ...clientes, visitantes };
+}
+
+// Motivo de abandono mais comum nos últimos 90 dias -> frase do e-mail de 72h.
+async function destaqueMotivo(agora: Date, freteGratisAcimaDe: number | null) {
+  const grupos = await prisma.lembreteCarrinho.groupBy({
+    by: ["motivo"],
+    where: { motivo: { not: null }, enviadoEm: { gte: new Date(agora.getTime() - 90 * DIA) } },
+    _count: { _all: true },
+  });
+  const contagens: Partial<Record<MotivoAbandono, number>> = {};
+  for (const g of grupos) contagens[g.motivo as MotivoAbandono] = g._count._all;
+  return destaqueDoEmail(motivoDominante(contagens), freteGratisAcimaDe);
 }
 
 const ROTULO_TESTE: Record<string, string> = {

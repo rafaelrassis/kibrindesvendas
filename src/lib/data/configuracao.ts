@@ -64,6 +64,7 @@ export type ConfiguracaoLoja = {
   cupomVencedor: "A" | "B" | null;
   whatsappModelo: string | null;
   carrinhoAltoValor: number | null;
+  funilAtivo: boolean;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -100,6 +101,7 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
       config?.assuntoVencedor === "A" || config?.assuntoVencedor === "B" ? config.assuntoVencedor : null,
     whatsappModelo: config?.whatsappModelo ?? null,
     carrinhoAltoValor: config?.carrinhoAltoValor ?? null,
+    funilAtivo: config?.funilAtivo ?? true,
     cupomVencedor:
       config?.cupomVencedor === "A" || config?.cupomVencedor === "B" ? config.cupomVencedor : null,
   };
@@ -159,6 +161,7 @@ export async function atualizarConfiguracaoLoja(dados: {
   // null/"" volta ao texto padrão.
   whatsappModelo?: string | null;
   carrinhoAltoValor?: number | null;
+  funilAtivo?: boolean;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -184,6 +187,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     cupomVencedor?: string | null;
     whatsappModelo?: string | null;
     carrinhoAltoValor?: number | null;
+    funilAtivo?: boolean;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -314,6 +318,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     }
     data.carrinhoAltoValor = n;
   }
+  if (dados.funilAtivo !== undefined) data.funilAtivo = dados.funilAtivo === true;
 
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
@@ -342,6 +347,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       cupomVencedor: data.cupomVencedor,
       whatsappModelo: data.whatsappModelo,
       carrinhoAltoValor: data.carrinhoAltoValor,
+      funilAtivo: data.funilAtivo,
     },
     update: data,
   });

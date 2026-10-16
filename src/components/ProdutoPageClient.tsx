@@ -81,7 +81,7 @@ export default function ProdutoPageClient() {
   // A barra fixa no topo some enquanto o bloco de preço original está visível
   // e aparece assim que ele sai da tela rolando pra cima — como no Magalu.
   useEffect(() => {
-    if (produto?.id) registrarEvento("produto_visto");
+    if (produto?.id) registrarEvento("produto_visto", produto.id);
   }, [produto?.id]);
 
   const precoRef = useRef<HTMLDivElement>(null);

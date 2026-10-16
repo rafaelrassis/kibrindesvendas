@@ -604,6 +604,8 @@ model ConfiguracaoLoja {
   whatsappModelo String?
   // Carrinho parado a partir deste valor (R$) entra no e-mail de prioridade pro admin; null = desligado.
   carrinhoAltoValor Int?
+  // Registro anônimo do funil (visita/carrinho/checkout); desligue se a política de privacidade pedir.
+  funilAtivo Boolean @default(true)
   // Resultados de teste A/B já avisados por e-mail ("chave:lider", separados por vírgula).
   abAlertado String?
   updatedAt        DateTime @updatedAt
@@ -663,10 +665,13 @@ model EventoFunil {
   sessao   String
   tipo     String
   dia      String
+  // Produto do passo ("" no checkout).
+  produtoId String  @default("")
   criadoEm DateTime @default(now())
 
-  @@unique([sessao, tipo, dia])
+  @@unique([sessao, tipo, dia, produtoId])
   @@index([criadoEm])
+  @@index([produtoId])
 }
 
 model CarrinhoVisitante {

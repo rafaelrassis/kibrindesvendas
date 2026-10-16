@@ -268,7 +268,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (novo: NovoItemCarrinho): string => {
       const { itens: proximos, id } = mesclarNovoItem(store.ler(), novo);
       aplicar(proximos);
-      registrarEvento("carrinho_add");
+      registrarEvento("carrinho_add", novo.produtoId);
       return id;
     },
     [aplicar]

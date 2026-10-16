@@ -17,19 +17,29 @@ function sessaoId(): string | null {
 
 // Melhor esforço: nunca atrapalha a navegação. Cada tipo é enviado uma vez por
 // aba (sessionStorage); o servidor ainda deduplica por dia.
-export function registrarEvento(tipo: TipoFunil) {
+export function registrarEvento(tipo: TipoFunil, produtoId = "") {
   try {
     const sessao = sessaoId();
     if (!sessao) return;
-    const marca = `funil-${tipo}`;
+    if (sessionStorage.getItem("funil-off")) return;
+    const marca = `funil-${tipo}-${produtoId}`;
     if (sessionStorage.getItem(marca)) return;
     sessionStorage.setItem(marca, "1");
     fetch("/api/funil", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessao, tipo }),
+      body: JSON.stringify({ sessao, tipo, produtoId }),
       keepalive: true,
-    }).catch(() => {});
+    })
+      .then((r) => r.json())
+      .then((d: { ativo?: boolean }) => {
+        if (d.ativo === false) {
+          // Funil desligado: esquece o id e para de tentar nesta aba.
+          sessionStorage.setItem("funil-off", "1");
+          localStorage.removeItem("funil-sessao");
+        }
+      })
+      .catch(() => {});
   } catch {
     // sem storage (modo privado): segue sem registrar
   }

@@ -35,6 +35,8 @@ export type PainelCarrinhos = {
   produtosParados: { produtoId: string; nome: string; carrinhos: number; estoqueBaixo: boolean }[];
   // Funil anônimo no período: sessões distintas por passo + pedidos.
   funil: { visitas: number; carrinho: number; checkout: number; pedidos: number };
+  // Produtos com muita visita e pouco carrinho (mín. 10 visitas).
+  funilProdutos: { produtoId: string; nome: string; visitas: number; carrinho: number }[];
   lembretes: {
     enviados: number;
     recuperados: number;
@@ -330,8 +332,36 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     where: { createdAt: { gte: desde }, status: { not: "CANCELADO" } },
   });
 
+  const porProduto = await prisma.$queryRaw<{ produtoId: string; tipo: string; total: bigint }[]>`
+    SELECT "produtoId", "tipo", COUNT(DISTINCT "sessao") AS total
+    FROM "EventoFunil"
+    WHERE "criadoEm" >= ${desde} AND "produtoId" <> '' AND "tipo" IN ('produto_visto', 'carrinho_add')
+    GROUP BY "produtoId", "tipo"`;
+  const mapaProduto = new Map<string, { visitas: number; carrinho: number }>();
+  for (const r of porProduto) {
+    const atual = mapaProduto.get(r.produtoId) ?? { visitas: 0, carrinho: 0 };
+    if (r.tipo === "produto_visto") atual.visitas = Number(r.total);
+    else atual.carrinho = Number(r.total);
+    mapaProduto.set(r.produtoId, atual);
+  }
+  const candidatosFunil = [...mapaProduto.entries()]
+    .filter(([, v]) => v.visitas >= 10)
+    .sort((a, b) => b[1].visitas - b[1].carrinho - (a[1].visitas - a[1].carrinho))
+    .slice(0, 5);
+  const nomesFunil = candidatosFunil.length
+    ? await prisma.produto.findMany({
+        where: { id: { in: candidatosFunil.map(([id]) => id) } },
+        select: { id: true, nome: true },
+      })
+    : [];
+  const funilProdutos = candidatosFunil.flatMap(([id, v]) => {
+    const nome = nomesFunil.find((p) => p.id === id)?.nome;
+    return nome ? [{ produtoId: id, nome, ...v }] : [];
+  });
+
   return {
     dias,
+    funilProdutos,
     funil: {
       visitas: sessoesDe("produto_visto"),
       carrinho: sessoesDe("carrinho_add"),

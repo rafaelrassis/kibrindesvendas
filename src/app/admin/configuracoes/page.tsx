@@ -59,6 +59,7 @@ export default function AdminConfiguracoesPage() {
   const [vencedorCupom, setVencedorCupom] = useState<"" | "A" | "B">("");
   const [modeloWhats, setModeloWhats] = useState("");
   const [altoValor, setAltoValor] = useState("");
+  const [funilAtivo, setFunilAtivo] = useState(true);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -90,6 +91,7 @@ export default function AdminConfiguracoesPage() {
     setVencedorCupom(c.cupomVencedor ?? "");
     setModeloWhats(c.whatsappModelo ?? "");
     setAltoValor(c.carrinhoAltoValor != null ? String(c.carrinhoAltoValor) : "");
+    setFunilAtivo(c.funilAtivo);
   }
 
   function preencherSync(c: ConfiguracaoLoja) {
@@ -159,6 +161,7 @@ export default function AdminConfiguracoesPage() {
       cupomVencedor: "A" | "B" | null;
       whatsappModelo: string | null;
       carrinhoAltoValor: number | null;
+      funilAtivo: boolean;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -187,6 +190,7 @@ export default function AdminConfiguracoesPage() {
       cupomVencedor: vencedorCupom || null,
       whatsappModelo: modeloWhats.trim() || null,
       carrinhoAltoValor: altoValor.trim() ? Math.round(Number(altoValor)) : null,
+      funilAtivo,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -668,6 +672,14 @@ export default function AdminConfiguracoesPage() {
               onChange={(e) => setAltoValor(e.target.value)}
               className="w-full sm:w-64 border border-line rounded px-3 py-2 text-sm"
             />
+          </label>
+          <label className="flex items-center gap-2 text-sm mb-3">
+            <input
+              type="checkbox"
+              checked={funilAtivo}
+              onChange={(e) => setFunilAtivo(e.target.checked)}
+            />
+            Registrar o funil anônimo (visita, carrinho, checkout) no painel de carrinhos
           </label>
           <p className="text-xs text-ink/50">
             Cada cupom é gerado com código próprio e vale uma única vez.

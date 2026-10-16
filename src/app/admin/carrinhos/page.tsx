@@ -168,6 +168,22 @@ export default async function AdminCarrinhosPage({
         ativação; pedidos incluem todos os canais.
       </p>
 
+      {p.funilProdutos.length > 0 && (
+        <>
+          <h2 className="font-display text-xl mb-3">Muita visita, pouco carrinho</h2>
+          <ul className="bg-white border border-line rounded-lg mb-8 divide-y divide-line text-sm">
+            {p.funilProdutos.map((x) => (
+              <li key={x.produtoId} className="flex justify-between gap-3 px-4 py-2">
+                <span>{x.nome}</span>
+                <span className="font-mono text-ink/60 whitespace-nowrap">
+                  {x.visitas} visitas → {x.carrinho} ({pct((x.carrinho / x.visitas) * 100)})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h2 className="font-display text-xl mb-3">WhatsApp</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         <Cartao titulo="Contatos feitos" valor={String(p.whatsapp.contatos)} />
