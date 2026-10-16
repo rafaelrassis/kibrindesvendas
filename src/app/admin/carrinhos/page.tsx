@@ -146,6 +146,13 @@ export default async function AdminCarrinhosPage({
           detalhe={`de ${p.whatsapp.clientes} contatados`}
         />
         <Cartao titulo="Receita" valor={reais(p.whatsapp.receita)} />
+        <Cartao
+          titulo="Taxa por canal"
+          valor={`WhatsApp ${
+            p.whatsapp.clientes > 0 ? pct((p.whatsapp.recuperados / p.whatsapp.clientes) * 100) : "—"
+          }`}
+          detalhe={`E-mail ${p.lembretes.taxa === null ? "—" : pct(p.lembretes.taxa)} (podem se sobrepor)`}
+        />
       </div>
 
       <h2 className="font-display text-xl mb-3">Visitantes que guardaram o carrinho</h2>

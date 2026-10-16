@@ -63,6 +63,7 @@ export type ConfiguracaoLoja = {
   assuntoVencedor: "A" | "B" | null;
   cupomVencedor: "A" | "B" | null;
   whatsappModelo: string | null;
+  carrinhoAltoValor: number | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -98,6 +99,7 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     assuntoVencedor:
       config?.assuntoVencedor === "A" || config?.assuntoVencedor === "B" ? config.assuntoVencedor : null,
     whatsappModelo: config?.whatsappModelo ?? null,
+    carrinhoAltoValor: config?.carrinhoAltoValor ?? null,
     cupomVencedor:
       config?.cupomVencedor === "A" || config?.cupomVencedor === "B" ? config.cupomVencedor : null,
   };
@@ -156,6 +158,7 @@ export async function atualizarConfiguracaoLoja(dados: {
   cupomVencedor?: "A" | "B" | null;
   // null/"" volta ao texto padrão.
   whatsappModelo?: string | null;
+  carrinhoAltoValor?: number | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -180,6 +183,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     assuntoVencedor?: string | null;
     cupomVencedor?: string | null;
     whatsappModelo?: string | null;
+    carrinhoAltoValor?: number | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -303,6 +307,13 @@ export async function atualizarConfiguracaoLoja(dados: {
     if (m.length > 600) throw new ErroDeNegocio("A mensagem do WhatsApp aceita até 600 caracteres.");
     data.whatsappModelo = m || null;
   }
+  if (dados.carrinhoAltoValor !== undefined) {
+    const n = dados.carrinhoAltoValor;
+    if (n !== null && (!Number.isInteger(n) || n < 1 || n > 100000)) {
+      throw new ErroDeNegocio("O valor de carrinho alto precisa ser um inteiro em reais.");
+    }
+    data.carrinhoAltoValor = n;
+  }
 
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
@@ -330,6 +341,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       assuntoVencedor: data.assuntoVencedor,
       cupomVencedor: data.cupomVencedor,
       whatsappModelo: data.whatsappModelo,
+      carrinhoAltoValor: data.carrinhoAltoValor,
     },
     update: data,
   });

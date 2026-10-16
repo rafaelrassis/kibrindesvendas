@@ -1,5 +1,6 @@
 "use client";
 
+import { mensagemCarrinhoWhatsapp } from "@/lib/whatsapp";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
@@ -57,6 +58,7 @@ export default function AdminConfiguracoesPage() {
   const [vencedor, setVencedor] = useState<"" | "A" | "B">("");
   const [vencedorCupom, setVencedorCupom] = useState<"" | "A" | "B">("");
   const [modeloWhats, setModeloWhats] = useState("");
+  const [altoValor, setAltoValor] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -87,6 +89,7 @@ export default function AdminConfiguracoesPage() {
     setVencedor(c.assuntoVencedor ?? "");
     setVencedorCupom(c.cupomVencedor ?? "");
     setModeloWhats(c.whatsappModelo ?? "");
+    setAltoValor(c.carrinhoAltoValor != null ? String(c.carrinhoAltoValor) : "");
   }
 
   function preencherSync(c: ConfiguracaoLoja) {
@@ -155,6 +158,7 @@ export default function AdminConfiguracoesPage() {
       assuntoVencedor: "A" | "B" | null;
       cupomVencedor: "A" | "B" | null;
       whatsappModelo: string | null;
+      carrinhoAltoValor: number | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -182,6 +186,7 @@ export default function AdminConfiguracoesPage() {
       assuntoVencedor: vencedor || null,
       cupomVencedor: vencedorCupom || null,
       whatsappModelo: modeloWhats.trim() || null,
+      carrinhoAltoValor: altoValor.trim() ? Math.round(Number(altoValor)) : null,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -646,6 +651,22 @@ export default function AdminConfiguracoesPage() {
               maxLength={600}
               rows={3}
               className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+            <span className="block text-xs text-ink/50 mt-1">
+              Prévia (Maria, carrinho de R$ 80, frete grátis acima de R$ 100):{" "}
+              <em>{mensagemCarrinhoWhatsapp("Maria", 80, 100, modeloWhats)}</em>
+            </span>
+          </label>
+          <label className="text-sm block mb-3">
+            <span className="block text-xs text-ink/60 mb-1">
+              Avisar por e-mail carrinhos parados a partir de (R$) — vazio = desligado
+            </span>
+            <input
+              type="number"
+              min={1}
+              value={altoValor}
+              onChange={(e) => setAltoValor(e.target.value)}
+              className="w-full sm:w-64 border border-line rounded px-3 py-2 text-sm"
             />
           </label>
           <p className="text-xs text-ink/50">

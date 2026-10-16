@@ -326,3 +326,24 @@ export async function enviarEmailResultadoAB(destinatario: string, linhas: strin
     )
   );
 }
+
+// Resumo ao admin: carrinhos de valor alto que acabaram de ficar parados (24h).
+export async function enviarEmailCarrinhosAltoValor(
+  destinatario: string,
+  carrinhos: { nome: string; email: string; valor: number }[],
+  link: string
+) {
+  const reais = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  await enviar(
+    destinatario,
+    `${carrinhos.length} carrinho(s) de valor alto parado(s) — LeoKibrindes`,
+    layout(
+      "Carrinhos de valor alto parados",
+      `<p>Vale chamar no WhatsApp antes de esperar o e-mail automático:</p>
+       <ul>${carrinhos
+         .map((c) => `<li>${escaparHtml(c.nome)} (${escaparHtml(c.email)}) — ${reais(c.valor)}</li>`)
+         .join("")}</ul>
+       ${botaoEmail("Abrir painel de carrinhos", link)}`
+    )
+  );
+}

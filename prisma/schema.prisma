@@ -602,6 +602,8 @@ model ConfiguracaoLoja {
   cupomVencedor String?
   // Texto do WhatsApp de carrinho parado ({nome}, {frete}); null = padrão.
   whatsappModelo String?
+  // Carrinho parado a partir deste valor (R$) entra no e-mail de prioridade pro admin; null = desligado.
+  carrinhoAltoValor Int?
   // Resultados de teste A/B já avisados por e-mail ("chave:lider", separados por vírgula).
   abAlertado String?
   updatedAt        DateTime @updatedAt

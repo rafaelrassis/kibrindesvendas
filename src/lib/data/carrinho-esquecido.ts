@@ -5,6 +5,7 @@ import { baseUrl } from "@/lib/mercadopago";
 import {
   enviarEmailCarrinhoEsquecido,
   enviarEmailCarrinhoVisitante,
+  enviarEmailCarrinhosAltoValor,
   enviarEmailResultadoAB,
 } from "@/lib/email";
 import {
@@ -88,7 +89,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
   vencedor: "A" | "B" | null;
   vencedorCupom: "A" | "B" | null;
   validadeDias: number;
-}) {
+}, altos: { limite: number | null; lista: { nome: string; email: string; valor: number }[] }) {
   const resultado = { lembrete1: { enviados: 0 } as Etapa, lembrete2: { enviados: 0 } as Etapa };
 
   // --- Lembrete 1 ---
@@ -120,21 +121,19 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
       `${baseUrl()}/carrinho`,
       assuntoDoLembrete(1, variante)
     );
+    const valorCarrinho = await valorDasLinhas(
+      usuario.carrinho.map((l) => ({
+        produtoId: l.produtoId,
+        variacoesEscolhidas: l.variacoesEscolhidas as Record<string, string>,
+        quantidade: l.quantidade,
+      }))
+    );
     await prisma.lembreteCarrinho.create({
-      data: {
-        usuarioId: usuario.id,
-        tipo: 1,
-        variante,
-        enviadoEm: agora,
-        valorCarrinho: await valorDasLinhas(
-          usuario.carrinho.map((l) => ({
-            produtoId: l.produtoId,
-            variacoesEscolhidas: l.variacoesEscolhidas as Record<string, string>,
-            quantidade: l.quantidade,
-          }))
-        ),
-      },
+      data: { usuarioId: usuario.id, tipo: 1, variante, enviadoEm: agora, valorCarrinho },
     });
+    if (altos.limite != null && valorCarrinho >= altos.limite) {
+      altos.lista.push({ nome: usuario.nome, email: usuario.email, valor: Number(valorCarrinho) });
+    }
     resultado.lembrete1.enviados += 1;
   }
 
@@ -249,13 +248,25 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
   const config = await getConfiguracaoLoja();
   if (!config.lembreteCarrinhoAtivo) return { ativo: false as const };
 
+  const altos = { limite: config.carrinhoAltoValor, lista: [] as { nome: string; email: string; valor: number }[] };
   const clientes = await lembretesDeClientes(agora, config.cupomCarrinhoAtivo, {
     percentual: config.cupomCarrinhoPercentual,
     percentualB: config.cupomCarrinhoPercentualB,
     vencedor: config.assuntoVencedor,
     vencedorCupom: config.cupomVencedor,
     validadeDias: config.cupomCarrinhoValidadeDias,
-  });
+  }, altos);
+  if (altos.lista.length > 0 && config.syncFornecedorEmailAlerta) {
+    try {
+      await enviarEmailCarrinhosAltoValor(
+        config.syncFornecedorEmailAlerta,
+        altos.lista,
+        `${baseUrl()}/admin/carrinhos`
+      );
+    } catch (e) {
+      console.error("Falha ao avisar carrinhos de valor alto", e);
+    }
+  }
   const visitantes = await lembretesDeVisitantes(agora);
   await avisarResultadoAB(config.syncFornecedorEmailAlerta, agora);
 
