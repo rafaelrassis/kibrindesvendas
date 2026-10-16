@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assuntoDoLembrete,
   leituraAB,
+  novosResultadosAB,
   varianteDoAssunto,
   varianteDoCupom,
 } from "./assuntos-carrinho";
@@ -53,5 +54,24 @@ describe("leituraAB", () => {
     const r = leituraAB({ enviados: 100, recuperados: 10 }, { enviados: 100, recuperados: 12 });
     expect(r.significativo).toBe(false);
     expect(r.texto).toMatch(/acaso/);
+  });
+});
+
+describe("novosResultadosAB", () => {
+  const sig = (lider: "A" | "B") => ({ texto: "x", significativo: true, lider });
+  const nao = { texto: "y", significativo: false } as const;
+
+  it("avisa só o que é novo e guarda o conjunto atual", () => {
+    const r = novosResultadosAB({ desconto: sig("B"), assunto24h: nao }, []);
+    expect(r.novos.map((n) => n.chave)).toEqual(["desconto"]);
+    expect(r.atuais).toEqual(["desconto:B"]);
+  });
+  it("não repete o que já foi avisado", () => {
+    const r = novosResultadosAB({ desconto: sig("B") }, ["desconto:B"]);
+    expect(r.novos).toEqual([]);
+  });
+  it("avisa de novo se o líder mudou", () => {
+    const r = novosResultadosAB({ desconto: sig("A") }, ["desconto:B"]);
+    expect(r.novos).toHaveLength(1);
   });
 });

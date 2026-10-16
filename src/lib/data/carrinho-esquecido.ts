@@ -2,9 +2,19 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { baseUrl } from "@/lib/mercadopago";
-import { enviarEmailCarrinhoEsquecido, enviarEmailCarrinhoVisitante } from "@/lib/email";
-import { assuntoDoLembrete, varianteDoAssunto, varianteDoCupom } from "@/lib/assuntos-carrinho";
+import {
+  enviarEmailCarrinhoEsquecido,
+  enviarEmailCarrinhoVisitante,
+  enviarEmailResultadoAB,
+} from "@/lib/email";
+import {
+  assuntoDoLembrete,
+  novosResultadosAB,
+  varianteDoAssunto,
+  varianteDoCupom,
+} from "@/lib/assuntos-carrinho";
 import { getConfiguracaoLoja } from "./configuracao";
+import { getPainelCarrinhos } from "./carrinhos-painel";
 import { valorDasLinhas } from "./carrinho-valor";
 
 const HORA = 60 * 60 * 1000;
@@ -247,6 +257,43 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
     validadeDias: config.cupomCarrinhoValidadeDias,
   });
   const visitantes = await lembretesDeVisitantes(agora);
+  await avisarResultadoAB(config.syncFornecedorEmailAlerta, agora);
 
   return { ativo: true as const, ...clientes, visitantes };
+}
+
+const ROTULO_TESTE: Record<string, string> = {
+  assunto24h: "Assunto do e-mail de 24h",
+  assunto72h: "Assunto do e-mail de 72h",
+  desconto: "Desconto do cupom de 72h",
+};
+
+// Manda um e-mail ao admin (o mesmo dos alertas de sincronização) quando um teste
+// A/B vira significativo, uma vez por resultado. Melhor esforço: não derruba o cron.
+async function avisarResultadoAB(destinatario: string | null, agora: Date) {
+  if (!destinatario) return;
+  try {
+    const painel = await getPainelCarrinhos(30, agora);
+    const atual = await prisma.configuracaoLoja.findUnique({
+      where: { id: "singleton" },
+      select: { abAlertado: true },
+    });
+    const ja = (atual?.abAlertado ?? "").split(",").filter(Boolean);
+    const { novos, atuais } = novosResultadosAB(painel.lembretes.leituras, ja);
+    if (novos.length > 0) {
+      await enviarEmailResultadoAB(
+        destinatario,
+        novos.map((n) => `${ROTULO_TESTE[n.chave] ?? n.chave}: ${n.texto}`),
+        `${baseUrl()}/admin/carrinhos`
+      );
+    }
+    if (atuais.join(",") !== ja.join(",")) {
+      await prisma.configuracaoLoja.update({
+        where: { id: "singleton" },
+        data: { abAlertado: atuais.join(",") || null },
+      });
+    }
+  } catch (e) {
+    console.error("Falha ao avisar resultado do teste A/B", e);
+  }
 }

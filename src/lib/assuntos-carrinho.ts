@@ -18,7 +18,12 @@ export function varianteDoCupom(usuarioId: string): VarianteAssunto {
   return (h >> 3) % 2 === 0 ? "A" : "B";
 }
 
-export type LeituraAB = { texto: string; significativo: boolean };
+export type LeituraAB = {
+  texto: string;
+  significativo: boolean;
+  // Quem está na frente (só quando há amostra mínima).
+  lider?: VarianteAssunto;
+};
 
 // Lê um teste A/B de taxa de recuperação (teste z de duas proporções, 95%).
 // Só aponta vencedor com amostra mínima por grupo; senão avisa que é cedo.
@@ -41,12 +46,35 @@ export function leituraAB(
   const lider = pa >= pb ? "A" : "B";
   const pontos = (Math.abs(pa - pb) * 100).toFixed(1).replace(".", ",");
   if (Math.abs(z) >= 1.96) {
-    return { texto: `${lider} está ${pontos} p.p. à frente — diferença significativa.`, significativo: true };
+    return {
+      texto: `${lider} está ${pontos} p.p. à frente — diferença significativa.`,
+      significativo: true,
+      lider,
+    };
   }
   return {
     texto: `${lider} está ${pontos} p.p. à frente, mas ainda dentro do acaso. Continue testando.`,
     significativo: false,
+    lider,
   };
+}
+
+// Testes que viraram significativos e ainda não foram avisados. `jaAvisados` é
+// o conjunto "chave:lider" guardado; devolve também o conjunto novo a guardar
+// (some o que deixou de ser significativo, então reaparece se voltar).
+export function novosResultadosAB(
+  leituras: Record<string, LeituraAB>,
+  jaAvisados: string[]
+): { novos: { chave: string; lider: VarianteAssunto; texto: string }[]; atuais: string[] } {
+  const atuais: string[] = [];
+  const novos: { chave: string; lider: VarianteAssunto; texto: string }[] = [];
+  for (const [chave, l] of Object.entries(leituras)) {
+    if (!l.significativo || !l.lider) continue;
+    const marca = `${chave}:${l.lider}`;
+    atuais.push(marca);
+    if (!jaAvisados.includes(marca)) novos.push({ chave, lider: l.lider, texto: l.texto });
+  }
+  return { novos, atuais };
 }
 
 export function assuntoDoLembrete(

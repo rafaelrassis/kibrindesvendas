@@ -36,8 +36,15 @@ describe("mensagemCarrinhoWhatsapp", () => {
   });
   it("perto do limite diz quanto falta", () => {
     const m = mensagemCarrinhoWhatsapp("Ana", 80, 100);
-    expect(m).toMatch(/faltam só/);
+    expect(m).toMatch(/faltam só/i);
     expect(m).toMatch(/20,00/);
+  });
+  it("usa o modelo da loja e troca {nome} e {frete}", () => {
+    const m = mensagemCarrinhoWhatsapp("Ana Souza", 150, 100, "Oi {nome}! {frete}Bora?");
+    expect(m).toBe("Oi Ana! Seu pedido já tem frete grátis! Bora?");
+  });
+  it("sem nome não deixa vírgula solta", () => {
+    expect(mensagemCarrinhoWhatsapp("", 10, null)).toMatch(/^Oi! Aqui/);
   });
   it("longe do limite ou sem limite usa a mensagem simples", () => {
     expect(mensagemCarrinhoWhatsapp("Ana", 20, 100)).not.toMatch(/frete/);

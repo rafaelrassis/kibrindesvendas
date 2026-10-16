@@ -311,3 +311,18 @@ export async function enviarEmailVoltouAoEstoque(
     )
   );
 }
+
+// Aviso ao admin: um teste A/B do carrinho chegou a resultado significativo.
+export async function enviarEmailResultadoAB(destinatario: string, linhas: string[], link: string) {
+  await enviar(
+    destinatario,
+    "Teste A/B do carrinho tem resultado — LeoKibrindes",
+    layout(
+      "Teste A/B com resultado",
+      `<p>Estes testes já têm diferença significativa (95%):</p>
+       <ul>${linhas.map((l) => `<li>${escaparHtml(l)}</li>`).join("")}</ul>
+       <p>Trave a variante vencedora em Configurações para todos receberem a melhor.</p>
+       ${botaoEmail("Ver painel", link)}`
+    )
+  );
+}

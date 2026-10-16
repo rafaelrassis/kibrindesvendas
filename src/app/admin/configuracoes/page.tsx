@@ -56,6 +56,7 @@ export default function AdminConfiguracoesPage() {
   const [cupomPctB, setCupomPctB] = useState("");
   const [vencedor, setVencedor] = useState<"" | "A" | "B">("");
   const [vencedorCupom, setVencedorCupom] = useState<"" | "A" | "B">("");
+  const [modeloWhats, setModeloWhats] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -85,6 +86,7 @@ export default function AdminConfiguracoesPage() {
     setCupomPctB(c.cupomCarrinhoPercentualB != null ? String(c.cupomCarrinhoPercentualB) : "");
     setVencedor(c.assuntoVencedor ?? "");
     setVencedorCupom(c.cupomVencedor ?? "");
+    setModeloWhats(c.whatsappModelo ?? "");
   }
 
   function preencherSync(c: ConfiguracaoLoja) {
@@ -152,6 +154,7 @@ export default function AdminConfiguracoesPage() {
       cupomCarrinhoPercentualB: number | null;
       assuntoVencedor: "A" | "B" | null;
       cupomVencedor: "A" | "B" | null;
+      whatsappModelo: string | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -178,6 +181,7 @@ export default function AdminConfiguracoesPage() {
       cupomCarrinhoPercentualB: cupomPctB.trim() ? Math.round(Number(cupomPctB)) : null,
       assuntoVencedor: vencedor || null,
       cupomVencedor: vencedorCupom || null,
+      whatsappModelo: modeloWhats.trim() || null,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -632,6 +636,18 @@ export default function AdminConfiguracoesPage() {
               </select>
             </label>
           )}
+          <label className="text-sm block mb-3">
+            <span className="block text-xs text-ink/60 mb-1">
+              Mensagem do WhatsApp (painel de carrinhos) — use {"{nome}"} e {"{frete}"}; vazio = padrão
+            </span>
+            <textarea
+              value={modeloWhats}
+              onChange={(e) => setModeloWhats(e.target.value)}
+              maxLength={600}
+              rows={3}
+              className="w-full border border-line rounded px-3 py-2 text-sm"
+            />
+          </label>
           <p className="text-xs text-ink/50">
             Cada cupom é gerado com código próprio e vale uma única vez.
           </p>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { exigirAdmin } from "@/lib/admin";
+import BotaoChamar from "@/components/BotaoChamar";
 import { getPainelCarrinhos } from "@/lib/data/carrinhos-painel";
 
 const reais = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -136,6 +137,17 @@ export default async function AdminCarrinhosPage({
         </p>
       </div>
 
+      <h2 className="font-display text-xl mb-3">WhatsApp</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <Cartao titulo="Contatos feitos" valor={String(p.whatsapp.contatos)} />
+        <Cartao
+          titulo="Clientes que compraram"
+          valor={String(p.whatsapp.recuperados)}
+          detalhe={`de ${p.whatsapp.clientes} contatados`}
+        />
+        <Cartao titulo="Receita" valor={reais(p.whatsapp.receita)} />
+      </div>
+
       <h2 className="font-display text-xl mb-3">Visitantes que guardaram o carrinho</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         <Cartao titulo="Guardados" valor={String(p.visitantes.guardados)} />
@@ -152,14 +164,7 @@ export default async function AdminCarrinhosPage({
                 {v.email}
                 <span className="block text-xs text-ink/50">{reais(v.valor)} no carrinho</span>
               </span>
-              <a
-                href={v.whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline text-xs"
-              >
-                Chamar
-              </a>
+              <BotaoChamar href={v.whatsapp} contato={{ email: v.email }} />
             </div>
           ))}
         </div>
@@ -194,14 +199,7 @@ export default async function AdminCarrinhosPage({
                   <td className="px-4 py-2 text-right font-mono">{c.lembretes}</td>
                   <td className="px-4 py-2 text-right">
                     {c.whatsapp ? (
-                      <a
-                        href={c.whatsapp}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline text-xs"
-                      >
-                        Chamar
-                      </a>
+                      <BotaoChamar href={c.whatsapp} contato={{ usuarioId: c.usuarioId }} />
                     ) : (
                       <span className="text-ink/30">—</span>
                     )}

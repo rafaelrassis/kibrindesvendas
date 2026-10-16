@@ -13,35 +13,43 @@ export function telefoneParaWhatsapp(telefone: string | null | undefined): strin
 const reais = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-// Mensagem pronta. Com o valor do carrinho e o limite de frete grátis da loja,
-// aproveita o argumento certo: "já tem frete grátis" ou "falta X pra ganhar".
+// {nome} = primeiro nome; {frete} = frase de frete grátis (ou vazio).
+export const MODELO_WHATSAPP_PADRAO =
+  "Oi, {nome}! Aqui é da LeoKibrindes. Vi que você deixou alguns itens no carrinho. {frete}Posso te ajudar a finalizar?";
+
+function fraseFrete(valor?: number, limite?: number | null): string {
+  if (valor == null || limite == null || limite <= 0) return "";
+  if (valor >= limite) return "Seu pedido já tem frete grátis! ";
+  const falta = limite - valor;
+  if (falta <= limite * 0.3) return `Faltam só ${reais(falta)} pra você ganhar frete grátis. `;
+  return "";
+}
+
+// Mensagem pronta a partir do modelo da loja (ou do padrão).
 export function mensagemCarrinhoWhatsapp(
   nome: string,
   valor?: number,
-  freteGratisAcimaDe?: number | null
+  freteGratisAcimaDe?: number | null,
+  modelo?: string | null
 ): string {
   const primeiroNome = nome.trim().split(/\s+/)[0] || "";
-  const abertura = `Oi${primeiroNome ? `, ${primeiroNome}` : ""}! Aqui é da LeoKibrindes. Vi que você deixou alguns itens no carrinho`;
-  if (valor != null && freteGratisAcimaDe != null && freteGratisAcimaDe > 0) {
-    if (valor >= freteGratisAcimaDe) {
-      return `${abertura} — e o seu pedido já tem frete grátis! Posso te ajudar a finalizar?`;
-    }
-    const falta = freteGratisAcimaDe - valor;
-    if (falta <= freteGratisAcimaDe * 0.3) {
-      return `${abertura} — faltam só ${reais(falta)} pra você ganhar frete grátis. Posso te ajudar a escolher mais algum item?`;
-    }
-  }
-  return `${abertura} — posso te ajudar a finalizar?`;
+  return (modelo?.trim() || MODELO_WHATSAPP_PADRAO)
+    .replaceAll("{nome}", primeiroNome)
+    .replaceAll("{frete}", fraseFrete(valor, freteGratisAcimaDe))
+    .replace(/,\s*!/g, "!")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 export function linkWhatsappCliente(
   telefone: string | null | undefined,
   nome: string,
   valor?: number,
-  freteGratisAcimaDe?: number | null
+  freteGratisAcimaDe?: number | null,
+  modelo?: string | null
 ): string | null {
   const numero = telefoneParaWhatsapp(telefone);
   if (!numero) return null;
-  const mensagem = mensagemCarrinhoWhatsapp(nome, valor, freteGratisAcimaDe);
+  const mensagem = mensagemCarrinhoWhatsapp(nome, valor, freteGratisAcimaDe, modelo);
   return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
 }

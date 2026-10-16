@@ -600,6 +600,10 @@ model ConfiguracaoLoja {
   assuntoVencedor String?
   // Teste do desconto, independente do assunto ("A"/"B"; null = dividindo).
   cupomVencedor String?
+  // Texto do WhatsApp de carrinho parado ({nome}, {frete}); null = padrão.
+  whatsappModelo String?
+  // Resultados de teste A/B já avisados por e-mail ("chave:lider", separados por vírgula).
+  abAlertado String?
   updatedAt        DateTime @updatedAt
 }
 
@@ -626,6 +630,17 @@ model LembreteCarrinho {
 
 // Carrinho de visitante (sem conta) que deixou o e-mail pra receber o lembrete.
 // `token` é o segredo do link de recuperação/descadastro enviado por e-mail.
+// Clique em "Chamar" (WhatsApp) no painel de carrinhos: mede o que o contato
+// manual recupera. usuarioId = cliente; email = visitante.
+model ContatoCarrinho {
+  id        String   @id @default(cuid())
+  usuarioId String?
+  email     String?
+  criadoEm  DateTime @default(now())
+
+  @@index([criadoEm])
+}
+
 model CarrinhoVisitante {
   id           String    @id @default(cuid())
   email        String    @unique

@@ -62,6 +62,7 @@ export type ConfiguracaoLoja = {
   cupomCarrinhoPercentualB: number | null;
   assuntoVencedor: "A" | "B" | null;
   cupomVencedor: "A" | "B" | null;
+  whatsappModelo: string | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -96,6 +97,7 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     cupomCarrinhoPercentualB: config?.cupomCarrinhoPercentualB ?? null,
     assuntoVencedor:
       config?.assuntoVencedor === "A" || config?.assuntoVencedor === "B" ? config.assuntoVencedor : null,
+    whatsappModelo: config?.whatsappModelo ?? null,
     cupomVencedor:
       config?.cupomVencedor === "A" || config?.cupomVencedor === "B" ? config.cupomVencedor : null,
   };
@@ -152,6 +154,8 @@ export async function atualizarConfiguracaoLoja(dados: {
   cupomCarrinhoPercentualB?: number | null;
   assuntoVencedor?: "A" | "B" | null;
   cupomVencedor?: "A" | "B" | null;
+  // null/"" volta ao texto padrão.
+  whatsappModelo?: string | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -175,6 +179,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     cupomCarrinhoPercentualB?: number | null;
     assuntoVencedor?: string | null;
     cupomVencedor?: string | null;
+    whatsappModelo?: string | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -293,6 +298,11 @@ export async function atualizarConfiguracaoLoja(dados: {
     if (v !== null && v !== "A" && v !== "B") throw new ErroDeNegocio("Variante inválida.");
     data.cupomVencedor = v;
   }
+  if (dados.whatsappModelo !== undefined) {
+    const m = typeof dados.whatsappModelo === "string" ? dados.whatsappModelo.trim() : "";
+    if (m.length > 600) throw new ErroDeNegocio("A mensagem do WhatsApp aceita até 600 caracteres.");
+    data.whatsappModelo = m || null;
+  }
 
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
@@ -319,6 +329,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       cupomCarrinhoPercentualB: data.cupomCarrinhoPercentualB,
       assuntoVencedor: data.assuntoVencedor,
       cupomVencedor: data.cupomVencedor,
+      whatsappModelo: data.whatsappModelo,
     },
     update: data,
   });

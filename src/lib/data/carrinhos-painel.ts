@@ -48,6 +48,9 @@ export type PainelCarrinhos = {
     cuponsEmitidos: number;
     cuponsUsados: number;
   };
+  // Cliques em "Chamar": cliente que fez pedido em até 7 dias depois do contato.
+  // Pode coincidir com e-mail enviado no mesmo período (crédito não é exclusivo).
+  whatsapp: { contatos: number; clientes: number; recuperados: number; receita: number };
   visitantes: {
     guardados: number;
     lembretes: number;
@@ -66,7 +69,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
   const desde = new Date(agora.getTime() - dias * DIA);
 
   // --- Carrinhos de clientes parados no banco agora ---
-  const { freteGratisAcimaDe } = await getConfiguracaoLoja();
+  const { freteGratisAcimaDe, whatsappModelo } = await getConfiguracaoLoja();
   const linhas = await prisma.carrinhoItem.findMany({
     include: {
       usuario: {
@@ -116,7 +119,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
         valor,
         paradoHaHoras: Math.floor((agora.getTime() - c.ultimaMudanca) / HORA),
         lembretes: contagemLembretes.find((g) => g.usuarioId === usuario.id)?._count._all ?? 0,
-        whatsapp: usuario.prefWhatsapp ? linkWhatsappCliente(usuario.telefone, usuario.nome, valor, freteGratisAcimaDe)
+        whatsapp: usuario.prefWhatsapp ? linkWhatsappCliente(usuario.telefone, usuario.nome, valor, freteGratisAcimaDe, whatsappModelo)
           : null,
       };
     })
@@ -208,12 +211,44 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     select: { email: true, telefone: true, valorCarrinho: true },
   });
   const comTelefone = comTelefoneBruto.flatMap((v) => {
-    const whatsapp = linkWhatsappCliente(v.telefone, "", Number(v.valorCarrinho), freteGratisAcimaDe);
+    const whatsapp = linkWhatsappCliente(v.telefone, "", Number(v.valorCarrinho), freteGratisAcimaDe, whatsappModelo);
     return whatsapp ? [{ email: v.email, valor: Number(v.valorCarrinho), whatsapp }] : [];
   });
 
+  const contatos = await prisma.contatoCarrinho.findMany({
+    where: { criadoEm: { gte: desde } },
+    orderBy: { criadoEm: "asc" },
+  });
+  const contatosClientes = contatos.flatMap((c) =>
+    c.usuarioId ? [{ id: c.id, usuarioId: c.usuarioId, enviadoEm: c.criadoEm }] : []
+  );
+  const pedidosContatados = contatosClientes.length
+    ? await prisma.pedido.findMany({
+        where: {
+          usuarioId: { in: [...new Set(contatosClientes.map((c) => c.usuarioId))] },
+          createdAt: { gte: desde },
+          status: { not: "CANCELADO" },
+        },
+        select: { usuarioId: true, total: true, createdAt: true },
+      })
+    : [];
+  const recuperadoWhats = atribuirRecuperacao(
+    contatosClientes,
+    pedidosContatados.map((p) => ({
+      usuarioId: p.usuarioId,
+      total: Number(p.total),
+      createdAt: p.createdAt,
+    }))
+  );
+
   return {
     dias,
+    whatsapp: {
+      contatos: contatos.length,
+      clientes: contatosClientes.length,
+      recuperados: recuperadoWhats.size,
+      receita: [...recuperadoWhats.values()].reduce((s, v) => s + v, 0),
+    },
     ativos: { carrinhos: carrinhos.length, valor: valorAtivos },
     esquecidos: { carrinhos: esquecidos.length, valor: valorEsquecidos, lista },
     lembretes: {
