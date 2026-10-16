@@ -2,6 +2,7 @@ import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
 import { exigirAdmin } from "@/lib/admin";
 import BotaoChamar from "@/components/BotaoChamar";
+import BotaoResolver from "@/components/BotaoResolver";
 import { getPainelCarrinhos } from "@/lib/data/carrinhos-painel";
 
 const reais = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -174,10 +175,31 @@ export default async function AdminCarrinhosPage({
                   {v.contatadoHaHoras !== null && ` · contatado há ${horas(v.contatadoHaHoras)}`}
                 </span>
               </span>
-              <BotaoChamar href={v.whatsapp} contato={{ email: v.email }} />
+              <span className="text-right">
+                <BotaoChamar href={v.whatsapp} contato={{ email: v.email }} />
+                {v.contatadoHaHoras !== null && (
+                  <span className="block">
+                    <BotaoResolver alvo={{ email: v.email }} />
+                  </span>
+                )}
+              </span>
             </div>
           ))}
         </div>
+      )}
+
+      {p.produtosParados.length > 0 && (
+        <>
+          <h2 className="font-display text-xl mb-3">Produtos mais abandonados</h2>
+          <ul className="bg-white border border-line rounded-lg mb-8 divide-y divide-line text-sm">
+            {p.produtosParados.map((x) => (
+              <li key={x.produtoId} className="flex justify-between px-4 py-2">
+                <span>{x.nome}</span>
+                <span className="font-mono text-ink/60">{x.carrinhos} carrinho(s)</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <h2 className="font-display text-xl mb-3">Carrinhos parados (clientes)</h2>
@@ -215,6 +237,9 @@ export default async function AdminCarrinhosPage({
                           <span className="block text-[11px] text-ink/50">
                             contatado há {horas(c.contatadoHaHoras)}
                           </span>
+                        )}
+                        {c.contatadoHaHoras !== null && (
+                          <BotaoResolver alvo={{ usuarioId: c.usuarioId }} />
                         )}
                       </>
                     ) : (

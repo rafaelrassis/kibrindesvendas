@@ -29,6 +29,8 @@ export type PainelCarrinhos = {
   dias: number;
   ativos: { carrinhos: number; valor: number };
   esquecidos: { carrinhos: number; valor: number; lista: CarrinhoEsquecido[] };
+  // Produtos que mais aparecem nos carrinhos parados (nº de carrinhos).
+  produtosParados: { produtoId: string; nome: string; carrinhos: number }[];
   lembretes: {
     enviados: number;
     recuperados: number;
@@ -101,9 +103,41 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     valorDasLinhas(paraLinhaValor(esquecidos.flatMap((c) => c.ls))),
   ]);
 
+  const resolvidosBrutos = await prisma.resolvidoCarrinho.findMany({
+    where: { resolvidoEm: { gte: new Date(agora.getTime() - 30 * DIA) } },
+    orderBy: { resolvidoEm: "desc" },
+  });
+  // Resolvido vale até o cliente/visitante mexer no carrinho de novo.
+  const resolvidoApos = (alvo: { usuarioId?: string; email?: string }, mudouEm: number) =>
+    resolvidosBrutos.some(
+      (r) =>
+        ((alvo.usuarioId && r.usuarioId === alvo.usuarioId) ||
+          (alvo.email && r.email === alvo.email)) &&
+        r.resolvidoEm.getTime() > mudouEm
+    );
+
   const maisRecentes = [...esquecidos]
+    .filter((c) => !resolvidoApos({ usuarioId: c.ls[0].usuarioId }, c.ultimaMudanca))
     .sort((a, b) => b.ultimaMudanca - a.ultimaMudanca)
     .slice(0, LIMITE_LISTA);
+
+  const contagemProdutos = new Map<string, number>();
+  for (const c of esquecidos) {
+    for (const id of new Set(c.ls.map((l) => l.produtoId))) {
+      contagemProdutos.set(id, (contagemProdutos.get(id) ?? 0) + 1);
+    }
+  }
+  const topIds = [...contagemProdutos.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const nomesTop = topIds.length
+    ? await prisma.produto.findMany({
+        where: { id: { in: topIds.map(([id]) => id) } },
+        select: { id: true, nome: true },
+      })
+    : [];
+  const produtosParados = topIds.flatMap(([id, carrinhos]) => {
+    const nome = nomesTop.find((p) => p.id === id)?.nome;
+    return nome ? [{ produtoId: id, nome, carrinhos }] : [];
+  });
   const contagemLembretes = await prisma.lembreteCarrinho.groupBy({
     by: ["usuarioId"],
     where: { usuarioId: { in: maisRecentes.map((c) => c.ls[0].usuarioId) }, enviadoEm: { gte: desde } },
@@ -226,9 +260,11 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     where: { telefone: { not: null }, restauradoEm: null },
     orderBy: { updatedAt: "desc" },
     take: LIMITE_LISTA,
-    select: { email: true, telefone: true, valorCarrinho: true },
+    select: { email: true, telefone: true, valorCarrinho: true, updatedAt: true },
   });
-  const comTelefone = comTelefoneBruto.flatMap((v) => {
+  const comTelefone = comTelefoneBruto
+    .filter((v) => !resolvidoApos({ email: v.email }, v.updatedAt.getTime()))
+    .flatMap((v) => {
     const whatsapp = linkWhatsappCliente(v.telefone, "", Number(v.valorCarrinho), freteGratisAcimaDe, whatsappModelo);
     return whatsapp
       ? [
@@ -278,6 +314,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     },
     ativos: { carrinhos: carrinhos.length, valor: valorAtivos },
     esquecidos: { carrinhos: esquecidos.length, valor: valorEsquecidos, lista },
+    produtosParados,
     lembretes: {
       enviados: enviados.length,
       recuperados,

@@ -643,6 +643,18 @@ model ContatoCarrinho {
   @@index([criadoEm])
 }
 
+// "Resolvido" no painel: o carrinho some da lista de parados até o cliente mexer
+// nele de novo (usuarioId = cliente; email = visitante).
+model ResolvidoCarrinho {
+  id          String   @id @default(cuid())
+  usuarioId   String?
+  email       String?
+  resolvidoEm DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([email])
+}
+
 model CarrinhoVisitante {
   id           String    @id @default(cuid())
   email        String    @unique
