@@ -10,6 +10,45 @@ export function varianteDoAssunto(usuarioId: string): VarianteAssunto {
   return soma % 2 === 0 ? "A" : "B";
 }
 
+// Teste do desconto, sorteado separado do assunto (hash diferente) pra não
+// misturar os dois efeitos.
+export function varianteDoCupom(usuarioId: string): VarianteAssunto {
+  let h = 0;
+  for (let i = 0; i < usuarioId.length; i++) h = (h * 31 + usuarioId.charCodeAt(i)) >>> 0;
+  return (h >> 3) % 2 === 0 ? "A" : "B";
+}
+
+export type LeituraAB = { texto: string; significativo: boolean };
+
+// Lê um teste A/B de taxa de recuperação (teste z de duas proporções, 95%).
+// Só aponta vencedor com amostra mínima por grupo; senão avisa que é cedo.
+export function leituraAB(
+  a: { enviados: number; recuperados: number },
+  b: { enviados: number; recuperados: number },
+  minimoPorGrupo = 30
+): LeituraAB {
+  if (a.enviados < minimoPorGrupo || b.enviados < minimoPorGrupo) {
+    return {
+      texto: `Ainda cedo: precisa de ${minimoPorGrupo}+ envios por variante (A ${a.enviados}, B ${b.enviados}).`,
+      significativo: false,
+    };
+  }
+  const pa = a.recuperados / a.enviados;
+  const pb = b.recuperados / b.enviados;
+  const p = (a.recuperados + b.recuperados) / (a.enviados + b.enviados);
+  const erro = Math.sqrt(p * (1 - p) * (1 / a.enviados + 1 / b.enviados));
+  const z = erro === 0 ? 0 : (pa - pb) / erro;
+  const lider = pa >= pb ? "A" : "B";
+  const pontos = (Math.abs(pa - pb) * 100).toFixed(1).replace(".", ",");
+  if (Math.abs(z) >= 1.96) {
+    return { texto: `${lider} está ${pontos} p.p. à frente — diferença significativa.`, significativo: true };
+  }
+  return {
+    texto: `${lider} está ${pontos} p.p. à frente, mas ainda dentro do acaso. Continue testando.`,
+    significativo: false,
+  };
+}
+
 export function assuntoDoLembrete(
   tipo: 1 | 2,
   variante: VarianteAssunto,

@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ErroDeNegocio } from "./erros";
+import { telefoneParaWhatsapp } from "@/lib/whatsapp";
 import { valorDasLinhas } from "./carrinho-valor";
 import { MAX_LINHAS_CARRINHO } from "./carrinho";
 
@@ -47,7 +48,8 @@ function lerLinhas(bruto: unknown): LinhaVisitante[] {
 export async function salvarCarrinhoVisitante(
   emailBruto: unknown,
   itensBrutos: unknown,
-  consentimento: unknown
+  consentimento: unknown,
+  telefoneBruto?: unknown
 ) {
   if (consentimento !== true) {
     throw new ErroDeNegocio("Confirme que aceita receber o lembrete por e-mail.");
@@ -71,10 +73,18 @@ export async function salvarCarrinhoVisitante(
   const valorCarrinho = await valorDasLinhas(linhas);
   const itens = linhas as unknown as Prisma.InputJsonValue;
 
+  // Telefone é opcional; se veio mas não parece um número, falha em vez de
+  // guardar lixo calado.
+  let telefone: string | null = null;
+  if (typeof telefoneBruto === "string" && telefoneBruto.trim()) {
+    telefone = telefoneParaWhatsapp(telefoneBruto);
+    if (!telefone) throw new ErroDeNegocio("Informe um telefone válido com DDD ou deixe em branco.");
+  }
+
   const existente = await prisma.carrinhoVisitante.findUnique({ where: { email } });
   if (!existente) {
     await prisma.carrinhoVisitante.create({
-      data: { email, token: randomBytes(24).toString("base64url"), itens, valorCarrinho },
+      data: { email, token: randomBytes(24).toString("base64url"), itens, valorCarrinho, telefone },
     });
     return;
   }
@@ -84,7 +94,12 @@ export async function salvarCarrinhoVisitante(
     existente.lembreteEm.getTime() > Date.now() - REAVISO_APOS_DIAS * 24 * 60 * 60 * 1000;
   await prisma.carrinhoVisitante.update({
     where: { email },
-    data: { itens, valorCarrinho, lembreteEm: recente ? existente.lembreteEm : null },
+    data: {
+      itens,
+      valorCarrinho,
+      lembreteEm: recente ? existente.lembreteEm : null,
+      ...(telefone ? { telefone } : {}),
+    },
   });
 }
 

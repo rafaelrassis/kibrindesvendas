@@ -10,6 +10,7 @@ export default function SalvarCarrinhoPorEmail() {
   const { itens } = useCart();
   const { logado, carregando } = useAuth();
   const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
   const [aceito, setAceito] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
@@ -27,6 +28,7 @@ export default function SalvarCarrinhoPorEmail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
+          telefone,
           consentimento: aceito,
           itens: itens.map((i) => ({
             produtoId: i.produtoId,
@@ -80,6 +82,15 @@ export default function SalvarCarrinhoPorEmail() {
           {enviando ? "..." : "Guardar"}
         </button>
       </div>
+      <input
+        type="tel"
+        inputMode="tel"
+        value={telefone}
+        onChange={(e) => setTelefone(e.target.value)}
+        placeholder="WhatsApp com DDD (opcional)"
+        aria-label="WhatsApp (opcional)"
+        className="w-full bg-white border border-line rounded-lg px-4 py-2.5 text-sm outline-none focus:border-pine mb-3"
+      />
       <label className="flex items-start gap-2 text-xs text-ink/60">
         <input
           type="checkbox"
@@ -87,8 +98,8 @@ export default function SalvarCarrinhoPorEmail() {
           onChange={(e) => setAceito(e.target.checked)}
           className="mt-0.5"
         />
-        Aceito receber um e-mail de lembrete sobre este carrinho. Posso apagar meus dados pelo
-        link do e-mail.
+        Aceito receber um lembrete sobre este carrinho por e-mail e, se informei o WhatsApp,
+        por mensagem. Posso apagar meus dados pelo link do e-mail.
       </label>
       {erro && <p className="text-xs text-berry mt-2">{erro}</p>}
     </form>

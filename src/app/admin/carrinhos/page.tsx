@@ -115,6 +115,19 @@ export default async function AdminCarrinhosPage({
               ))}
           </tbody>
         </table>
+        {p.lembretes.porVarianteCupom
+          .filter((v) => v.enviados > 0)
+          .map((v) => (
+            <p key={v.variante} className="text-xs text-ink/70 px-4 py-1 border-t border-line">
+              72h · desconto {v.variante}: {v.enviados} enviados, {v.recuperados} recuperados,{" "}
+              {reais(v.receita)}
+            </p>
+          ))}
+        <div className="text-xs text-ink/60 px-4 py-2 border-t border-line space-y-1">
+          <p>Assunto 24h: {p.lembretes.leituras.assunto24h.texto}</p>
+          <p>Assunto 72h: {p.lembretes.leituras.assunto72h.texto}</p>
+          <p>Desconto: {p.lembretes.leituras.desconto.texto}</p>
+        </div>
         <p className="text-xs text-ink/50 px-4 py-2 border-t border-line">
           Cupons emitidos: {p.lembretes.cuponsEmitidos} — usados: {p.lembretes.cuponsUsados}
         </p>
@@ -127,6 +140,27 @@ export default async function AdminCarrinhosPage({
         <Cartao titulo="Voltaram pelo link" valor={String(p.visitantes.recuperados)} />
         <Cartao titulo="Guardados agora" valor={String(p.visitantes.ativos)} />
       </div>
+
+      {p.visitantes.comTelefone.length > 0 && (
+        <div className="bg-white border border-line rounded-lg mb-8 divide-y divide-line">
+          {p.visitantes.comTelefone.map((v) => (
+            <div key={v.email} className="flex items-center justify-between px-4 py-2 text-sm">
+              <span>
+                {v.email}
+                <span className="block text-xs text-ink/50">{reais(v.valor)} no carrinho</span>
+              </span>
+              <a
+                href={v.whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-xs"
+              >
+                Chamar
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2 className="font-display text-xl mb-3">Carrinhos parados (clientes)</h2>
       {p.esquecidos.lista.length === 0 ? (

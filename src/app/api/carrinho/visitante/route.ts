@@ -18,12 +18,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { email, itens, consentimento } = await corpoJson<{
+    const { email, itens, consentimento, telefone } = await corpoJson<{
       email?: unknown;
       itens?: unknown;
       consentimento?: unknown;
+      telefone?: unknown;
     }>(req);
-    await salvarCarrinhoVisitante(email, itens, consentimento);
+    await salvarCarrinhoVisitante(email, itens, consentimento, telefone);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return respostaDeErro(e);

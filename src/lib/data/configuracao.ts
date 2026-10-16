@@ -61,6 +61,7 @@ export type ConfiguracaoLoja = {
   cupomCarrinhoValidadeDias: number;
   cupomCarrinhoPercentualB: number | null;
   assuntoVencedor: "A" | "B" | null;
+  cupomVencedor: "A" | "B" | null;
 };
 
 export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
@@ -95,6 +96,8 @@ export async function getConfiguracaoLoja(): Promise<ConfiguracaoLoja> {
     cupomCarrinhoPercentualB: config?.cupomCarrinhoPercentualB ?? null,
     assuntoVencedor:
       config?.assuntoVencedor === "A" || config?.assuntoVencedor === "B" ? config.assuntoVencedor : null,
+    cupomVencedor:
+      config?.cupomVencedor === "A" || config?.cupomVencedor === "B" ? config.cupomVencedor : null,
   };
 }
 
@@ -148,6 +151,7 @@ export async function atualizarConfiguracaoLoja(dados: {
   // null desliga o teste / destrava a variante.
   cupomCarrinhoPercentualB?: number | null;
   assuntoVencedor?: "A" | "B" | null;
+  cupomVencedor?: "A" | "B" | null;
 }): Promise<ConfiguracaoLoja> {
   const data: {
     cepOrigem?: string;
@@ -170,6 +174,7 @@ export async function atualizarConfiguracaoLoja(dados: {
     cupomCarrinhoValidadeDias?: number;
     cupomCarrinhoPercentualB?: number | null;
     assuntoVencedor?: string | null;
+    cupomVencedor?: string | null;
   } = {};
 
   if (dados.cepOrigem !== undefined) {
@@ -283,6 +288,11 @@ export async function atualizarConfiguracaoLoja(dados: {
     if (v !== null && v !== "A" && v !== "B") throw new ErroDeNegocio("Variante inválida.");
     data.assuntoVencedor = v;
   }
+  if (dados.cupomVencedor !== undefined) {
+    const v = dados.cupomVencedor;
+    if (v !== null && v !== "A" && v !== "B") throw new ErroDeNegocio("Variante inválida.");
+    data.cupomVencedor = v;
+  }
 
   await prisma.configuracaoLoja.upsert({
     where: { id: "singleton" },
@@ -308,6 +318,7 @@ export async function atualizarConfiguracaoLoja(dados: {
       cupomCarrinhoValidadeDias: data.cupomCarrinhoValidadeDias,
       cupomCarrinhoPercentualB: data.cupomCarrinhoPercentualB,
       assuntoVencedor: data.assuntoVencedor,
+      cupomVencedor: data.cupomVencedor,
     },
     update: data,
   });

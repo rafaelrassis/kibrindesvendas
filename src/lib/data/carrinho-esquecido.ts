@@ -3,7 +3,7 @@ import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { baseUrl } from "@/lib/mercadopago";
 import { enviarEmailCarrinhoEsquecido, enviarEmailCarrinhoVisitante } from "@/lib/email";
-import { assuntoDoLembrete, varianteDoAssunto } from "@/lib/assuntos-carrinho";
+import { assuntoDoLembrete, varianteDoAssunto, varianteDoCupom } from "@/lib/assuntos-carrinho";
 import { getConfiguracaoLoja } from "./configuracao";
 import { valorDasLinhas } from "./carrinho-valor";
 
@@ -76,6 +76,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
   // Desconto da variante B (null = mesma % nas duas) e variante travada pelo admin.
   percentualB: number | null;
   vencedor: "A" | "B" | null;
+  vencedorCupom: "A" | "B" | null;
   validadeDias: number;
 }) {
   const resultado = { lembrete1: { enviados: 0 } as Etapa, lembrete2: { enviados: 0 } as Etapa };
@@ -151,8 +152,9 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     if (itens.length === 0) continue;
 
     const variante = cupomCfg.vencedor ?? varianteDoAssunto(usuario.id);
+    const varianteCupom = cupomCfg.vencedorCupom ?? varianteDoCupom(usuario.id);
     const percentual =
-      variante === "B" && cupomCfg.percentualB ? cupomCfg.percentualB : cupomCfg.percentual;
+      varianteCupom === "B" && cupomCfg.percentualB ? cupomCfg.percentualB : cupomCfg.percentual;
     const cupom = await criarCupomDeCarrinho(usuario.id, percentual, cupomCfg.validadeDias, agora);
     await enviarEmailCarrinhoEsquecido(
       usuario.email,
@@ -167,6 +169,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
         usuarioId: usuario.id,
         tipo: 2,
         variante,
+        varianteCupom,
         enviadoEm: agora,
         cupomCodigo: cupom.codigo,
         valorCarrinho: await valorDasLinhas(
@@ -240,6 +243,7 @@ export async function enviarLembretesCarrinho(agora = new Date()) {
     percentual: config.cupomCarrinhoPercentual,
     percentualB: config.cupomCarrinhoPercentualB,
     vencedor: config.assuntoVencedor,
+    vencedorCupom: config.cupomVencedor,
     validadeDias: config.cupomCarrinhoValidadeDias,
   });
   const visitantes = await lembretesDeVisitantes(agora);

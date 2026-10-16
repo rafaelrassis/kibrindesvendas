@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { atribuirRecuperacao } from "@/lib/recuperacao-carrinho";
+import { leituraAB, type LeituraAB } from "@/lib/assuntos-carrinho";
 import { linkWhatsappCliente } from "@/lib/whatsapp";
 import { valorDasLinhas } from "./carrinho-valor";
 
@@ -39,10 +40,21 @@ export type PainelCarrinhos = {
       recuperados: number;
       receita: number;
     }[];
+    // Teste do desconto (só tipo 2), sorteado separado do assunto.
+    porVarianteCupom: { variante: "A" | "B"; enviados: number; recuperados: number; receita: number }[];
+    // Leitura estatística de cada teste: "já dá pra decidir?"
+    leituras: { assunto24h: LeituraAB; assunto72h: LeituraAB; desconto: LeituraAB };
     cuponsEmitidos: number;
     cuponsUsados: number;
   };
-  visitantes: { guardados: number; lembretes: number; recuperados: number; ativos: number };
+  visitantes: {
+    guardados: number;
+    lembretes: number;
+    recuperados: number;
+    ativos: number;
+    // Quem deixou telefone: lista pra chamar no WhatsApp.
+    comTelefone: { email: string; valor: number; whatsapp: string }[];
+  };
 };
 
 // Números de recuperação de carrinho dos últimos `dias`. "Recuperado" = o cliente
@@ -150,6 +162,27 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       };
     })
   );
+  const porVarianteCupom = (["A", "B"] as const).map((variante) => {
+    const grupo = enviados.filter((e) => e.tipo === 2 && e.varianteCupom === variante);
+    const rec = grupo.filter((e) => recuperadoPor.has(e.id));
+    return {
+      variante,
+      enviados: grupo.length,
+      recuperados: rec.length,
+      receita: rec.reduce((soma, e) => soma + (recuperadoPor.get(e.id) ?? 0), 0),
+    };
+  });
+  const dupla = (tipo: 1 | 2) => {
+    const [a, b] = (["A", "B"] as const).map(
+      (v) => porVariante.find((x) => x.tipo === tipo && x.variante === v)!
+    );
+    return leituraAB(a, b);
+  };
+  const leituras = {
+    assunto24h: dupla(1),
+    assunto72h: dupla(2),
+    desconto: leituraAB(porVarianteCupom[0], porVarianteCupom[1]),
+  };
   const recuperados = porTipo.reduce((s, t) => s + t.recuperados, 0);
 
   const codigos = enviados.flatMap((e) => (e.cupomCodigo ? [e.cupomCodigo] : []));
@@ -164,6 +197,16 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     prisma.carrinhoVisitante.count({ where: { restauradoEm: { gte: desde } } }),
     prisma.carrinhoVisitante.count(),
   ]);
+  const comTelefoneBruto = await prisma.carrinhoVisitante.findMany({
+    where: { telefone: { not: null }, restauradoEm: null },
+    orderBy: { updatedAt: "desc" },
+    take: LIMITE_LISTA,
+    select: { email: true, telefone: true, valorCarrinho: true },
+  });
+  const comTelefone = comTelefoneBruto.flatMap((v) => {
+    const whatsapp = linkWhatsappCliente(v.telefone, "");
+    return whatsapp ? [{ email: v.email, valor: Number(v.valorCarrinho), whatsapp }] : [];
+  });
 
   return {
     dias,
@@ -176,6 +219,8 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       receita: porTipo.reduce((s, t) => s + t.receita, 0),
       porTipo,
       porVariante,
+      porVarianteCupom,
+      leituras,
       cuponsEmitidos: codigos.length,
       cuponsUsados: cupons.filter((c) => c.usos > 0).length,
     },
@@ -184,6 +229,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       lembretes: lembretesVisitante,
       recuperados: recuperadosVisitante,
       ativos: ativosVisitante,
+      comTelefone,
     },
   };
 }

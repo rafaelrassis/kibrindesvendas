@@ -55,6 +55,7 @@ export default function AdminConfiguracoesPage() {
   const [cupomDias, setCupomDias] = useState("7");
   const [cupomPctB, setCupomPctB] = useState("");
   const [vencedor, setVencedor] = useState<"" | "A" | "B">("");
+  const [vencedorCupom, setVencedorCupom] = useState<"" | "A" | "B">("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -83,6 +84,7 @@ export default function AdminConfiguracoesPage() {
     setCupomDias(String(c.cupomCarrinhoValidadeDias));
     setCupomPctB(c.cupomCarrinhoPercentualB != null ? String(c.cupomCarrinhoPercentualB) : "");
     setVencedor(c.assuntoVencedor ?? "");
+    setVencedorCupom(c.cupomVencedor ?? "");
   }
 
   function preencherSync(c: ConfiguracaoLoja) {
@@ -149,6 +151,7 @@ export default function AdminConfiguracoesPage() {
       cupomCarrinhoValidadeDias: number;
       cupomCarrinhoPercentualB: number | null;
       assuntoVencedor: "A" | "B" | null;
+      cupomVencedor: "A" | "B" | null;
     } = {
       cepOrigem,
       transportadoraAtiva: transportadora,
@@ -174,6 +177,7 @@ export default function AdminConfiguracoesPage() {
       cupomCarrinhoValidadeDias: Math.round(Number(cupomDias)),
       cupomCarrinhoPercentualB: cupomPctB.trim() ? Math.round(Number(cupomPctB)) : null,
       assuntoVencedor: vencedor || null,
+      cupomVencedor: vencedorCupom || null,
     };
     // Só manda o token se o admin digitou algo novo — campo vazio não apaga
     // por engano um token já cadastrado.
@@ -609,6 +613,22 @@ export default function AdminConfiguracoesPage() {
                 <option value="">Dividir 50/50 (testando)</option>
                 <option value="A">Todos recebem A</option>
                 <option value="B">Todos recebem B</option>
+              </select>
+            </label>
+          )}
+          {cupomAtivo && lembreteAtivo && cupomPctB.trim() && (
+            <label className="text-sm block mb-3">
+              <span className="block text-xs text-ink/60 mb-1">
+                Teste do desconto — variante vencedora (sorteio separado do assunto)
+              </span>
+              <select
+                value={vencedorCupom}
+                onChange={(e) => setVencedorCupom(e.target.value as "" | "A" | "B")}
+                className="w-full sm:w-64 border border-line rounded px-3 py-2 text-sm bg-white"
+              >
+                <option value="">Dividir 50/50 (testando)</option>
+                <option value="A">Todos recebem desconto A</option>
+                <option value="B">Todos recebem desconto B</option>
               </select>
             </label>
           )}

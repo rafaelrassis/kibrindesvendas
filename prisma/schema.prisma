@@ -598,6 +598,8 @@ model ConfiguracaoLoja {
   // trava todo mundo numa variante ("A"/"B"; null = continua dividindo).
   cupomCarrinhoPercentualB Int?
   assuntoVencedor String?
+  // Teste do desconto, independente do assunto ("A"/"B"; null = dividindo).
+  cupomVencedor String?
   updatedAt        DateTime @updatedAt
 }
 
@@ -615,6 +617,8 @@ model LembreteCarrinho {
   cupomCodigo   String?
   // Variante do assunto do e-mail (teste A/B): "A" ou "B".
   variante      String?
+  // Variante do desconto (teste independente do assunto); só no tipo 2.
+  varianteCupom String?
 
   @@index([enviadoEm])
   @@index([usuarioId])
@@ -630,6 +634,8 @@ model CarrinhoVisitante {
   valorCarrinho Decimal  @default(0) @db.Decimal(10, 2)
   lembreteEm   DateTime?
   restauradoEm DateTime?
+  // Opcional: o visitante pediu contato por WhatsApp.
+  telefone     String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
