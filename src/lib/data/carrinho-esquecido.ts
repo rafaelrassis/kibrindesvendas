@@ -13,6 +13,7 @@ import {
   novosResultadosAB,
   varianteDoAssunto,
   varianteDoCupom,
+  varianteDoDestaque,
 } from "@/lib/assuntos-carrinho";
 import { destaqueDoEmail, motivoDominante } from "@/lib/motivo-dominante";
 import type { MotivoAbandono } from "@/lib/motivo-abandono";
@@ -118,12 +119,15 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
     if (itens.length === 0) continue;
 
     const variante = cupomCfg.vencedor ?? varianteDoAssunto(usuario.id);
+    const lembrete1Id = randomUUID();
     await enviarEmailCarrinhoEsquecido(
       usuario.email,
       usuario.nome,
       itens,
       `${baseUrl()}/carrinho`,
-      assuntoDoLembrete(1, variante)
+      assuntoDoLembrete(1, variante),
+      undefined,
+      `${baseUrl()}/carrinho/motivo?l=${lembrete1Id}`
     );
     const valorCarrinho = await valorDasLinhas(
       usuario.carrinho.map((l) => ({
@@ -133,7 +137,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
       }))
     );
     await prisma.lembreteCarrinho.create({
-      data: { usuarioId: usuario.id, tipo: 1, variante, enviadoEm: agora, valorCarrinho },
+      data: { id: lembrete1Id, usuarioId: usuario.id, tipo: 1, variante, enviadoEm: agora, valorCarrinho },
     });
     if (altos.limite != null && valorCarrinho >= altos.limite) {
       altos.lista.push({ nome: usuario.nome, email: usuario.email, valor: Number(valorCarrinho) });
@@ -170,6 +174,9 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
       varianteCupom === "B" && cupomCfg.percentualB ? cupomCfg.percentualB : cupomCfg.percentual;
     const cupom = await criarCupomDeCarrinho(usuario.id, percentual, cupomCfg.validadeDias, agora);
     const lembreteId = randomUUID();
+    // Teste 50/50: só metade recebe a frase, pra medir se ela ajuda de verdade.
+    const comDestaque = cupomCfg.destaque ? varianteDoDestaque(usuario.id) === "B" : null;
+    const destaqueAplicado = comDestaque ? cupomCfg.destaque : null;
     await enviarEmailCarrinhoEsquecido(
       usuario.email,
       usuario.nome,
@@ -178,7 +185,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
       assuntoDoLembrete(2, variante, percentual),
       { codigo: cupom.codigo, percentual, validoAte: cupom.validoAte },
       `${baseUrl()}/carrinho/motivo?l=${lembreteId}`,
-      cupomCfg.destaque
+      destaqueAplicado
     );
     await prisma.lembreteCarrinho.create({
       data: {
@@ -187,6 +194,7 @@ async function lembretesDeClientes(agora: Date, comCupom: boolean, cupomCfg: {
         tipo: 2,
         variante,
         varianteCupom,
+        comDestaque,
         enviadoEm: agora,
         cupomCodigo: cupom.codigo,
         valorCarrinho: await valorDasLinhas(
@@ -302,6 +310,7 @@ const ROTULO_TESTE: Record<string, string> = {
   assunto24h: "Assunto do e-mail de 24h",
   assunto72h: "Assunto do e-mail de 72h",
   desconto: "Desconto do cupom de 72h",
+  destaque: "Frase de destaque por motivo (72h)",
 };
 
 // Manda um e-mail ao admin (o mesmo dos alertas de sincronização) quando um teste

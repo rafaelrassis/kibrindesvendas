@@ -629,6 +629,9 @@ model LembreteCarrinho {
   varianteCupom String?
   // Resposta do cliente a "o que te impediu de finalizar?" (e-mail de 72h).
   motivo        String?
+  // E-mail de 72h: true = foi com a frase de destaque do motivo mais comum, false = sem
+  // (teste 50/50); null = não havia destaque.
+  comDestaque   Boolean?
 
   @@index([enviadoEm])
   @@index([usuarioId])

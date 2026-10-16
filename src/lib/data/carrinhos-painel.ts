@@ -56,7 +56,9 @@ export type PainelCarrinhos = {
     motivos: { motivo: string; rotulo: string; total: number }[];
     porVarianteCupom: { variante: "A" | "B"; enviados: number; recuperados: number; receita: number }[];
     // Leitura estatística de cada teste: "já dá pra decidir?"
-    leituras: { assunto24h: LeituraAB; assunto72h: LeituraAB; desconto: LeituraAB };
+    leituras: { assunto24h: LeituraAB; assunto72h: LeituraAB; desconto: LeituraAB; destaque: LeituraAB };
+    // Teste do destaque por motivo (e-mail de 72h): sem x com a frase.
+    porDestaque: { comDestaque: boolean; enviados: number; recuperados: number; receita: number }[];
     cuponsEmitidos: number;
     cuponsUsados: number;
   };
@@ -250,10 +252,28 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
     );
     return leituraAB(a, b);
   };
+  const porDestaque = [false, true].map((comDestaque) => {
+    const grupo = enviados.filter((e) => e.tipo === 2 && e.comDestaque === comDestaque);
+    const rec = grupo.filter((e) => recuperadoPor.has(e.id));
+    return {
+      comDestaque,
+      enviados: grupo.length,
+      recuperados: rec.length,
+      receita: rec.reduce((soma, e) => soma + (recuperadoPor.get(e.id) ?? 0), 0),
+    };
+  });
+  const leituraDestaque = leituraAB(porDestaque[0], porDestaque[1]);
   const leituras = {
     assunto24h: dupla(1),
     assunto72h: dupla(2),
     desconto: leituraAB(porVarianteCupom[0], porVarianteCupom[1]),
+    // A = sem a frase, B = com a frase.
+    destaque: {
+      ...leituraDestaque,
+      texto: leituraDestaque.texto
+        .replace(/^A /, "Sem a frase ")
+        .replace(/^B /, "Com a frase "),
+    },
   };
   const motivos = MOTIVOS_ABANDONO.map((m) => ({
     motivo: m.valor as string,
@@ -385,6 +405,7 @@ export async function getPainelCarrinhos(dias = 30, agora = new Date()): Promise
       porTipo,
       porVariante,
       porVarianteCupom,
+      porDestaque,
       motivos,
       leituras,
       cuponsEmitidos: codigos.length,

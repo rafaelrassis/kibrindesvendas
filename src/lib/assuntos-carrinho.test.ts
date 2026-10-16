@@ -5,6 +5,7 @@ import {
   novosResultadosAB,
   varianteDoAssunto,
   varianteDoCupom,
+  varianteDoDestaque,
 } from "./assuntos-carrinho";
 
 describe("varianteDoAssunto", () => {
@@ -73,5 +74,13 @@ describe("novosResultadosAB", () => {
   it("avisa de novo se o líder mudou", () => {
     const r = novosResultadosAB({ desconto: sig("A") }, ["desconto:B"]);
     expect(r.novos).toHaveLength(1);
+  });
+});
+
+describe("varianteDoDestaque", () => {
+  it("é estável e divide os grupos", () => {
+    expect(varianteDoDestaque("abc")).toBe(varianteDoDestaque("abc"));
+    const ids = Array.from({ length: 60 }, (_, i) => `usuario-${i}`);
+    expect(new Set(ids.map(varianteDoDestaque))).toEqual(new Set(["A", "B"]));
   });
 });

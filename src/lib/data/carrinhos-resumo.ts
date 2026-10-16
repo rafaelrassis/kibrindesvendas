@@ -27,12 +27,21 @@ export async function enviarResumoSemanalCarrinhos() {
     `Receita recuperada por e-mail: ${reais(p.lembretes.receita)} (${variacaoTexto(p.lembretes.receita, ant.receita)})`,
     `WhatsApp: ${p.whatsapp.contatos} contato(s), ${p.whatsapp.recuperados} compra(s), ${reais(p.whatsapp.receita)} (${variacaoTexto(p.whatsapp.receita, ant.whatsReceita)})`,
     `Carrinhos parados agora: ${p.esquecidos.carrinhos} (${reais(p.esquecidos.valor)})`,
+    ...(p.funilProdutos.length
+      ? [
+          `Muita visita, pouco carrinho: ${p.funilProdutos
+            .slice(0, 3)
+            .map((x) => `${x.nome} (${x.visitas} visitas, ${x.carrinho} no carrinho)`)
+            .join("; ")}`,
+        ]
+      : []),
     ...(p.produtosParados.length
       ? [`Mais abandonados: ${p.produtosParados.map((x) => `${x.nome} (${x.carrinhos})`).join("; ")}`]
       : []),
     `Assunto 24h — ${p.lembretes.leituras.assunto24h.texto}`,
     `Assunto 72h — ${p.lembretes.leituras.assunto72h.texto}`,
     `Desconto — ${p.lembretes.leituras.desconto.texto}`,
+    `Frase de destaque — ${p.lembretes.leituras.destaque.texto}`,
   ];
   await enviarEmailResumoCarrinhos(destino, linhas, `${baseUrl()}/admin/carrinhos`);
   return { enviado: true as const };

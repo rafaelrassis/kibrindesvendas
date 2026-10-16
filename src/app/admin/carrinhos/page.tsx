@@ -138,6 +138,7 @@ export default async function AdminCarrinhosPage({
           <p>Assunto 24h: {p.lembretes.leituras.assunto24h.texto}</p>
           <p>Assunto 72h: {p.lembretes.leituras.assunto72h.texto}</p>
           <p>Desconto: {p.lembretes.leituras.desconto.texto}</p>
+          <p>Frase de destaque: {p.lembretes.leituras.destaque.texto}</p>
         </div>
         <p className="text-xs text-ink/50 px-4 py-2 border-t border-line">
           Cupons emitidos: {p.lembretes.cuponsEmitidos} — usados: {p.lembretes.cuponsUsados}

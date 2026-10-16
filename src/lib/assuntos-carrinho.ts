@@ -18,6 +18,13 @@ export function varianteDoCupom(usuarioId: string): VarianteAssunto {
   return (h >> 3) % 2 === 0 ? "A" : "B";
 }
 
+// Teste do destaque por motivo: quem cai em B recebe a frase, quem cai em A não.
+export function varianteDoDestaque(usuarioId: string): VarianteAssunto {
+  let h = 7;
+  for (let i = 0; i < usuarioId.length; i++) h = (h * 17 + usuarioId.charCodeAt(i) * (i + 1)) >>> 0;
+  return (h >> 2) % 2 === 0 ? "A" : "B";
+}
+
 export type LeituraAB = {
   texto: string;
   significativo: boolean;
