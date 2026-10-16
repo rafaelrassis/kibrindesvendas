@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { Categoria } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useNotificacoes } from "@/lib/notificacoes-context";
+import { useCart } from "@/lib/cart-context";
 import { Search } from "lucide-react";
 
 export default function Header({ categorias }: { categorias: Categoria[] }) {
@@ -16,6 +17,7 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
   const home = pathname === "/";
   const { logado } = useAuth();
   const { naoLidas } = useNotificacoes();
+  const { quantidadeTotal } = useCart();
 
   const buscar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +109,20 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
 
         <div className="flex items-center gap-4 shrink-0 ml-auto">
           <Link
+            href="/carrinho"
+            aria-label={
+              quantidadeTotal > 0 ? `Carrinho, ${quantidadeTotal} item(ns)` : "Carrinho"
+            }
+            className="relative text-xl hover:text-mustard transition-colors"
+          >
+            🛒
+            {quantidadeTotal > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {quantidadeTotal > 9 ? "9+" : quantidadeTotal}
+              </span>
+            )}
+          </Link>
+          <Link
             href="/notificacoes"
             aria-label="Notificações"
             className="relative text-xl hover:text-mustard transition-colors"
@@ -165,6 +181,20 @@ export default function Header({ categorias }: { categorias: Categoria[] }) {
             className="w-full bg-white text-ink rounded-full pl-11 pr-5 py-3 text-sm outline-none shadow-sm"
           />
         </div>
+        <Link
+          href="/carrinho"
+          aria-label={
+            quantidadeTotal > 0 ? `Carrinho, ${quantidadeTotal} item(ns)` : "Carrinho"
+          }
+          className="relative shrink-0 text-2xl leading-none hover:text-mustard transition-colors"
+        >
+          🛒
+          {quantidadeTotal > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 bg-mustard text-pine text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {quantidadeTotal > 9 ? "9+" : quantidadeTotal}
+            </span>
+          )}
+        </Link>
         <Link
           href="/notificacoes"
           aria-label="Notificações"

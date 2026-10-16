@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useProduto } from "@/lib/use-produto";
@@ -31,11 +32,15 @@ export default function ProdutoPageClient() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { produto, carregando } = useProduto(id);
-  const { iniciarItem, definirQuantidade } = useCart();
+  const { adicionarItem } = useCart();
   const { enderecos } = useConta();
 
   const [selecoes, setSelecoes] = useState<Record<string, string>>({});
   const [corHover, setCorHover] = useState<string | null>(null);
+  // Seleção + quantidade que acabaram de ir pro carrinho. A confirmação só
+  // aparece enquanto a tela ainda mostra exatamente isso — mexer na variação
+  // ou na quantidade a faz sumir, sem precisar de um efeito pra apagá-la.
+  const [adicionadoChave, setAdicionadoChave] = useState<string | null>(null);
   const [quantidade, setQuantidade] = useState(1);
   // Espelha `quantidade` como texto livre no campo controlado — permite o
   // campo ficar vazio enquanto o usuário apaga pra digitar outro número,
@@ -60,12 +65,9 @@ export default function ProdutoPageClient() {
   const cepPadrao = enderecoPadrao ? normalizarCep(enderecoPadrao.cep) : null;
   const [cepDigitado, setCepDigitado] = useState<string | null>(null);
   const cep = cepDigitado ?? (cepPadrao ? formatarCep(cepPadrao) : "");
-  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(
-    cep,
-    id,
-    quantidade,
-    selecoes
-  );
+  const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(cep, [
+    { produtoId: id, quantidade, variacoes: selecoes },
+  ]);
 
   // Começa fechado (mostra só o resumo) enquanto houver um endereço resolvido
   // — o CEP padrão da conta só chega depois da hidratação, então isso é
@@ -190,6 +192,9 @@ export default function ProdutoPageClient() {
           : quantidade
       );
 
+  const adicionadoAoCarrinho =
+    adicionadoChave !== null && adicionadoChave === JSON.stringify([selecoes, quantidadeEfetiva]);
+
   // Um valor de variação é marcado como indisponível só quando dá pra saber
   // que a combinação resultante está zerada — ou seja, quando faltar escolher
   // no máximo este tipo. Com outros tipos ainda em aberto não dá pra cravar,
@@ -211,21 +216,43 @@ export default function ProdutoPageClient() {
     return estoqueDaCombinacao(produto!, tentativa) === 0;
   }
 
-  // Personalização não tem como pular pro pagamento sem antes definir a arte
-  // — por isso só existe um botão nesse caso, sem a escolha "sacola vs. agora".
+  // Personalização não tem como pular pro carrinho sem antes definir a arte
+  // — por isso só existe um botão nesse caso, sem a escolha "carrinho vs.
+  // agora". Cada adição é uma linha própria (uma arte por unidade).
   function avancarPersonalizacao() {
     if (!produto || faltaEscolher) return;
-    iniciarItem(produto.id, selecoes, normalizarCep(cep) ?? undefined);
-    definirQuantidade(quantidadeEfetiva);
+    adicionarItem({
+      produtoId: produto.id,
+      variacoesEscolhidas: selecoes,
+      quantidade: quantidadeEfetiva,
+      cepInformado: normalizarCep(cep) ?? undefined,
+      linhaUnica: true,
+    });
     router.push(`/personalizar/${produto.id}`);
   }
 
-  // Guarda o item e já manda direto pro checkout — o CEP calculado aqui segue
-  // junto, o checkout começa com ele preenchido em vez de pedir de novo.
+  // Coloca no carrinho e segue na página, pra continuar escolhendo.
+  function adicionarAoCarrinho() {
+    if (!produto || faltaEscolher) return;
+    adicionarItem({
+      produtoId: produto.id,
+      variacoesEscolhidas: selecoes,
+      quantidade: quantidadeEfetiva,
+      cepInformado: normalizarCep(cep) ?? undefined,
+    });
+    setAdicionadoChave(JSON.stringify([selecoes, quantidadeEfetiva]));
+  }
+
+  // Coloca no carrinho e já manda direto pro checkout — o CEP calculado aqui
+  // segue junto, o checkout começa com ele preenchido em vez de pedir de novo.
   function comprarAgora() {
     if (!produto || faltaEscolher) return;
-    iniciarItem(produto.id, selecoes, normalizarCep(cep) ?? undefined);
-    definirQuantidade(quantidadeEfetiva);
+    adicionarItem({
+      produtoId: produto.id,
+      variacoesEscolhidas: selecoes,
+      quantidade: quantidadeEfetiva,
+      cepInformado: normalizarCep(cep) ?? undefined,
+    });
     router.push("/checkout");
   }
 
@@ -621,8 +648,8 @@ export default function ProdutoPageClient() {
               )}
             </div>
 
-            {/* CTA — botão único: personalização avança pro editor de arte,
-                os demais produtos vão direto pro checkout */}
+            {/* CTA — personalização avança pro editor de arte (um botão só); os
+                demais produtos podem ir pro carrinho ou direto pro checkout */}
             {produto.requerPersonalizacao ? (
               <button
                 onClick={avancarPersonalizacao}
@@ -632,13 +659,30 @@ export default function ProdutoPageClient() {
                 Avançar para personalização
               </button>
             ) : (
-              <button
-                onClick={comprarAgora}
-                disabled={faltaEscolher}
-                className="w-full inline-flex items-center justify-center gap-2 bg-pine text-white font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
-              >
-                ⚡ Comprar agora
-              </button>
+              <div className="space-y-2.5">
+                <button
+                  onClick={comprarAgora}
+                  disabled={faltaEscolher}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-pine text-white font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
+                >
+                  ⚡ Comprar agora
+                </button>
+                <button
+                  onClick={adicionarAoCarrinho}
+                  disabled={faltaEscolher}
+                  className="w-full inline-flex items-center justify-center gap-2 border border-pine text-pine-2 font-medium px-8 py-3 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:bg-pine/5 transition"
+                >
+                  🛒 Adicionar ao carrinho
+                </button>
+                {adicionadoAoCarrinho && (
+                  <p className="text-xs text-pine-2 text-center" role="status">
+                    ✓ Adicionado ao carrinho.{" "}
+                    <Link href="/carrinho" className="underline font-medium">
+                      Ver carrinho
+                    </Link>
+                  </p>
+                )}
+              </div>
             )}
             {faltaEscolher && !combinacaoSemEstoque && faltaSelecionar && (
               <p className="text-xs text-ink/40 mt-2">Escolha todas as variações pra continuar.</p>

@@ -46,7 +46,7 @@ const PRODUTO_ID = "teste-estoque-produto";
 const USUARIO_ID = "teste-estoque-usuario";
 const PRECO = 100;
 
-const item: ItemCarrinho = { produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
+const item: ItemCarrinho = { id: "linha-1", produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
 
 // `estoque: null` é o produto sem controle — o padrão de quem nunca mexeu
 // nesse campo. Cada teste define o que precisa.
@@ -280,7 +280,7 @@ const COR_PRETA_G = "Cor:Preta|Tamanho:G";
 const COR_BRANCA_G = "Cor:Branca|Tamanho:G";
 
 function itemVariacao(escolhas: Record<string, string>, quantidade = 1): ItemCarrinho {
-  return { produtoId: PRODUTO_VARIACAO_ID, variacoesEscolhidas: escolhas, quantidade };
+  return { id: "linha-var", produtoId: PRODUTO_VARIACAO_ID, variacoesEscolhidas: escolhas, quantidade };
 }
 
 async function definirGrade(linhas: { combinacao: string; estoque: number }[]) {

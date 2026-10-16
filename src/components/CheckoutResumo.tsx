@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useProduto } from "@/lib/use-produto";
-import { useCart } from "@/lib/cart-context";
+import { useEffect, useMemo, useState } from "react";
+import { useProdutos } from "@/lib/use-produtos";
+import { useCart, type ItemCarrinho } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useConta } from "@/lib/conta-context";
 import { useCep } from "@/lib/use-cep";
@@ -12,7 +12,9 @@ import { compararPreco } from "@/lib/compare-price";
 import { formatarCep, normalizarCep } from "@/lib/frete";
 import { precoEfetivo } from "@/lib/estoque-variacao";
 import EnderecoForm from "@/components/EnderecoForm";
+import QuantidadeItem from "@/components/QuantidadeItem";
 import { novoIdEndereco, type Endereco } from "@/lib/conta-data";
+import type { Produto } from "@/lib/types";
 
 function reais(valor: number) {
   return `R$ ${valor.toFixed(2).replace(".", ",")}`;
@@ -42,13 +44,13 @@ export default function CheckoutResumo({
   freteGratisAcimaDe?: number | null;
 }) {
   const router = useRouter();
-  const { item, definirQuantidade } = useCart();
+  const { itens, definirQuantidade, removerItem } = useCart();
   const { logado, carregando: carregandoAuth } = useAuth();
   const { enderecos, salvarEndereco, carregando: carregandoConta } = useConta();
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState(erroInicial);
 
-  const { produto, carregando } = useProduto(item?.produtoId);
+  const { produtos, carregando } = useProdutos(itens.map((i) => i.produtoId));
 
   // Endereço escolhido pra entrega — obrigatório pra fechar o pedido. `null`
   // até o cliente escolher; a pré-seleção abaixo roda uma vez, assim que a
@@ -56,6 +58,8 @@ export default function CheckoutResumo({
   // produto), mas nunca decide por conta própria depois disso. Ajuste de
   // estado durante o render (não efeito) — mesmo padrão do `logadoAnterior`
   // em conta-context.tsx.
+  // CEP que o cliente digitou na página de produto (o da adição mais recente).
+  const cepInformado = itens.findLast((i) => i.cepInformado)?.cepInformado;
   const [enderecoIdSelecionado, setEnderecoIdSelecionado] = useState<string | null>(null);
   const [enderecoJaPreSelecionado, setEnderecoJaPreSelecionado] = useState(false);
   // Formulário de novo endereço aberto inline, embutido no checkout — sem
@@ -64,7 +68,7 @@ export default function CheckoutResumo({
   const [mostrandoFormNovo, setMostrandoFormNovo] = useState(false);
   if (!enderecoJaPreSelecionado && enderecos.length > 0) {
     setEnderecoJaPreSelecionado(true);
-    const cepDoProduto = item?.cepInformado ? normalizarCep(item.cepInformado) : null;
+    const cepDoProduto = cepInformado ? normalizarCep(cepInformado) : null;
     const porCep = cepDoProduto
       ? enderecos.find((e) => normalizarCep(e.cep) === cepDoProduto)
       : undefined;
@@ -80,13 +84,20 @@ export default function CheckoutResumo({
     mostrandoFormNovo || (!carregandoConta && enderecos.length === 0);
   const cepSelecionado = enderecoSelecionado ? normalizarCep(enderecoSelecionado.cep) : null;
 
-  const quantidade = item?.quantidade ?? 1;
-  const quantidadeMinima = Math.max(1, produto?.quantidadeMinima || 1);
+  // O frete é cotado sobre o carrinho inteiro (uma cotação por CEP de origem,
+  // somadas — ver consultarCep no servidor).
+  const linhasFrete = useMemo(
+    () =>
+      itens.map((i) => ({
+        produtoId: i.produtoId,
+        quantidade: i.quantidade,
+        variacoes: i.variacoesEscolhidas,
+      })),
+    [itens]
+  );
   const { endereco, erro: erroCep, consultando: consultandoCep } = useCep(
     cepSelecionado ? formatarCep(cepSelecionado) : "",
-    item?.produtoId,
-    quantidade,
-    item?.variacoesEscolhidas
+    linhasFrete
   );
 
   // EnderecoForm já trata o erro (mostra a própria mensagem) se `onSalvar`
@@ -109,44 +120,55 @@ export default function CheckoutResumo({
   } | null>(null);
   const servicoEscolhido =
     servicoEscolhidoState?.cep === endereco?.cep ? (servicoEscolhidoState?.servico ?? null) : null;
-  // `valorPedido` guarda sobre qual valor esse desconto foi calculado. Mudar a
-  // quantidade muda o valor, e um desconto percentual sobre o total antigo
-  // mostraria na tela um total que o servidor não vai cobrar.
+  // `chave` guarda sobre qual carrinho (produtos e valores das linhas) esse
+  // desconto foi calculado. Mudar uma quantidade muda o valor, e um desconto
+  // percentual sobre o total antigo mostraria na tela um total que o servidor
+  // não vai cobrar.
   const [cupomAplicado, setCupomAplicado] = useState<{
     codigo: string;
     desconto: number;
     freteGratis: boolean;
-    valorPedido: number;
+    chave: string;
   } | null>(null);
   const [validandoCupom, setValidandoCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
 
-  // Preço final considerando a variação escolhida (ex: "Tamanho imã": 7x7 =
-  // R$1) já multiplicado pela quantidade — é o valor que o cupom valida e
-  // que compõe o subtotal exibido. Sem produto carregado ainda não há preço,
-  // e o efeito abaixo não tem o que revalidar.
-  const precoUnitario = produto ? precoEfetivo(produto, item?.variacoesEscolhidas ?? {}) : 0;
-  const precoProduto = precoUnitario * quantidade;
+  // Preço final de cada linha considerando a variação escolhida (ex: "Tamanho
+  // imã": 7x7 = R$1) já multiplicado pela quantidade — é o valor que o cupom
+  // valida e que compõe o subtotal exibido. Linha sem produto carregado (ou
+  // que saiu do catálogo) não tem preço e fica fora da conta.
+  const linhasCupom = useMemo(
+    () =>
+      itens.flatMap((i) => {
+        const p = produtos[i.produtoId];
+        return p
+          ? [{ produtoId: i.produtoId, valor: precoEfetivo(p, i.variacoesEscolhidas) * i.quantidade }]
+          : [];
+      }),
+    [itens, produtos]
+  );
+  const precoProdutos = linhasCupom.reduce((soma, l) => soma + l.valor, 0);
+  const chaveCupom = JSON.stringify(linhasCupom);
 
-  // Cupom validado sobre um valor que não é mais o da tela: o desconto em mãos
-  // está velho até a revalidação abaixo responder. É estado derivado — dá pra
-  // ler direto de `cupomAplicado`, sem um `useState` pra espelhar.
-  const recalculandoCupom = !!cupomAplicado && cupomAplicado.valorPedido !== precoProduto;
+  // Cupom validado sobre um carrinho que não é mais o da tela: o desconto em
+  // mãos está velho até a revalidação abaixo responder. É estado derivado — dá
+  // pra ler direto de `cupomAplicado`, sem um `useState` pra espelhar.
+  const recalculandoCupom = !!cupomAplicado && cupomAplicado.chave !== chaveCupom;
 
   // O pedido é gravado no banco em nome do usuário, então quem tem sacola mas
   // não tem sessão passa pelo login antes de ver o resumo.
   useEffect(() => {
-    if (!carregandoAuth && !logado && item) {
+    if (!carregandoAuth && !logado && itens.length > 0) {
       router.replace("/entrar?next=/checkout");
     }
-  }, [carregandoAuth, logado, item, router]);
+  }, [carregandoAuth, logado, itens.length, router]);
 
-  // Quantidade mudou com cupom aplicado: revalida no servidor pelo novo valor
+  // Carrinho mudou com cupom aplicado: revalida no servidor pelos novos valores
   // em vez de repetir o desconto antigo. Se o cupom não valer mais pra esse
-  // valor (pedido mínimo, por exemplo), ele sai da tela com o motivo — melhor
-  // aqui do que só na hora de pagar, quando o servidor recalcula tudo.
+  // carrinho (pedido mínimo, por exemplo), ele sai da tela com o motivo —
+  // melhor aqui do que só na hora de pagar, quando o servidor recalcula tudo.
   useEffect(() => {
-    if (!cupomAplicado || cupomAplicado.valorPedido === precoProduto) return;
+    if (!cupomAplicado || cupomAplicado.chave === chaveCupom) return;
 
     const { codigo } = cupomAplicado;
     let cancelado = false;
@@ -154,7 +176,7 @@ export default function CheckoutResumo({
     fetch("/api/cupons/validar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigo, valorPedido: precoProduto, produtoId: item?.produtoId }),
+      body: JSON.stringify({ codigo, valorPedido: precoProdutos, itens: linhasCupom }),
     })
       .then(async (r) => {
         const data = await r.json();
@@ -169,7 +191,7 @@ export default function CheckoutResumo({
           codigo,
           desconto: data.desconto,
           freteGratis: !!data.freteGratis,
-          valorPedido: precoProduto,
+          chave: chaveCupom,
         });
       })
       .catch(() => {
@@ -178,12 +200,12 @@ export default function CheckoutResumo({
         setCupomAplicado(null);
       });
 
-    // Trocar a quantidade de novo no meio da consulta descarta a resposta
+    // Mexer no carrinho de novo no meio da consulta descarta a resposta
     // antiga, que já nasceu de um valor que não é mais o da tela.
     return () => {
       cancelado = true;
     };
-  }, [cupomAplicado, precoProduto, item?.produtoId]);
+  }, [cupomAplicado, chaveCupom, precoProdutos, linhasCupom]);
 
   if (carregando) {
     return (
@@ -193,9 +215,8 @@ export default function CheckoutResumo({
     );
   }
 
-  // Sem item na sacola, ou com um item cujo produto saiu do catálogo — nos dois
-  // casos não há o que fechar.
-  if (!item || !produto) {
+  // Sem nada no carrinho não há o que fechar.
+  if (itens.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-5 py-16 text-center">
         {erro && <p className="text-sm text-berry mb-4">{erro}</p>}
@@ -210,18 +231,51 @@ export default function CheckoutResumo({
     );
   }
 
-  const precisaArte = produto.requerPersonalizacao && !item.personalizacao?.aceite;
-  const comparacao = compararPreco(produto.precoShopee, precoUnitario, produto.vendidoNaShopee);
+  // Linha cujo produto saiu do catálogo não tem o que fechar: aparece com o
+  // aviso e trava o pagamento até ser removida.
+  const linhas = itens.map((item) => ({ item, produto: produtos[item.produtoId] }));
+  const indisponiveis = linhas.filter((l) => !l.produto);
+  const disponiveis = linhas.filter(
+    (l): l is { item: ItemCarrinho; produto: Produto } => !!l.produto
+  );
+
+  const semArte = disponiveis.filter(
+    (l) => l.produto.requerPersonalizacao && !l.item.personalizacao?.aceite
+  );
+  const precisaArte = semArte.length > 0;
+  const totalUnidades = itens.reduce((soma, i) => soma + i.quantidade, 0);
+  // Produção extra de personalização soma ao prazo: vale a linha mais demorada.
+  const diasProducaoExtra = Math.max(0, ...disponiveis.map((l) => l.produto.diasProducaoExtra));
+
+  // Comparativo com a Shopee: soma só as linhas que têm economia pra mostrar.
+  const comparativo = disponiveis.reduce(
+    (acc, { item, produto }) => {
+      const precoUnitario = precoEfetivo(produto, item.variacoesEscolhidas);
+      const c = compararPreco(produto.precoShopee, precoUnitario, produto.vendidoNaShopee);
+      if (!c.mostrar) return acc;
+      return {
+        shopee: acc.shopee + produto.precoShopee * item.quantidade,
+        site: acc.site + precoUnitario * item.quantidade,
+        economia: acc.economia + c.economia * item.quantidade,
+      };
+    },
+    { shopee: 0, site: 0, economia: 0 }
+  );
+  const mostrarComparativo = comparativo.economia > 0;
+  const percentualEconomia = mostrarComparativo
+    ? Math.round((comparativo.economia / comparativo.shopee) * 100)
+    : 0;
+
   const opcoesFrete = endereco?.opcoesFrete ?? [];
   const freteCalculado =
     opcoesFrete.find((o) => o.servico === servicoEscolhido) ?? opcoesFrete[0] ?? null;
   const desconto = cupomAplicado?.desconto ?? 0;
-  const subtotal = Math.max(0, precoProduto - desconto);
+  const subtotal = Math.max(0, precoProdutos - desconto);
 
   // Frete grátis por cupom OU por o pedido já bater o valor mínimo
   // configurado em /admin/cupons — os dois só zeram o frete cobrado, nunca
   // empilham desconto duplicado.
-  const freteGratisPorValor = freteGratisAcimaDe !== null && precoProduto >= freteGratisAcimaDe;
+  const freteGratisPorValor = freteGratisAcimaDe !== null && precoProdutos >= freteGratisAcimaDe;
   const freteGratis = !!cupomAplicado?.freteGratis || freteGratisPorValor;
   const frete = freteGratis ? 0 : (freteCalculado?.valor ?? null);
   const total = subtotal + (frete ?? 0);
@@ -231,15 +285,18 @@ export default function CheckoutResumo({
     setErroCupom("");
     setValidandoCupom(true);
 
-    // Valor congelado aqui: se a quantidade mudar antes da resposta chegar, o
+    // Carrinho congelado aqui: se algo mudar antes da resposta chegar, o
     // efeito de revalidação vê a diferença e pede o desconto de novo.
-    const valorPedido = precoProduto;
+    const chave = chaveCupom;
 
     fetch("/api/cupons/validar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ codigo: codigoCupom, valorPedido, produtoId: item?.produtoId }),
-      // (valorPedido já é preço unitário × quantidade)
+      body: JSON.stringify({
+        codigo: codigoCupom,
+        valorPedido: precoProdutos,
+        itens: linhasCupom,
+      }),
     })
       .then(async (r) => {
         const data = await r.json();
@@ -252,7 +309,7 @@ export default function CheckoutResumo({
           codigo: codigoCupom.trim().toUpperCase(),
           desconto: data.desconto,
           freteGratis: !!data.freteGratis,
-          valorPedido,
+          chave,
         });
       })
       .catch(() => setErroCupom("Não foi possível aplicar o cupom agora."))
@@ -266,9 +323,9 @@ export default function CheckoutResumo({
   }
 
   function pagar() {
-    // O botão já fica travado sem item, endereço e frete; a checagem sobra
+    // O botão já fica travado sem itens, endereço e frete; a checagem sobra
     // só pra estreitar os tipos.
-    if (!item || !endereco || !enderecoIdSelecionado) return;
+    if (itens.length === 0 || !endereco || !enderecoIdSelecionado) return;
     setErro("");
     setProcessando(true);
 
@@ -278,7 +335,7 @@ export default function CheckoutResumo({
       // Frete e desconto não vão fixos no corpo, de propósito: o servidor
       // recalcula os dois a partir do endereço e do código do cupom.
       body: JSON.stringify({
-        item,
+        itens,
         enderecoId: enderecoIdSelecionado,
         cupomCodigo: cupomAplicado?.codigo,
         servicoFrete: freteCalculado?.servico,
@@ -291,9 +348,9 @@ export default function CheckoutResumo({
           setProcessando(false);
           return;
         }
-        // A sacola só é limpa quando o pagamento é confirmado (ver
+        // O carrinho só é limpo quando o pagamento é confirmado (ver
         // /pedido/confirmado): se o cliente voltar de um pagamento recusado,
-        // o item continua aqui em vez de ter que ser montado de novo.
+        // os itens continuam aqui em vez de ter que ser montados de novo.
         // Pagamento real devolve a URL da página do Mercado Pago; o modo
         // simulado devolve a rota interna da confirmação. Nos dois casos é uma
         // navegação de verdade, então window.location dá conta dos dois.
@@ -309,79 +366,95 @@ export default function CheckoutResumo({
     <div className="mx-auto max-w-2xl px-5 py-12">
       <h1 className="font-display text-3xl mb-8">Finalizar pedido</h1>
 
-      <div className="bg-white border border-line rounded-lg p-5 mb-5">
-        <div className="flex gap-4">
-          <div
-            className="w-16 h-16 rounded-md flex items-center justify-center text-2xl shrink-0"
-            style={{ backgroundColor: `${produto.cor}22` }}
-          >
-            {produto.emoji}
-          </div>
-          <div className="flex-1">
-            <p className="font-medium">{produto.nome}</p>
-            <p className="text-xs text-ink/50">
-              {Object.entries(item.variacoesEscolhidas)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(" · ")}
-            </p>
-            {item.personalizacao && (
-              <p className="text-xs text-pine-2 mt-1">✓ {item.personalizacao.resumo}</p>
-            )}
-
-            {/* Personalização é feita uma vez por unidade; item que já exige
-                arte fica travado em 1 pra não pedir n artes diferentes aqui. */}
-            {!produto.requerPersonalizacao && (
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-xs text-ink/50">Quantidade</span>
-                {produto.quantidadePersonalizavel ? (
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={quantidadeMinima}
-                    value={quantidade}
-                    onChange={(e) => {
-                      const valor = Math.round(Number(e.target.value));
-                      definirQuantidade(Number.isFinite(valor) && valor > 0 ? valor : quantidadeMinima);
-                    }}
-                    onBlur={() => definirQuantidade(Math.max(quantidadeMinima, quantidade))}
-                    className="w-16 h-7 border border-line rounded-full text-center text-sm font-mono"
-                  />
-                ) : (
-                  <div className="flex items-center border border-line rounded-full">
-                    <button
-                      onClick={() => definirQuantidade(quantidade - 1)}
-                      disabled={quantidade <= quantidadeMinima}
-                      className="w-7 h-7 flex items-center justify-center text-sm disabled:opacity-30"
-                      aria-label="Diminuir quantidade"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-sm font-mono">{quantidade}</span>
-                    <button
-                      onClick={() => definirQuantidade(quantidade + 1)}
-                      className="w-7 h-7 flex items-center justify-center text-sm"
-                      aria-label="Aumentar quantidade"
-                    >
-                      +
-                    </button>
-                  </div>
-                )}
+      <div className="space-y-3 mb-5">
+        {linhas.map(({ item, produto }) => {
+          if (!produto) {
+            return (
+              <div
+                key={item.id}
+                className="bg-white border border-line rounded-lg p-5 flex items-center justify-between gap-4"
+              >
+                <p className="text-sm text-ink/60">Este produto não está mais disponível.</p>
+                <button
+                  onClick={() => removerItem(item.id)}
+                  className="text-xs text-berry hover:underline shrink-0"
+                >
+                  Remover
+                </button>
               </div>
-            )}
-          </div>
-          <p className="font-mono font-medium">{reais(precoProduto)}</p>
-        </div>
+            );
+          }
+
+          const precoUnitario = precoEfetivo(produto, item.variacoesEscolhidas);
+          return (
+            <div key={item.id} className="bg-white border border-line rounded-lg p-5">
+              <div className="flex gap-4">
+                <div
+                  className="w-16 h-16 rounded-md flex items-center justify-center text-2xl shrink-0 overflow-hidden"
+                  style={{ backgroundColor: `${produto.cor}22` }}
+                >
+                  {produto.imagens[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={produto.imagens[0]} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    produto.emoji
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">{produto.nome}</p>
+                  <p className="text-xs text-ink/50">
+                    {Object.entries(item.variacoesEscolhidas)
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(" · ")}
+                  </p>
+                  {item.personalizacao && (
+                    <p className="text-xs text-pine-2 mt-1">✓ {item.personalizacao.resumo}</p>
+                  )}
+                  {/* Personalização é feita uma vez por unidade; item que já
+                      exige arte fica travado em 1 (o seletor nem aparece). */}
+                  <QuantidadeItem
+                    produto={produto}
+                    variacoesEscolhidas={item.variacoesEscolhidas}
+                    quantidade={item.quantidade}
+                    onChange={(q) => definirQuantidade(item.id, q)}
+                  />
+                </div>
+                <p className="font-mono font-medium">{reais(precoUnitario * item.quantidade)}</p>
+              </div>
+              {itens.length > 1 && (
+                <div className="flex justify-end mt-3">
+                  <button
+                    onClick={() => removerItem(item.id)}
+                    className="text-xs text-berry hover:underline"
+                    aria-label={`Remover ${produto.nome} do pedido`}
+                  >
+                    Remover
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <Link href="/carrinho" className="block text-center text-xs text-pine-2 hover:underline">
+          Voltar ao carrinho
+        </Link>
       </div>
 
       {precisaArte && (
         <div className="bg-berry/10 border border-berry/40 text-berry text-sm rounded-md px-4 py-3 mb-5">
           Falta definir e confirmar a arte antes de pagar.{" "}
           <button
-            onClick={() => router.push(`/personalizar/${produto.id}`)}
+            onClick={() => router.push(`/personalizar/${semArte[0].produto.id}`)}
             className="underline font-medium"
           >
             Voltar pra personalização
           </button>
+        </div>
+      )}
+
+      {indisponiveis.length > 0 && (
+        <div className="bg-berry/10 border border-berry/40 text-berry text-sm rounded-md px-4 py-3 mb-5">
+          Remova os itens indisponíveis pra poder pagar.
         </div>
       )}
 
@@ -450,7 +523,7 @@ export default function CheckoutResumo({
               inicial={{
                 ...enderecoVazio,
                 id: novoIdEndereco(),
-                cep: item?.cepInformado ? formatarCep(item.cepInformado) : "",
+                cep: cepInformado ? formatarCep(cepInformado) : "",
               }}
               onSalvar={salvarNovoEndereco}
             />
@@ -494,7 +567,7 @@ export default function CheckoutResumo({
                       <span className="text-xs">
                         <span className="font-medium">{opcao.servico}</span>{" "}
                         <span className="text-ink/50">
-                          — até {opcao.prazoDias + produto.diasProducaoExtra} dias úteis
+                          — até {opcao.prazoDias + diasProducaoExtra} dias úteis
                         </span>
                       </span>
                     </span>
@@ -504,9 +577,8 @@ export default function CheckoutResumo({
               </div>
             ) : (
               <p className="text-xs text-pine-2 mt-1.5">
-                Entrega em até{" "}
-                {(freteCalculado?.prazoDias ?? 0) + produto.diasProducaoExtra}{" "}
-                dias úteis após a postagem
+                Entrega em até {(freteCalculado?.prazoDias ?? 0) + diasProducaoExtra} dias úteis
+                após a postagem
               </p>
             )}
           </div>
@@ -517,23 +589,21 @@ export default function CheckoutResumo({
         </p>
       </div>
 
-      {comparacao.mostrar && (
+      {mostrarComparativo && (
         <div className="bg-white border border-line rounded-lg p-5 mb-5">
           <p className="text-sm font-medium mb-3">Comparativo de preço</p>
           <div className="flex justify-between text-sm mb-1.5">
             <span className="text-ink/60">Na Shopee</span>
-            <span className="line-through text-ink/40 font-mono">
-              {reais(produto.precoShopee)}
-            </span>
+            <span className="line-through text-ink/40 font-mono">{reais(comparativo.shopee)}</span>
           </div>
           <div className="flex justify-between text-sm font-medium mb-1.5">
             <span>Aqui no site</span>
-            <span className="font-mono text-pine-2">{reais(precoUnitario)}</span>
+            <span className="font-mono text-pine-2">{reais(comparativo.site)}</span>
           </div>
           <div className="flex justify-between text-sm text-berry">
             <span>Você economiza</span>
             <span className="font-mono">
-              {reais(comparacao.economia ?? 0)} ({comparacao.percentual}%)
+              {reais(comparativo.economia)} ({percentualEconomia}%)
             </span>
           </div>
         </div>
@@ -578,16 +648,17 @@ export default function CheckoutResumo({
       <div className="bg-white border border-line rounded-lg p-5 mb-5">
         <div className="flex justify-between text-sm mb-1.5">
           <span className="text-ink/60">
-            Produto{quantidade > 1 ? ` (${quantidade}x)` : ""}
+            {itens.length > 1 ? "Produtos" : "Produto"}
+            {totalUnidades > 1 ? ` (${totalUnidades}x)` : ""}
           </span>
-          <span className="font-mono">{reais(precoProduto)}</span>
+          <span className="font-mono">{reais(precoProdutos)}</span>
         </div>
         {(desconto > 0 || recalculandoCupom) && (
           <div className="flex justify-between text-sm mb-1.5">
             <span className="text-ink/60">Desconto ({cupomAplicado?.codigo})</span>
             <span className="font-mono text-pine-2">
               {/* Enquanto a revalidação não volta, o desconto em mãos foi
-                  calculado sobre outra quantidade — mostrar o número velho
+                  calculado sobre outro carrinho — mostrar o número velho
                   aqui é justamente o "total mentiroso" que isto resolve. */}
               {recalculandoCupom ? "recalculando..." : `-${reais(desconto)}`}
             </span>
@@ -631,6 +702,7 @@ export default function CheckoutResumo({
         onClick={pagar}
         disabled={
           precisaArte ||
+          indisponiveis.length > 0 ||
           processando ||
           !enderecoIdSelecionado ||
           !freteCalculado ||

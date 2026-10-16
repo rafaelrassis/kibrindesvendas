@@ -3,15 +3,16 @@ import { getCarrinho, limparCarrinho, salvarCarrinho } from "@/lib/data/carrinho
 import { usuarioIdDaSessao } from "@/lib/session";
 import { corpoJson, respostaDeErro } from "@/lib/api";
 
-// Sacola persistida é só de quem está logado: visitante segue no localStorage
-// (ver cart-context.tsx), então as três rotas exigem sessão.
+// Carrinho persistido é só de quem está logado: visitante segue no
+// localStorage (ver cart-context.tsx), então as três rotas exigem sessão.
 export async function GET() {
   const usuarioId = await usuarioIdDaSessao();
-  if (!usuarioId) return NextResponse.json(null);
+  if (!usuarioId) return NextResponse.json([]);
 
   return NextResponse.json(await getCarrinho(usuarioId));
 }
 
+// Substitui o carrinho inteiro pela lista enviada.
 export async function PUT(req: NextRequest) {
   const usuarioId = await usuarioIdDaSessao();
   if (!usuarioId) {
@@ -19,9 +20,11 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const { item } = await corpoJson<{ item?: unknown }>(req);
-    const salvo = await salvarCarrinho(usuarioId, item);
-    return NextResponse.json(salvo);
+    const { itens } = await corpoJson<{ itens?: unknown }>(req);
+    if (!Array.isArray(itens)) {
+      return NextResponse.json({ error: "Carrinho inválido." }, { status: 400 });
+    }
+    return NextResponse.json(await salvarCarrinho(usuarioId, itens));
   } catch (e) {
     return respostaDeErro(e);
   }

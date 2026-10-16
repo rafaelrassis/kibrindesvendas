@@ -52,8 +52,8 @@ const PRODUTO_ID_2 = "teste-cupom-produto-2";
 const USUARIO_ID = "teste-cupom-usuario";
 const PRECO = 100;
 
-const item: ItemCarrinho = { produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
-const item2: ItemCarrinho = { produtoId: PRODUTO_ID_2, variacoesEscolhidas: {}, quantidade: 1 };
+const item: ItemCarrinho = { id: "linha-1", produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
+const item2: ItemCarrinho = { id: "linha-2", produtoId: PRODUTO_ID_2, variacoesEscolhidas: {}, quantidade: 1 };
 
 function esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

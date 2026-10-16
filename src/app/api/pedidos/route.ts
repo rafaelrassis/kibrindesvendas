@@ -23,15 +23,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { item, enderecoId, cupomCodigo, servicoFrete } = await corpoJson<{
-      item: ItemCarrinho;
+    const { itens, item, enderecoId, cupomCodigo, servicoFrete } = await corpoJson<{
+      itens?: ItemCarrinho[];
+      // Formato antigo (1 item só) — segue aceito.
+      item?: ItemCarrinho;
       enderecoId: string;
       cupomCodigo?: string;
       servicoFrete?: string;
     }>(req);
+    const linhas = Array.isArray(itens) ? itens : item ? [item] : [];
     const { pedido, checkoutUrl } = await criarPedido(
       usuarioId,
-      item,
+      linhas,
       enderecoId,
       cupomCodigo,
       servicoFrete

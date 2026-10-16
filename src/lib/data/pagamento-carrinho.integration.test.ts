@@ -43,7 +43,7 @@ const PRODUTO_ID = "teste-pagcarrinho-produto";
 const USUARIO_ID = "teste-pagcarrinho-usuario";
 const PRECO = 100;
 
-const item: ItemCarrinho = { produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
+const item: ItemCarrinho = { id: "linha-1", produtoId: PRODUTO_ID, variacoesEscolhidas: {}, quantidade: 1 };
 
 async function limpar() {
   await prisma.pedido.deleteMany({ where: { usuarioId: USUARIO_ID } });
@@ -101,8 +101,8 @@ afterAll(async () => {
 });
 
 describe("carrinho gravado x confirmação de pagamento", () => {
-  it("pagamento aprovado esvazia a sacola do banco", async () => {
-    await salvarCarrinho(USUARIO_ID, item);
+  it("pagamento aprovado esvazia o carrinho do banco", async () => {
+    await salvarCarrinho(USUARIO_ID, [item]);
     const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
 
     gateway.getPagamento.mockResolvedValue({
@@ -114,11 +114,11 @@ describe("carrinho gravado x confirmação de pagamento", () => {
 
     const atualizado = await prisma.pedido.findUnique({ where: { id: pedido.id } });
     expect(atualizado?.status).toBe("PAGO");
-    expect(await getCarrinho(USUARIO_ID)).toBeNull();
+    expect(await getCarrinho(USUARIO_ID)).toEqual([]);
   });
 
-  it("pagamento recusado mantém a sacola intacta pra tentar de novo", async () => {
-    await salvarCarrinho(USUARIO_ID, item);
+  it("pagamento recusado mantém o carrinho intacto pra tentar de novo", async () => {
+    await salvarCarrinho(USUARIO_ID, [item]);
     const { pedido } = await criarPedido(USUARIO_ID, item, "teste-endereco-id");
 
     gateway.getPagamento.mockResolvedValue({
@@ -130,6 +130,6 @@ describe("carrinho gravado x confirmação de pagamento", () => {
 
     const atualizado = await prisma.pedido.findUnique({ where: { id: pedido.id } });
     expect(atualizado?.status).toBe("CANCELADO");
-    expect(await getCarrinho(USUARIO_ID)).toMatchObject({ produtoId: PRODUTO_ID });
+    expect(await getCarrinho(USUARIO_ID)).toMatchObject([{ produtoId: PRODUTO_ID }]);
   });
 });

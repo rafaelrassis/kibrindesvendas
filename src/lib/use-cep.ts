@@ -13,17 +13,23 @@ export type EnderecoConsultado = {
   frete: OpcaoFrete;
 };
 
-// Como em useProduto: a resposta guarda o CEP (e a quantidade) que originou
-// a busca, então "consultando" é derivado e resposta atrasada não vale.
-// Só o CEP não bastava: o frete real (Melhor Envio) depende do peso total,
-// que depende da quantidade — sem guardá-la aqui, mudar a quantidade com o
-// mesmo CEP fazia o frete da quantidade antiga continuar de pé, sem nenhum
-// aviso de "Calculando...", até a resposta nova chegar.
-type Resposta = { cep: string; quantidade: number; endereco?: EnderecoConsultado; erro?: string };
+// Uma linha do carrinho do ponto de vista do frete (peso e origem).
+export type LinhaConsultaCep = {
+  produtoId: string;
+  quantidade: number;
+  variacoes?: Record<string, string>;
+};
 
-// Chave estável pra comparar/depender das variações escolhidas sem disparar
-// o efeito de novo a cada render por causa de um objeto novo com o mesmo
-// conteúdo (ex: pai recriando o Record a cada render).
+// Como em useProduto: a resposta guarda o CEP (e as linhas) que originou a
+// busca, então "consultando" é derivado e resposta atrasada não vale.
+// Só o CEP não bastava: o frete real depende do peso total, que depende da
+// quantidade e dos produtos — sem guardá-los aqui, mudar o carrinho com o
+// mesmo CEP fazia o frete antigo continuar de pé, sem nenhum aviso de
+// "Calculando...", até a resposta nova chegar.
+type Resposta = { cep: string; chave: string; endereco?: EnderecoConsultado; erro?: string };
+
+// Chave estável pra comparar/depender das linhas sem disparar o efeito de novo
+// a cada render por causa de um objeto novo com o mesmo conteúdo.
 function chaveVariacoes(v?: Record<string, string>): string {
   if (!v) return "";
   return Object.keys(v)
@@ -32,30 +38,28 @@ function chaveVariacoes(v?: Record<string, string>): string {
     .join("|");
 }
 
+function chaveLinhas(linhas: LinhaConsultaCep[]): string {
+  return linhas
+    .map((l) => `${l.produtoId}#${l.quantidade}#${chaveVariacoes(l.variacoes)}`)
+    .join(";");
+}
+
 // Consulta o CEP (endereço + frete) sempre que ele fica completo. CEP
 // incompleto não dispara nada — é o estado normal de quem está digitando.
-// `variacoesEscolhidas` afeta o peso/dimensão cotados quando o produto tem
-// peso por valor de variação (ex: tamanho de ímã) — ver dimensaoEfetiva.
-export function useCep(
-  valor: string,
-  produtoId?: string,
-  quantidade = 1,
-  variacoesEscolhidas?: Record<string, string>
-) {
+// `linhas` define o que está sendo enviado: uma linha só na página do produto,
+// o carrinho inteiro no checkout. Variações afetam o peso/dimensão cotados
+// quando o produto tem peso por valor de variação (ex: tamanho de ímã).
+export function useCep(valor: string, linhas: LinhaConsultaCep[] = []) {
   const cep = normalizarCep(valor);
   const [resposta, setResposta] = useState<Resposta | undefined>(undefined);
-  const variacoesKey = chaveVariacoes(variacoesEscolhidas);
+  const chave = chaveLinhas(linhas);
 
   useEffect(() => {
     if (!cep) return;
     let ativo = true;
 
     const params = new URLSearchParams();
-    if (produtoId) params.set("produtoId", produtoId);
-    if (quantidade > 1) params.set("quantidade", String(quantidade));
-    if (variacoesEscolhidas && Object.keys(variacoesEscolhidas).length > 0) {
-      params.set("variacoes", JSON.stringify(variacoesEscolhidas));
-    }
+    if (linhas.length > 0) params.set("itens", JSON.stringify(linhas));
     const query = params.toString();
     const url = query ? `/api/cep/${cep}?${query}` : `/api/cep/${cep}`;
 
@@ -65,22 +69,21 @@ export function useCep(
         if (!ativo) return;
         setResposta(
           r.ok
-            ? { cep, quantidade, endereco: dados }
-            : { cep, quantidade, erro: dados.error ?? "Não foi possível consultar o CEP." }
+            ? { cep, chave, endereco: dados }
+            : { cep, chave, erro: dados.error ?? "Não foi possível consultar o CEP." }
         );
       })
       .catch(() => {
-        if (ativo) setResposta({ cep, quantidade, erro: "Não foi possível consultar o CEP agora." });
+        if (ativo) setResposta({ cep, chave, erro: "Não foi possível consultar o CEP agora." });
       });
 
     return () => {
       ativo = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- variacoesKey já resume variacoesEscolhidas
-  }, [cep, produtoId, quantidade, variacoesKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `chave` já resume `linhas`
+  }, [cep, chave]);
 
-  const atual =
-    cep && resposta?.cep === cep && resposta?.quantidade === quantidade ? resposta : undefined;
+  const atual = cep && resposta?.cep === cep && resposta?.chave === chave ? resposta : undefined;
 
   return {
     endereco: atual?.endereco ?? null,

@@ -59,10 +59,20 @@ export async function usuarioJaComprou(
 // preview: quem garante o limite de usos (e, pra cupom de primeira compra, o
 // próprio "é a primeira mesmo") sob concorrência é `registrarUsoCupom` /
 // a trava por usuário dentro da transação que grava o pedido (ver criarPedido).
+//
+// Carrinho com vários produtos: `contexto.itens` traz o valor de cada linha. Um
+// cupom restrito a um produto só incide sobre as linhas desse produto (o
+// desconto e o pedido mínimo olham só pra elas); sem restrição, vale o
+// carrinho inteiro (`valorPedido`). `valorBase` devolve sobre o que o desconto
+// foi calculado, pra quem grava o uso do cupom conferir o mesmo valor.
 export async function validarCupom(
   codigoBruto: unknown,
   valorPedido: number,
-  contexto: { usuarioId: string; produtoId?: string | null }
+  contexto: {
+    usuarioId: string;
+    produtoId?: string | null;
+    itens?: { produtoId: string; valor: number }[];
+  }
 ) {
   const codigo = typeof codigoBruto === "string" ? normalizarCodigo(codigoBruto) : "";
   if (!codigo) throw new ErroDeNegocio("Informe o código do cupom.");
@@ -74,6 +84,18 @@ export async function validarCupom(
   // poupa uma query em todo cupom comum, que é a grande maioria.
   const jaComprou = cupom.primeiraCompra ? await usuarioJaComprou(contexto.usuarioId) : false;
 
+  let valorBase = valorPedido;
+  let produtoIdContexto = contexto.produtoId ?? null;
+  if (contexto.itens && contexto.itens.length > 0) {
+    if (cupom.produtoId) {
+      const doProduto = contexto.itens.filter((i) => i.produtoId === cupom.produtoId);
+      valorBase = doProduto.reduce((soma, i) => soma + i.valor, 0);
+      produtoIdContexto = doProduto.length > 0 ? cupom.produtoId : null;
+    } else {
+      valorBase = contexto.itens.reduce((soma, i) => soma + i.valor, 0);
+    }
+  }
+
   const indisponivel = checarDisponibilidade(
     {
       ativo: cupom.ativo,
@@ -84,14 +106,15 @@ export async function validarCupom(
       produtoId: cupom.produtoId,
       primeiraCompra: cupom.primeiraCompra,
     },
-    valorPedido,
-    { produtoId: contexto.produtoId ?? null, jaComprou }
+    valorBase,
+    { produtoId: produtoIdContexto, jaComprou }
   );
   if (indisponivel) throw new ErroDeNegocio(indisponivel.mensagem, indisponivel.status);
 
   return {
     cupom,
-    desconto: calcularDesconto(cupom.tipo, Number(cupom.valor), valorPedido),
+    desconto: calcularDesconto(cupom.tipo, Number(cupom.valor), valorBase),
+    valorBase,
     freteGratis: cupom.tipo === "FRETE_GRATIS",
   };
 }

@@ -30,7 +30,12 @@ export default function PersonalizarPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { produto } = useProduto(id);
-  const { item, definirPersonalizacao } = useCart();
+  const { itens, definirPersonalizacao } = useCart();
+  // A linha que acabou de ser criada pra personalizar: a última deste produto
+  // ainda sem arte (cada adição de produto personalizado é uma linha própria).
+  // Sem nenhuma pendente, cai na última do produto — dá pra refazer a arte.
+  const doProduto = itens.filter((i) => i.produtoId === id);
+  const item = doProduto.findLast((i) => !i.personalizacao) ?? doProduto.at(-1);
 
   const [via, setVia] = useState<ViaPersonalizacao>("UPLOAD");
   const [arquivoNome, setArquivoNome] = useState<string | null>(null);
@@ -50,7 +55,7 @@ export default function PersonalizarPage() {
     );
   }
 
-  if (!item || item.produtoId !== produto.id) {
+  if (!item) {
     return (
       <div className="mx-auto max-w-3xl px-5 py-16 text-center">
         <p className="text-ink/60 mb-4">
@@ -65,6 +70,10 @@ export default function PersonalizarPage() {
       </div>
     );
   }
+
+  // Fixado aqui porque `confirmar` (declaração de função) não herda o
+  // estreitamento de `item` feito pelo retorno antecipado acima.
+  const itemId = item.id;
 
   // Só vale como arte pronta depois que o arquivo chegou no servidor (upload)
   // ou depois que a pessoa abriu a conversa no WhatsApp (manual) — o nome do
@@ -112,14 +121,16 @@ export default function PersonalizarPage() {
         ? `Arte enviada pelo cliente — ${arquivoNome}`
         : "Arte combinada com o cliente por WhatsApp";
 
-    definirPersonalizacao({
+    definirPersonalizacao(itemId, {
       via,
       resumo,
       aceite: true,
       aceiteEm: new Date().toISOString(),
       ...(arteUrl && { arteUrl }),
     });
-    router.push("/checkout");
+    // Arte definida: o item já está no carrinho, de onde dá pra seguir pro
+    // pagamento ou continuar comprando.
+    router.push("/carrinho");
   }
 
   return (
@@ -234,7 +245,7 @@ export default function PersonalizarPage() {
         disabled={!artePronta || !aceite || enviandoArquivo}
         className="w-full md:w-auto bg-berry text-paper font-medium px-8 py-3.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-95 transition"
       >
-        Confirmar arte e ir pro pagamento
+        Confirmar arte e ir pro carrinho
       </button>
     </div>
   );

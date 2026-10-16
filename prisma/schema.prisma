@@ -264,7 +264,7 @@ model Usuario {
   favoritos    Favorito[]
   notificacoes Notificacao[]
   avaliacoes   Avaliacao[]
-  carrinho     CarrinhoItem?
+  carrinho     CarrinhoItem[]
   enderecos    Endereco[]
   createdAt    DateTime      @default(now())
 }
@@ -294,24 +294,32 @@ model Endereco {
   @@index([usuarioId])
 }
 
-// A sacola do usuário logado, espelhando o `ItemCarrinho` do client (um item
-// só, com variações, quantidade e personalização). Visitante sem sessão
-// continua só no localStorage — ver cart-context.tsx.
+// O carrinho do usuário logado, espelhando os `ItemCarrinho` do client (uma
+// linha por item, com variações, quantidade e personalização). Visitante sem
+// sessão continua só no localStorage — ver cart-context.tsx.
 //
 // `produtoId` não é uma relação de verdade pro `Produto`: uma FK aqui
-// travaria a remoção de um produto só porque alguém tem ele numa sacola nunca
-// comprada. A tela já lida com produto que sumiu do catálogo (useProduto
+// travaria a remoção de um produto só porque alguém tem ele num carrinho nunca
+// comprado. A tela já lida com produto que sumiu do catálogo (useProdutos
 // devolve undefined) do mesmo jeito que lida hoje com o item do localStorage.
 model CarrinhoItem {
   id                  String   @id @default(cuid())
-  usuarioId           String   @unique
+  usuarioId           String
   usuario             Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // Id da linha gerado no navegador (ver cart-context.tsx): é o que liga a
+  // linha do banco à linha do localStorage entre aparelhos. Único por usuário.
+  chave               String
+  // Posição da linha no carrinho, pra voltar na mesma ordem em outro aparelho.
+  ordem               Int      @default(0)
   produtoId           String
   variacoesEscolhidas Json     @default("{}")
   quantidade          Int      @default(1)
   cepInformado        String?
   personalizacao      Json?
   updatedAt           DateTime @updatedAt
+
+  @@unique([usuarioId, chave])
+  @@index([usuarioId])
 }
 
 model Favorito {

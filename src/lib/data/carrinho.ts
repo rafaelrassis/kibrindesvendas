@@ -4,12 +4,17 @@ import { prisma } from "@/lib/prisma";
 import type { ItemCarrinho } from "@/lib/cart-context";
 import { ErroDeNegocio } from "./erros";
 
-// A sacola persistida é só pra quem está logado — visitante continua inteiro
+// O carrinho persistido é só pra quem está logado — visitante continua inteiro
 // no localStorage (ver cart-context.tsx). Aqui é só o espelho no banco, pra
-// sobreviver a troca de aparelho e a payment que demora (boleto) sem depender
+// sobreviver a troca de aparelho e a pagamento que demora (boleto) sem depender
 // da aba continuar aberta.
 
+// Teto de linhas: o carrinho vem do navegador, então não confiamos que ele
+// seja pequeno.
+export const MAX_LINHAS_CARRINHO = 30;
+
 function paraItemCarrinho(linha: {
+  chave: string;
   produtoId: string;
   variacoesEscolhidas: unknown;
   quantidade: number;
@@ -17,6 +22,7 @@ function paraItemCarrinho(linha: {
   personalizacao: unknown;
 }): ItemCarrinho {
   const item: ItemCarrinho = {
+    id: linha.chave,
     produtoId: linha.produtoId,
     variacoesEscolhidas: (linha.variacoesEscolhidas as Record<string, string>) ?? {},
     quantidade: linha.quantidade,
@@ -28,56 +34,67 @@ function paraItemCarrinho(linha: {
   return item;
 }
 
-export async function getCarrinho(usuarioId: string): Promise<ItemCarrinho | null> {
-  const linha = await prisma.carrinhoItem.findUnique({ where: { usuarioId } });
-  return linha ? paraItemCarrinho(linha) : null;
+export async function getCarrinho(usuarioId: string): Promise<ItemCarrinho[]> {
+  const linhas = await prisma.carrinhoItem.findMany({
+    where: { usuarioId },
+    orderBy: [{ ordem: "asc" }, { updatedAt: "asc" }],
+  });
+  return linhas.map(paraItemCarrinho);
 }
 
-// Upsert de um jeito só: a sacola é sempre um item por usuário, então salvar
-// substitui o que tinha antes em vez de acumular.
-export async function salvarCarrinho(usuarioId: string, item: unknown): Promise<ItemCarrinho> {
-  if (
-    !item ||
-    typeof item !== "object" ||
-    typeof (item as ItemCarrinho).produtoId !== "string" ||
-    !(item as ItemCarrinho).produtoId
-  ) {
-    throw new ErroDeNegocio("Item da sacola inválido.");
+// Salvar substitui o carrinho inteiro: o navegador manda o estado completo, e
+// o banco passa a ser exatamente isso (linhas removidas somem, novas entram).
+// Aceita também um item solto (formato antigo de 1 item só).
+export async function salvarCarrinho(usuarioId: string, entrada: unknown): Promise<ItemCarrinho[]> {
+  const lista = Array.isArray(entrada) ? entrada : [entrada];
+  if (lista.length > MAX_LINHAS_CARRINHO) {
+    throw new ErroDeNegocio(`O carrinho aceita no máximo ${MAX_LINHAS_CARRINHO} itens.`);
   }
 
-  const bruto = item as ItemCarrinho;
-  const quantidade = Math.max(1, Math.round(Number(bruto.quantidade)) || 1);
-  // Json nullable do Prisma não aceita `null` cru pra "apagar o campo" — pede
-  // o sentinela `Prisma.JsonNull`, senão o TS lê como "não alterar nada".
-  const personalizacao = bruto.personalizacao
-    ? (bruto.personalizacao as Prisma.InputJsonValue)
-    : Prisma.JsonNull;
+  const vistas = new Set<string>();
+  const linhas = lista.map((bruto, ordem) => {
+    if (
+      !bruto ||
+      typeof bruto !== "object" ||
+      typeof (bruto as ItemCarrinho).produtoId !== "string" ||
+      !(bruto as ItemCarrinho).produtoId
+    ) {
+      throw new ErroDeNegocio("Item do carrinho inválido.");
+    }
+    const item = bruto as ItemCarrinho;
+    // Item vindo do formato antigo não tem id: usa a posição, que já é única.
+    const chave =
+      typeof item.id === "string" && item.id.trim() ? item.id.trim().slice(0, 64) : `item-${ordem}`;
+    if (vistas.has(chave)) throw new ErroDeNegocio("Carrinho com itens repetidos.");
+    vistas.add(chave);
 
-  const linha = await prisma.carrinhoItem.upsert({
-    where: { usuarioId },
-    create: {
+    return {
       usuarioId,
-      produtoId: bruto.produtoId,
-      variacoesEscolhidas: bruto.variacoesEscolhidas ?? {},
-      quantidade,
-      cepInformado: bruto.cepInformado ?? null,
-      personalizacao,
-    },
-    update: {
-      produtoId: bruto.produtoId,
-      variacoesEscolhidas: bruto.variacoesEscolhidas ?? {},
-      quantidade,
-      cepInformado: bruto.cepInformado ?? null,
-      personalizacao,
-    },
+      chave,
+      ordem,
+      produtoId: item.produtoId,
+      variacoesEscolhidas: (item.variacoesEscolhidas ?? {}) as Prisma.InputJsonValue,
+      quantidade: Math.max(1, Math.round(Number(item.quantidade)) || 1),
+      cepInformado: item.cepInformado ?? null,
+      // Json nullable do Prisma não aceita `null` cru pra "apagar o campo" —
+      // pede o sentinela `Prisma.JsonNull`.
+      personalizacao: item.personalizacao
+        ? (item.personalizacao as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+    };
   });
 
-  return paraItemCarrinho(linha);
+  await prisma.$transaction([
+    prisma.carrinhoItem.deleteMany({ where: { usuarioId } }),
+    prisma.carrinhoItem.createMany({ data: linhas }),
+  ]);
+
+  return getCarrinho(usuarioId);
 }
 
 export async function limparCarrinho(usuarioId: string) {
   // `deleteMany` em vez de `delete`: chamado também pelo webhook de
   // pagamento, onde não há garantia de que ainda exista uma linha (o cliente
-  // pode já ter limpado a sacola por conta própria).
+  // pode já ter limpado o carrinho por conta própria).
   await prisma.carrinhoItem.deleteMany({ where: { usuarioId } });
 }

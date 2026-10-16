@@ -10,6 +10,7 @@ import {
   paymentClient,
   preferenceClient,
 } from "@/lib/mercadopago";
+import { MAX_LINHAS_CARRINHO } from "./carrinho";
 import { consultarEnderecoSalvo, resumoDoEnderecoSalvo } from "./entrega";
 import { ErroDeNegocio } from "./erros";
 import { notificar } from "./notificacoes";
@@ -38,120 +39,181 @@ function emReais(valor: number) {
   return Math.round(valor * 100) / 100;
 }
 
+// Produto como o pedido precisa dele: com variações, estoque por combinação e
+// materiais (pro custo). Um por linha do carrinho (ou compartilhado entre
+// linhas do mesmo produto).
+type ProdutoDoPedido = Prisma.ProdutoGetPayload<{
+  include: { estoqueVariacoes: true; variacoes: true; materiais: true };
+}>;
+
+type LinhaDoPedido = {
+  item: ItemCarrinho;
+  produto: ProdutoDoPedido;
+  quantidade: number;
+  precoUnitario: number;
+  // Produto com variações e controle ligado (tem linha em estoqueVariacoes)
+  // é controlado por combinação; senão cai no campo único de sempre.
+  combinacao: string;
+  controladoPorVariacao: boolean;
+};
+
 // Cria o pedido e devolve pra onde mandar o cliente em seguida: a página
 // hospedada do Mercado Pago quando o pagamento é real, ou direto a tela de
 // confirmação no modo simulado.
+//
+// Aceita o carrinho inteiro (lista de linhas) ou, por compatibilidade, um item
+// solto. O pedido é um só: um frete (soma das origens, ver consultarCep), um
+// cupom e um pagamento, com um ItemPedido por linha.
 export async function criarPedido(
   usuarioId: string,
-  item: ItemCarrinho,
+  itensBrutos: ItemCarrinho | ItemCarrinho[],
   enderecoId: unknown,
   cupomCodigo?: unknown,
   servicoFrete?: unknown
 ) {
-  if (!item?.produtoId) throw new ErroDeNegocio("Item do pedido inválido.");
+  const itens = Array.isArray(itensBrutos) ? itensBrutos : [itensBrutos];
+  if (itens.length === 0) throw new ErroDeNegocio("Seu carrinho está vazio.");
+  if (itens.length > MAX_LINHAS_CARRINHO) {
+    throw new ErroDeNegocio(`O pedido aceita no máximo ${MAX_LINHAS_CARRINHO} itens.`);
+  }
+  if (itens.some((item) => !item?.produtoId)) throw new ErroDeNegocio("Item do pedido inválido.");
 
   // Quantidade também não é confiada do navegador: normaliza aqui, valida
   // contra o produto mais abaixo (mínima + personalização) antes de usar em
   // qualquer cálculo.
-  const quantidade = Math.max(1, Math.round(Number(item.quantidade)) || 1);
+  const entradas = itens.map((item) => ({
+    item,
+    quantidade: Math.max(1, Math.round(Number(item.quantidade)) || 1),
+  }));
+  const idsProdutos = [...new Set(entradas.map((e) => e.item.produtoId))];
 
   // O frete é recalculado aqui de propósito: o valor que o navegador mostrou
   // é só pra visualização, quem define o que vai ser cobrado é o servidor.
-  const [usuario, produto, endereco] = await Promise.all([
+  const [usuario, produtosDb, endereco] = await Promise.all([
     prisma.usuario.findUnique({ where: { id: usuarioId } }),
-    prisma.produto.findUnique({
-      where: { id: item.produtoId },
+    prisma.produto.findMany({
+      where: { id: { in: idsProdutos } },
       include: { estoqueVariacoes: true, variacoes: true, materiais: true },
     }),
     consultarEnderecoSalvo(
       usuarioId,
       enderecoId,
-      item.produtoId,
-      quantidade,
-      servicoFrete,
-      item.variacoesEscolhidas
+      entradas.map(({ item, quantidade }) => ({
+        produtoId: item.produtoId,
+        quantidade,
+        variacoesEscolhidas: item.variacoesEscolhidas,
+      })),
+      servicoFrete
     ),
   ]);
   if (!usuario) throw new ErroDeNegocio("Usuário não encontrado.", 404);
-  if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
 
-  if (produto.requerPersonalizacao && !item.personalizacao?.aceite) {
-    throw new ErroDeNegocio("Falta confirmar a personalização antes de pagar.");
-  }
+  const varias = entradas.length > 1;
 
-  // Item com personalização fica preso em 1 — não faz sentido pedir n artes
-  // num único item. Sem personalização, o piso é o cadastrado no produto
-  // (quantidadeMinima), nunca confiado só do navegador.
-  if (item.personalizacao && quantidade !== 1) {
-    throw new ErroDeNegocio("Item personalizado só pode ter quantidade 1.");
-  }
-  const quantidadeMinima = Math.max(1, produto.quantidadeMinima || 1);
-  if (!item.personalizacao && quantidade < quantidadeMinima) {
-    throw new ErroDeNegocio(`Pedido mínimo de ${quantidadeMinima} unidade(s) para este produto.`);
-  }
+  const linhas: LinhaDoPedido[] = entradas.map(({ item, quantidade }) => {
+    const produto = produtosDb.find((p) => p.id === item.produtoId);
+    if (!produto) throw new ErroDeNegocio("Produto não encontrado.", 404);
+    // Com mais de uma linha, a mensagem diz de qual produto está falando.
+    const msg = (texto: string) => (varias ? `${produto.nome}: ${texto}` : texto);
 
-  // Produto com variações e controle ligado (tem linha em estoqueVariacoes)
-  // é controlado por combinação; senão cai no campo único de sempre.
-  // Combinação sem linha cadastrada conta como esgotada — mesmo critério de
-  // estoqueDaCombinacao.
-  const combinacaoEscolhida = buildCombinacaoKey(item.variacoesEscolhidas ?? {});
-  const controladoPorVariacao = produto.estoqueVariacoes.length > 0;
-  const linhaVariacao = controladoPorVariacao
-    ? produto.estoqueVariacoes.find((e) => e.combinacao === combinacaoEscolhida)
-    : undefined;
+    if (produto.requerPersonalizacao && !item.personalizacao?.aceite) {
+      throw new ErroDeNegocio(msg("Falta confirmar a personalização antes de pagar."));
+    }
 
-  // Estoque também é conferido aqui antes de qualquer coisa: produto sem
-  // controle passa direto, do jeito que sempre funcionou. A trava de
-  // verdade (contra duas compras simultâneas da última unidade) é o UPDATE
-  // condicional dentro da transação, mais abaixo — esta checagem aqui só
-  // evita abrir preferência de pagamento pra um pedido que a transação ia
-  // recusar de qualquer jeito.
-  if (controladoPorVariacao) {
-    const disponivel = linhaVariacao?.estoque ?? 0;
-    if (disponivel < quantidade) {
+    // Item com personalização fica preso em 1 — não faz sentido pedir n artes
+    // num único item. Sem personalização, o piso é o cadastrado no produto
+    // (quantidadeMinima), nunca confiado só do navegador.
+    if (item.personalizacao && quantidade !== 1) {
+      throw new ErroDeNegocio(msg("Item personalizado só pode ter quantidade 1."));
+    }
+    const quantidadeMinima = Math.max(1, produto.quantidadeMinima || 1);
+    if (!item.personalizacao && quantidade < quantidadeMinima) {
       throw new ErroDeNegocio(
-        disponivel === 0
-          ? "Esta combinação está sem estoque no momento."
-          : `Só restam ${disponivel} unidade(s) desta combinação.`
+        msg(`Pedido mínimo de ${quantidadeMinima} unidade(s) para este produto.`)
       );
     }
-  } else if (produto.estoque !== null && produto.estoque < quantidade) {
-    throw new ErroDeNegocio(
-      produto.estoque === 0
-        ? "Este produto está sem estoque no momento."
-        : `Só restam ${produto.estoque} unidade(s) deste produto.`
+
+    // Combinação sem linha cadastrada conta como esgotada — mesmo critério de
+    // estoqueDaCombinacao.
+    const combinacao = buildCombinacaoKey(item.variacoesEscolhidas ?? {});
+    const controladoPorVariacao = produto.estoqueVariacoes.length > 0;
+    const linhaVariacao = controladoPorVariacao
+      ? produto.estoqueVariacoes.find((e) => e.combinacao === combinacao)
+      : undefined;
+
+    // Estoque também é conferido aqui antes de qualquer coisa: produto sem
+    // controle passa direto, do jeito que sempre funcionou. A trava de
+    // verdade (contra duas compras simultâneas da última unidade) é o UPDATE
+    // condicional dentro da transação, mais abaixo — esta checagem aqui só
+    // evita abrir preferência de pagamento pra um pedido que a transação ia
+    // recusar de qualquer jeito.
+    if (controladoPorVariacao) {
+      const disponivel = linhaVariacao?.estoque ?? 0;
+      if (disponivel < quantidade) {
+        throw new ErroDeNegocio(
+          msg(
+            disponivel === 0
+              ? "Esta combinação está sem estoque no momento."
+              : `Só restam ${disponivel} unidade(s) desta combinação.`
+          )
+        );
+      }
+    } else if (produto.estoque !== null && produto.estoque < quantidade) {
+      throw new ErroDeNegocio(
+        msg(
+          produto.estoque === 0
+            ? "Este produto está sem estoque no momento."
+            : `Só restam ${produto.estoque} unidade(s) deste produto.`
+        )
+      );
+    }
+
+    // Preço final considerando variação selecionada (ex: "Tamanho imã": 7x7 =
+    // R$1) — substitui o preço base do produto quando o valor tem entrada em
+    // precosValores. Sem entrada aplicável, cai no preço normal.
+    const precoUnitario = precoEfetivo(
+      {
+        preco: Number(produto.preco),
+        variacoes: produto.variacoes.map((v) => ({
+          tipo: v.tipo,
+          precosValores: normalizarPrecosValores(v.precosValores),
+        })),
+      },
+      item.variacoesEscolhidas ?? {}
     );
-  }
+
+    return { item, produto, quantidade, precoUnitario, combinacao, controladoPorVariacao };
+  });
 
   // O desconto também é recalculado no servidor, pelo mesmo motivo do frete:
   // o que o navegador mostrou é preview, quem decide é a validação aqui.
-  // `valorPedido` já considera a quantidade — cupom percentual incide sobre
-  // o total das unidades, não só sobre uma.
-  // Preço final considerando variação selecionada (ex: "Tamanho imã": 7x7 =
-  // R$1) — substitui o preço base do produto quando o valor tem entrada em
-  // precosValores. Sem entrada aplicável, cai no preço normal.
-  const precoUnitario = precoEfetivo(
-    {
-      preco: Number(produto.preco),
-      variacoes: produto.variacoes.map((v) => ({
-        tipo: v.tipo,
-        precosValores: normalizarPrecosValores(v.precosValores),
-      })),
-    },
-    item.variacoesEscolhidas ?? {}
+  // `precoTotalProdutos` já considera as quantidades — cupom percentual incide
+  // sobre o total das unidades, não só sobre uma.
+  const precoTotalProdutos = emReais(
+    linhas.reduce((soma, l) => soma + l.precoUnitario * l.quantidade, 0)
   );
-  const precoTotalProduto = precoUnitario * quantidade;
   const temCupom = typeof cupomCodigo === "string" && cupomCodigo.trim();
-  const { cupom, desconto, freteGratis: freteGratisPorCupom } = temCupom
-    ? await validarCupom(cupomCodigo, precoTotalProduto, { usuarioId, produtoId: produto.id })
-    : { cupom: null, desconto: 0, freteGratis: false };
+  const {
+    cupom,
+    desconto,
+    freteGratis: freteGratisPorCupom,
+    valorBase: valorBaseCupom,
+  } = temCupom
+    ? await validarCupom(cupomCodigo, precoTotalProdutos, {
+        usuarioId,
+        itens: linhas.map((l) => ({
+          produtoId: l.produto.id,
+          valor: l.precoUnitario * l.quantidade,
+        })),
+      })
+    : { cupom: null, desconto: 0, freteGratis: false, valorBase: precoTotalProdutos };
 
   // Frete grátis automático por valor mínimo (ConfiguracaoLoja, editável em
   // /admin/cupons) soma sem conflito com o cupom: os dois só zeram o frete,
   // não empilham desconto nenhum um sobre o outro.
   const config = await getConfiguracaoLoja();
   const freteGratisPorValor =
-    config.freteGratisAcimaDe !== null && precoTotalProduto >= config.freteGratisAcimaDe;
+    config.freteGratisAcimaDe !== null && precoTotalProdutos >= config.freteGratisAcimaDe;
   const freteGratis = freteGratisPorCupom || freteGratisPorValor;
 
   const pagamentoReal = pagamentoRealConfigurado();
@@ -165,8 +227,15 @@ export async function criarPedido(
     );
   }
   const frete = freteGratis ? 0 : endereco.frete.valor;
-  const subtotal = emReais(precoTotalProduto - desconto);
+  const subtotal = emReais(precoTotalProdutos - desconto);
   const total = emReais(subtotal + frete);
+
+  // Texto usado nas notificações e no e-mail: o nome do produto quando é um
+  // só, a contagem quando são vários.
+  const resumoItens = varias ? `${linhas.length} itens` : linhas[0].produto.nome;
+  const mensagemRecebido = linhas.some((l) => l.produto.requerPersonalizacao)
+    ? `Recebemos seu pedido de ${resumoItens}. Sua arte entrou na fila de validação da nossa equipe.`
+    : `Recebemos seu pedido de ${resumoItens}. Já entrou na fila de produção.`;
 
   const pedido = await prisma.$transaction(async (tx) => {
     // Cupom de primeira compra: reconfere "o cliente nunca comprou" já
@@ -205,27 +274,25 @@ export async function criarPedido(
         enderecoComplemento: endereco.complemento || null,
         pagamentoMock: !pagamentoReal,
         itens: {
-          create: [
-            {
-              produtoId: produto.id,
-              quantidade,
-              precoUnitario,
-              // Snapshot: o DRE de hoje não pode mudar se o custo do produto
-              // for editado depois.
-              custoUnitario: custoUnitarioDoProduto(produto, item.variacoesEscolhidas ?? {}),
-              variacaoEscolhida: item.variacoesEscolhidas ?? {},
-              ...(item.personalizacao && {
-                personalizacao: {
-                  create: {
-                    tipo: item.personalizacao.via,
-                    briefing: item.personalizacao.resumo,
-                    arteUrl: item.personalizacao.arteUrl ?? null,
-                    aceiteTermos: !!item.personalizacao.aceite,
-                  },
+          create: linhas.map(({ item, produto, quantidade, precoUnitario }) => ({
+            produtoId: produto.id,
+            quantidade,
+            precoUnitario,
+            // Snapshot: o DRE de hoje não pode mudar se o custo do produto
+            // for editado depois.
+            custoUnitario: custoUnitarioDoProduto(produto, item.variacoesEscolhidas ?? {}),
+            variacaoEscolhida: item.variacoesEscolhidas ?? {},
+            ...(item.personalizacao && {
+              personalizacao: {
+                create: {
+                  tipo: item.personalizacao.via,
+                  briefing: item.personalizacao.resumo,
+                  arteUrl: item.personalizacao.arteUrl ?? null,
+                  aceiteTermos: !!item.personalizacao.aceite,
                 },
-              }),
-            },
-          ],
+              },
+            }),
+          })),
         },
       },
     });
@@ -236,30 +303,26 @@ export async function criarPedido(
     // derruba a transação inteira: o cliente ouve "cupom esgotado" e não sobra
     // pedido gravado com um desconto que o cupom não podia mais dar.
     if (cupom) {
-      await registrarUsoCupom(cupom.id, tx, precoTotalProduto, produto.id);
+      await registrarUsoCupom(cupom.id, tx, valorBaseCupom, cupom.produtoId ?? null);
     }
 
     // Mesmo raciocínio pro estoque: produto sem controle passa direto, com
     // controle o desconto é condicional no próprio UPDATE (ver
     // decrementarEstoque / decrementarEstoqueVariacao) — duas compras
-    // simultâneas da última unidade não vendem a mesma peça duas vezes.
-    if (controladoPorVariacao) {
-      await decrementarEstoqueVariacao(produto.id, combinacaoEscolhida, quantidade, tx);
-    } else if (produto.estoque !== null) {
-      await decrementarEstoque(produto.id, quantidade, tx);
+    // simultâneas da última unidade não vendem a mesma peça duas vezes. Uma
+    // linha por vez, na mesma transação: se qualquer uma falta, nenhuma sai.
+    for (const l of linhas) {
+      if (l.controladoPorVariacao) {
+        await decrementarEstoqueVariacao(l.produto.id, l.combinacao, l.quantidade, tx);
+      } else if (l.produto.estoque !== null) {
+        await decrementarEstoque(l.produto.id, l.quantidade, tx);
+      }
     }
 
     // No modo simulado o pedido já nasce pago, então o aviso sai junto. Com
     // pagamento real quem avisa é o webhook, depois da confirmação.
     if (!pagamentoReal) {
-      await notificar(
-        usuarioId,
-        "Pedido recebido!",
-        produto.requerPersonalizacao
-          ? `Recebemos seu pedido de ${produto.nome}. Sua arte entrou na fila de validação da nossa equipe.`
-          : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`,
-        tx
-      );
+      await notificar(usuarioId, "Pedido recebido!", mensagemRecebido, tx);
     }
 
     return criado;
@@ -268,53 +331,47 @@ export async function criarPedido(
   if (!pagamentoReal) {
     // Fora da transação de propósito: e-mail é melhor esforço, uma falha dele
     // não pode desfazer um pedido que já foi gravado com sucesso.
-    enviarEmailStatusPedido(
-      usuario.email,
-      usuario.nome,
-      "Pedido recebido!",
-      produto.requerPersonalizacao
-        ? `Recebemos seu pedido de ${produto.nome}. Sua arte entrou na fila de validação da nossa equipe.`
-        : `Recebemos seu pedido de ${produto.nome}. Já entrou na fila de produção.`,
-      {
-        id: pedido.id,
-        itens: [
-          {
-            nomeProduto: produto.nome,
-            quantidade,
-            precoUnitario,
-            variacao: item.variacoesEscolhidas ?? null,
-          },
-        ],
-        frete,
-        freteGratis,
-        desconto,
-        total,
-      }
-    ).catch(() => {});
+    enviarEmailStatusPedido(usuario.email, usuario.nome, "Pedido recebido!", mensagemRecebido, {
+      id: pedido.id,
+      itens: linhas.map((l) => ({
+        nomeProduto: l.produto.nome,
+        quantidade: l.quantidade,
+        precoUnitario: l.precoUnitario,
+        variacao: l.item.variacoesEscolhidas ?? null,
+      })),
+      frete,
+      freteGratis,
+      desconto,
+      total,
+    }).catch(() => {});
     return { pedido, checkoutUrl: `/pedido/confirmado?id=${pedido.id}` };
   }
 
   // Checkout Pro: Pix, cartão e boleto ficam por conta da tela do Mercado Pago,
   // então o site não toca em dado de cartão em momento nenhum.
   try {
+    // Itens do pedido numa linha só de texto pro título da preferência.
+    const descricaoItens = linhas
+      .map((l) => (l.quantidade > 1 ? `${l.produto.nome} (${l.quantidade}x)` : l.produto.nome))
+      .join(", ");
+    const tituloItens =
+      descricaoItens.length > 200 ? `${descricaoItens.slice(0, 197)}...` : descricaoItens;
+
     const preferencia = await preferenceClient().create({
       body: {
         external_reference: pedido.id,
         items: [
           {
-            id: produto.id,
+            id: linhas.length === 1 ? linhas[0].produto.id : pedido.id,
             // Desconto do cupom já embutido aqui: a soma dos itens da
             // preferência precisa bater com `total`, e o Mercado Pago não
             // aceita item de valor negativo pra representar desconto.
-            // Vai como 1 item de valor já somado (quantidade × preço − desconto)
-            // em vez de `quantity: quantidade`, porque o desconto do cupom é um
-            // valor único que não dá pra ratear certinho entre unidades sem
-            // gerar diferença de centavos contra `subtotal`.
-            title: [
-              produto.nome,
-              quantidade > 1 ? `(${quantidade}x)` : null,
-              cupom ? `(cupom ${cupom.codigo})` : null,
-            ]
+            // Vai como 1 item de valor já somado (Σ quantidade × preço −
+            // desconto) em vez de um item por linha, porque o desconto do
+            // cupom é um valor único que não dá pra ratear certinho entre
+            // linhas e unidades sem gerar diferença de centavos contra
+            // `subtotal`.
+            title: [tituloItens, cupom ? `(cupom ${cupom.codigo})` : null]
               .filter(Boolean)
               .join(" "),
             quantity: 1,
@@ -368,10 +425,12 @@ export async function criarPedido(
         if (pedido.cupomCodigo) {
           await devolverUsoCupom(pedido.cupomCodigo, tx);
         }
-        if (controladoPorVariacao) {
-          await devolverEstoqueVariacao(produto.id, combinacaoEscolhida, quantidade, tx);
-        } else if (produto.estoque !== null) {
-          await devolverEstoque(produto.id, quantidade, tx);
+        for (const l of linhas) {
+          if (l.controladoPorVariacao) {
+            await devolverEstoqueVariacao(l.produto.id, l.combinacao, l.quantidade, tx);
+          } else if (l.produto.estoque !== null) {
+            await devolverEstoque(l.produto.id, l.quantidade, tx);
+          }
         }
       });
     } catch (erroDaLimpeza) {

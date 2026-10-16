@@ -75,6 +75,55 @@ export type PacoteFrete = {
 // devolve todas, pra o cliente escolher no checkout.
 export type OpcaoFrete = Frete & { servico: string };
 
+const centavos = (valor: number) => Math.round(valor * 100) / 100;
+
+// Junta as cotações de várias origens (uma por CEP de postagem) no frete do
+// carrinho inteiro. Cada posição de `grupos` é o resultado de um grupo:
+// as opções cotadas, ou `null` quando a cotação falhou (cai na estimativa por
+// região só pra esse grupo). Um serviço (ex: "SEDEX") só entra no resultado se
+// todos os grupos cotados o têm; o valor é a soma dos grupos e o prazo é o do
+// grupo mais demorado — o pedido só fecha quando o último pacote chega.
+export function combinarFretesPorOrigem(
+  grupos: (OpcaoFrete[] | null)[],
+  estimativa: Frete
+): OpcaoFrete[] {
+  const total = grupos.length;
+  const cotados = grupos.filter((g): g is OpcaoFrete[] => !!g && g.length > 0);
+  const semCotacao = total - cotados.length;
+
+  const soEstimativa = (): OpcaoFrete[] => [
+    {
+      valor: centavos(estimativa.valor * Math.max(1, total)),
+      prazoDias: estimativa.prazoDias,
+      servico: "Estimativa",
+    },
+  ];
+
+  if (cotados.length === 0) return soEstimativa();
+  if (total === 1) return cotados[0];
+
+  const nomes = cotados[0]
+    .map((o) => o.servico)
+    .filter((nome) => cotados.every((g) => g.some((o) => o.servico === nome)));
+  if (nomes.length === 0) return soEstimativa();
+
+  return nomes
+    .map((nome) => {
+      const doServico = cotados.map((g) => g.find((o) => o.servico === nome)!);
+      return {
+        servico: nome,
+        valor: centavos(
+          doServico.reduce((soma, o) => soma + o.valor, 0) + estimativa.valor * semCotacao
+        ),
+        prazoDias: Math.max(
+          ...doServico.map((o) => o.prazoDias),
+          semCotacao > 0 ? estimativa.prazoDias : 0
+        ),
+      };
+    })
+    .sort((a, b) => a.valor - b.valor);
+}
+
 type ServicoMelhorEnvio = {
   id: number;
   name: string;

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   calcularFrete,
+  combinarFretesPorOrigem,
   cotarFreteMelhorEnvio,
   cotarFreteSuperFrete,
   formatarCep,
@@ -397,5 +398,77 @@ describe("cotarFreteSuperFrete", () => {
     expect(await cotarFreteSuperFrete("token", "01310100", "60000000", pacote, 1000)).toBeNull();
     // nunca deveria chegar perto de tentar unidade por unidade num pedido de 1000
     expect(chamadas).toBeLessThan(30);
+  });
+});
+
+describe("combinarFretesPorOrigem", () => {
+  const estimativa = { valor: 20, prazoDias: 5 };
+
+  it("uma origem só devolve a cotação como veio", () => {
+    const opcoes = [
+      { servico: "PAC", valor: 15, prazoDias: 6 },
+      { servico: "SEDEX", valor: 30, prazoDias: 2 },
+    ];
+    expect(combinarFretesPorOrigem([opcoes], estimativa)).toEqual(opcoes);
+  });
+
+  it("soma o mesmo serviço entre origens e fica com o maior prazo", () => {
+    const franca = [
+      { servico: "PAC", valor: 18.5, prazoDias: 7 },
+      { servico: "SEDEX", valor: 32, prazoDias: 3 },
+    ];
+    const lojista = [
+      { servico: "PAC", valor: 12, prazoDias: 5 },
+      { servico: "SEDEX", valor: 25.4, prazoDias: 2 },
+    ];
+    expect(combinarFretesPorOrigem([franca, lojista], estimativa)).toEqual([
+      { servico: "PAC", valor: 30.5, prazoDias: 7 },
+      { servico: "SEDEX", valor: 57.4, prazoDias: 3 },
+    ]);
+  });
+
+  it("descarta serviço que uma das origens não cotou", () => {
+    const a = [
+      { servico: "PAC", valor: 10, prazoDias: 5 },
+      { servico: "SEDEX", valor: 20, prazoDias: 2 },
+    ];
+    const b = [{ servico: "PAC", valor: 12, prazoDias: 6 }];
+    expect(combinarFretesPorOrigem([a, b], estimativa)).toEqual([
+      { servico: "PAC", valor: 22, prazoDias: 6 },
+    ]);
+  });
+
+  it("origem sem cotação entra com a estimativa por região em cada serviço", () => {
+    const cotada = [
+      { servico: "PAC", valor: 10, prazoDias: 4 },
+      { servico: "SEDEX", valor: 20, prazoDias: 2 },
+    ];
+    expect(combinarFretesPorOrigem([cotada, null], estimativa)).toEqual([
+      { servico: "PAC", valor: 30, prazoDias: 5 },
+      { servico: "SEDEX", valor: 40, prazoDias: 5 },
+    ]);
+  });
+
+  it("nenhuma origem cotada: estimativa multiplicada pelo número de origens", () => {
+    expect(combinarFretesPorOrigem([null, null], estimativa)).toEqual([
+      { servico: "Estimativa", valor: 40, prazoDias: 5 },
+    ]);
+    expect(combinarFretesPorOrigem([null], estimativa)).toEqual([
+      { servico: "Estimativa", valor: 20, prazoDias: 5 },
+    ]);
+  });
+
+  it("sem serviço em comum cai na estimativa", () => {
+    const a = [{ servico: "PAC", valor: 10, prazoDias: 5 }];
+    const b = [{ servico: "SEDEX", valor: 20, prazoDias: 2 }];
+    expect(combinarFretesPorOrigem([a, b], estimativa)).toEqual([
+      { servico: "Estimativa", valor: 40, prazoDias: 5 },
+    ]);
+  });
+
+  it("não acumula erro de ponto flutuante nos centavos", () => {
+    const a = [{ servico: "PAC", valor: 39.9, prazoDias: 5 }];
+    const b = [{ servico: "PAC", valor: 16.9, prazoDias: 5 }];
+    expect(combinarFretesPorOrigem([a, b], estimativa)[0].valor).toBe(56.8);
   });
 });

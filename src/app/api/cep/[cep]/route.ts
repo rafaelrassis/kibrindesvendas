@@ -10,10 +10,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cep:
   const quantidade = req.nextUrl.searchParams.get("quantidade") ?? undefined;
   const servico = req.nextUrl.searchParams.get("servico") ?? undefined;
   const variacoes = req.nextUrl.searchParams.get("variacoes") ?? undefined;
+  // Carrinho inteiro (JSON: [{ produtoId, quantidade, variacoes }]) — tem
+  // prioridade sobre os parâmetros de produto único acima.
+  const itens = req.nextUrl.searchParams.get("itens") ?? undefined;
 
   try {
     return NextResponse.json(
-      await consultarCep(cep, produtoId, quantidade, servico, variacoes)
+      await consultarCep(cep, produtoId, quantidade, servico, variacoes, itens)
     );
   } catch (e) {
     return respostaDeErro(e);
