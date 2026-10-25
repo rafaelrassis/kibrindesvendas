@@ -5,21 +5,27 @@ import { enviarEmailAlertaFornecedor } from "@/lib/email";
 import {
   calcularSync,
   espelharVariacoes,
-  extrairImagemPrincipal,
-  extrairVariantesNuvemshop,
+  extrairImagemPrincipalLoja,
+  extrairVariantesLoja,
+  FORNECEDOR_API_KEY,
+  FORNECEDOR_API_URL,
   normalizarOpcao,
+  referenciaDoLink,
   ultimoHorarioAgendado,
   validarUrlFornecedor,
+  type LojaFornecedor,
+  type ProdutoLojaFornecedor,
 } from "@/lib/fornecedor";
 import { avisarSeVoltouAoEstoque, estaIndisponivel } from "./favoritos-estoque";
 import { tipoTemFotoPorValor } from "@/lib/estoque-variacao";
 import { formatoDeImagem, salvarImagem } from "@/lib/imagens";
 import { ErroDeNegocio } from "./erros";
 
-// Sincronização de estoque com o fornecedor: lê a página do produto no site
-// dele (Nuvemshop), zera aqui o que está indisponível lá e repõe o que
-// voltou. Roda em ciclos agendados (ver executarCicloAgendado, chamado pelo
-// cron) ou na mão pelo admin.
+// Sincronização de estoque com o fornecedor: lê o produto na API da loja
+// dele (Sete Malhas — vitrine própria sobre Supabase, não mais Nuvemshop),
+// zera aqui o que está indisponível lá e repõe o que voltou. Roda em ciclos
+// agendados (ver executarCicloAgendado, chamado pelo cron) ou na mão pelo
+// admin.
 //
 // Cada chamada processa um lote que cabe no tempo da função serverless; o
 // que sobrar fica pra próxima chamada — por isso o "quem falta" é quem tem
@@ -28,16 +34,17 @@ import { ErroDeNegocio } from "./erros";
 const TIMEOUT_FETCH_MS = 15_000;
 const PARALELO = 3;
 
-export async function baixarPagina(url: string): Promise<string> {
+async function chamarApiFornecedor<T>(funcao: string, corpo: Record<string, unknown>): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetch(`${FORNECEDOR_API_URL}/rest/v1/rpc/${funcao}`, {
+      method: "POST",
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
-        Accept: "text/html",
-        "Accept-Language": "pt-BR,pt;q=0.9",
+        "content-type": "application/json",
+        apikey: FORNECEDOR_API_KEY,
+        authorization: `Bearer ${FORNECEDOR_API_KEY}`,
       },
+      body: JSON.stringify(corpo),
       signal: AbortSignal.timeout(TIMEOUT_FETCH_MS),
       cache: "no-store",
     });
@@ -45,14 +52,31 @@ export async function baixarPagina(url: string): Promise<string> {
     const motivo = e instanceof Error && e.name === "TimeoutError" ? "demorou demais pra responder" : "não respondeu";
     throw new Error(`O site do fornecedor ${motivo}.`);
   }
-  if (res.status === 404) throw new Error("Link quebrado (404) — o produto pode ter sido removido do fornecedor.");
   if (!res.ok) throw new Error(`O site do fornecedor respondeu com erro ${res.status}.`);
-  // Produto removido na Nuvemshop costuma redirecionar pra home/categoria.
-  const destino = new URL(res.url);
-  if (!destino.pathname.includes("/produtos/")) {
-    throw new Error("O link redirecionou pra outra página — o produto pode ter sido removido do fornecedor.");
+  return res.json();
+}
+
+// Dados públicos da loja do fornecedor (empresa + todos os produtos) a
+// partir do domínio que o admin cadastrou.
+export async function buscarLojaFornecedor(host: string): Promise<LojaFornecedor> {
+  const slug = await chamarApiFornecedor<string | null>("fn_loja_slug_por_dominio", { p_host: host });
+  if (!slug) throw new Error("Não achei uma loja nesse endereço — confira o link do fornecedor.");
+  return chamarApiFornecedor<LojaFornecedor>("fn_loja_publica", { p_slug: slug });
+}
+
+// Produto específico a partir do link salvo aqui (host da loja + referência
+// na query "?produto=").
+export async function buscarProdutoFornecedor(
+  url: string
+): Promise<{ produto: ProdutoLojaFornecedor; variantes: ReturnType<typeof extrairVariantesLoja> }> {
+  const referencia = referenciaDoLink(url);
+  if (!referencia) throw new Error("Link do fornecedor inválido.");
+  const loja = await buscarLojaFornecedor(new URL(url).hostname);
+  const produto = loja.produtos.find((p) => p.referencia === referencia);
+  if (!produto) {
+    throw new Error("Não achei esse produto no fornecedor — pode ter sido removido ou trocado de referência.");
   }
-  return res.text();
+  return { produto, variantes: extrairVariantesLoja(produto) };
 }
 
 type Config = {
@@ -131,8 +155,8 @@ async function carregarProduto(produtoId: string) {
 async function trazerFotos(
   produto: ProdutoComVariacoes,
   espelho: ReturnType<typeof espelharVariacoes> | null,
-  variantes: ReturnType<typeof extrairVariantesNuvemshop>,
-  html: string
+  variantes: ReturnType<typeof extrairVariantesLoja>,
+  produtoFornecedor: ProdutoLojaFornecedor
 ) {
   let restante = MAX_FOTOS_POR_CICLO;
   const porVariacao = new Map<number, Record<string, string[]>>();
@@ -159,10 +183,10 @@ async function trazerFotos(
 
   let galeria: string[] | undefined;
   if (produto.imagens.length === 0) {
-    // Primeira foto que achar: a principal da página (og:image) ou, na falta
-    // dela, a da primeira variante com foto.
+    // Primeira foto que achar: a principal do produto no fornecedor ou, na
+    // falta dela, a da primeira variante com foto.
     const principal =
-      extrairImagemPrincipal(html) ?? variantes.find((x) => x.imagem)?.imagem ?? null;
+      extrairImagemPrincipalLoja(produtoFornecedor) ?? variantes.find((x) => x.imagem)?.imagem ?? null;
     const nossa = principal ? await trazerFoto(principal) : null;
     if (nossa) galeria = [nossa];
   }
@@ -187,15 +211,14 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
   try {
     const url = produto.fornecedorUrl && validarUrlFornecedor(produto.fornecedorUrl);
     if (!url) throw new Error("Link do fornecedor inválido.");
-    const html = await baixarPagina(url);
-    const variantes = extrairVariantesNuvemshop(html);
+    const { produto: produtoFornecedor, variantes } = await buscarProdutoFornecedor(url);
     const espelho = produto.fornecedorEspelhar
       ? espelharVariacoes(produto.variacoes, variantes)
       : null;
     // Fotos que faltam aqui (cor sem foto, galeria vazia) vêm do fornecedor.
     // A foto geral do produto vem mesmo sem espelhamento (só se a galeria está
     // vazia); as fotos por cor só com o espelhamento ligado.
-    const fotos = await trazerFotos(produto, espelho, variantes, html);
+    const fotos = await trazerFotos(produto, espelho, variantes, produtoFornecedor);
     const espelhar = espelho && (espelho.mudou || fotos?.porVariacao.size) ? espelho : null;
     // Variações como ficam depois do espelho (a grade de estoque é calculada
     // em cima delas).

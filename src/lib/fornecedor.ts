@@ -1,6 +1,11 @@
 // Funções puras da sincronização com fornecedor (sem Prisma nem rede), pra
 // serem testadas isoladas. O fluxo com banco e fetch fica em
 // lib/data/sync-fornecedor.ts.
+//
+// A Sete Malhas (nosso único fornecedor) saiu do Nuvemshop e hoje roda numa
+// plataforma própria (vitrine SPA + API Supabase). Por isso a leitura não é
+// mais scraping de HTML: é uma chamada de API que devolve a loja inteira
+// (empresa + produtos) de uma vez.
 import { buildCombinacaoKey, gerarCombinacoes } from "./estoque-variacao";
 
 // Uma variante do produto no fornecedor (ex: Cor=Preto + Tamanho=P).
@@ -14,126 +19,73 @@ export type VarianteFornecedor = {
   imagem?: string | null;
 };
 
-// --- Leitura da página (Nuvemshop) ------------------------------------------
+// --- Leitura da loja no fornecedor (API da Sete Malhas) ---------------------
 
-// Lê um array JSON começando em `inicio` (que aponta pro "["), respeitando
-// strings — o JSON do LS.variants vem inline no <script>, sem terminador
-// confiável além do fechamento do próprio array.
-function lerArrayJson(texto: string, inicio: number): unknown {
-  let nivel = 0;
-  let emString = false;
-  for (let i = inicio; i < texto.length; i++) {
-    const c = texto[i];
-    if (emString) {
-      if (c === "\\") i++;
-      else if (c === '"') emString = false;
-      continue;
-    }
-    if (c === '"') emString = true;
-    else if (c === "[") nivel++;
-    else if (c === "]") {
-      nivel--;
-      if (nivel === 0) return JSON.parse(texto.slice(inicio, i + 1));
-    }
-  }
-  throw new Error("JSON incompleto");
+export const FORNECEDOR_API_URL = "https://wvvbvkmddehdyoozbnkx.supabase.co";
+// Chave "publishable" do Supabase da loja — é a mesma que o site deles expõe
+// no navegador (client-side), não dá acesso a nada que já não seja público.
+export const FORNECEDOR_API_KEY = "sb_publishable_EdfogpAu1VSFEhweTtWGfQ_yrDbhCx7";
+
+export type ProdutoLojaFornecedor = {
+  id: string;
+  nome: string;
+  referencia: string;
+  descricao: string | null;
+  preco: number;
+  // Caminho dentro do bucket público da loja (não a URL inteira).
+  foto: string | null;
+  cores: string[];
+  tamanhos: string[];
+  fotos_cores: Record<string, string> | null;
+  // cor -> tamanho -> quantidade.
+  estoque: Record<string, Record<string, number>> | null;
+  // cor -> tamanhos que vendem sem controle de estoque lá.
+  estoque_infinito: Record<string, string[]> | null;
+  // Preço específico de uma combinação, quando difere do preço base.
+  precos_var: Record<string, Record<string, number>> | null;
+};
+
+export type LojaFornecedor = {
+  empresa: { nome: string };
+  produtos: ProdutoLojaFornecedor[];
+};
+
+// Foto do bucket da loja: só aceita caminho relativo (nunca uma URL de fora
+// embutida no JSON) e monta sempre em cima do storage público de verdade.
+export function urlFotoFornecedor(caminho: unknown): string | null {
+  if (typeof caminho !== "string" || !caminho.trim()) return null;
+  const c = caminho.trim();
+  if (/^[a-z][a-z0-9+.-]*:/i.test(c) || c.startsWith("//")) return null;
+  return `${FORNECEDOR_API_URL}/storage/v1/object/public/loja/${c}`;
 }
 
-function decodificarEntidades(s: string) {
-  return s
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
-}
-
-function variantesBrutas(html: string): unknown {
-  // Fonte principal: `LS.variants = [...]`, que só existe na página de
-  // produto e é sempre do produto principal (os "relacionados" da página
-  // têm data-variants próprios, mas não entram aqui).
-  const marcador = html.indexOf("LS.variants");
-  if (marcador >= 0) {
-    const inicio = html.indexOf("[", marcador);
-    if (inicio >= 0) {
-      try {
-        return lerArrayJson(html, inicio);
-      } catch {
-        // cai no plano B abaixo
-      }
+// Produto do fornecedor -> uma variante por combinação Cor x Tamanho, com o
+// preço e estoque específicos dela quando informados. "Infinito" lá é o
+// mesmo que estoque null no resto do fluxo: vende sem limite.
+export function extrairVariantesLoja(produto: ProdutoLojaFornecedor): VarianteFornecedor[] {
+  if (produto.cores.length === 0 || produto.tamanhos.length === 0) {
+    return [{ opcoes: [], disponivel: true, estoque: null, preco: produto.preco, imagem: null }];
+  }
+  const variantes: VarianteFornecedor[] = [];
+  for (const cor of produto.cores) {
+    for (const tamanho of produto.tamanhos) {
+      const infinito = produto.estoque_infinito?.[cor]?.includes(tamanho) ?? false;
+      const bruto = produto.estoque?.[cor]?.[tamanho] ?? 0;
+      variantes.push({
+        opcoes: [cor, tamanho],
+        disponivel: infinito || bruto > 0,
+        estoque: infinito ? null : bruto,
+        preco: produto.precos_var?.[cor]?.[tamanho] ?? produto.preco,
+        imagem: urlFotoFornecedor(produto.fotos_cores?.[cor] ?? null),
+      });
     }
   }
-  // Plano B: data-variants do container principal (o que não é item de
-  // lista/carrossel de relacionados).
-  for (const m of html.matchAll(/class="([^"]*js-product-container[^"]*)"[^>]*?data-variants="([^"]+)"/g)) {
-    if (m[1].includes("js-item-product")) continue;
-    try {
-      return JSON.parse(decodificarEntidades(m[2]));
-    } catch {
-      // tenta o próximo
-    }
-  }
-  return null;
+  return variantes;
 }
 
-// Extrai as variantes do produto principal de uma página de produto
-// Nuvemshop. Lança erro com mensagem legível quando a página não tem o que
-// esperamos (link errado, layout mudou, produto removido).
-export function extrairVariantesNuvemshop(html: string): VarianteFornecedor[] {
-  const bruto = variantesBrutas(html);
-  if (!Array.isArray(bruto) || bruto.length === 0) {
-    throw new Error(
-      "Não achei as variações do produto na página — o link pode não ser de um produto, ou o site mudou."
-    );
-  }
-  return bruto.map((v: Record<string, unknown>) => {
-    const opcoes: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const o = v[`option${i}`];
-      if (typeof o === "string" && o.trim()) opcoes.push(o.trim());
-    }
-    const estoque = typeof v.stock === "number" ? v.stock : null;
-    const preco = typeof v.price_number === "number" ? v.price_number : null;
-    const imagem = urlImagemFornecedor(v.image_url);
-    return {
-      opcoes,
-      // `available` já considera estoque 0; stock 0 sem o campo também conta
-      // como indisponível.
-      disponivel: v.available === true && estoque !== 0,
-      estoque,
-      preco,
-      imagem,
-    };
-  });
-}
-
-// Foto principal do produto (og:image da página), ou null.
-export function extrairImagemPrincipal(html: string): string | null {
-  const m =
-    html.match(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i) ??
-    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ??
-    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-  return m ? urlImagemFornecedor(decodificarEntidades(m[1])) : null;
-}
-
-// Só aceita foto servida pelo CDN da Nuvemshop: a URL é baixada pelo
-// servidor, então não pode apontar pra qualquer lugar (mesmo cuidado de
-// validarUrlFornecedor).
-export function urlImagemFornecedor(bruta: unknown): string | null {
-  if (typeof bruta !== "string" || !bruta.trim()) return null;
-  const url = bruta.trim().startsWith("//") ? `https:${bruta.trim()}` : bruta.trim();
-  try {
-    const u = new URL(url);
-    const ok = [".mitiendanube.com", ".nuvemshop.com.br", ".lojavirtualnuvem.com.br"].some((d) =>
-      u.hostname.endsWith(d)
-    );
-    if (!ok || (u.protocol !== "https:" && u.protocol !== "http:")) return null;
-    // O og:image da Nuvemshop vem em http://, mas o CDN atende em https.
-    u.protocol = "https:";
-    return u.toString();
-  } catch {
-    return null;
-  }
+// Foto principal do produto no fornecedor, ou null.
+export function extrairImagemPrincipalLoja(produto: ProdutoLojaFornecedor): string | null {
+  return urlFotoFornecedor(produto.foto);
 }
 
 // --- Casamento com o cadastro daqui -----------------------------------------
@@ -392,48 +344,35 @@ export function validarUrlFornecedor(url: string): string | null {
 
 // --- Importação de produtos novos -------------------------------------------
 
-// Links de produto (/produtos/<slug>/) do sitemap.xml de uma loja Nuvemshop.
-// A página de listagem (/produtos/) não conta.
-export function extrairUrlsProdutos(sitemapXml: string): string[] {
-  const urls = new Set<string>();
-  for (const m of sitemapXml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)) {
-    try {
-      const u = new URL(decodificarEntidades(m[1]));
-      if (u.protocol !== "https:") continue;
-      const partes = u.pathname.split("/").filter(Boolean);
-      if (partes.length === 2 && partes[0] === "produtos") {
-        urls.add(`${u.origin}/produtos/${partes[1]}/`);
-      }
-    } catch {
-      // loc inválido: ignora
-    }
-  }
-  return [...urls];
+// A vitrine do fornecedor é um app de página única: não existe uma URL por
+// produto de verdade, mas o link abre direto o produto certo pela
+// referência (é o que o próprio site usa pra compartilhar um produto).
+export function urlProdutoLoja(origem: string, referencia: string): string {
+  return `${origem}/?produto=${encodeURIComponent(referencia)}`;
 }
 
-// Mesma página, com ou sem barra final, www ou não: vira a mesma chave.
+// Referência do produto a partir do link salvo aqui (o valor de
+// "?produto="). null = link de outro formato.
+export function referenciaDoLink(url: string): string | null {
+  try {
+    return new URL(url).searchParams.get("produto");
+  } catch {
+    return null;
+  }
+}
+
+// Mesma loja e mesmo produto, com ou sem barra final, www ou não: vira a
+// mesma chave.
 export function chaveUrlFornecedor(url: string): string {
   try {
     const u = new URL(url);
-    return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    const referencia = u.searchParams.get("produto");
+    if (referencia) return `${host}?produto=${referencia.toLowerCase()}`;
+    return `${host}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
   } catch {
     return url.toLowerCase();
   }
-}
-
-function textoLimpo(s: string) {
-  return decodificarEntidades(s.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
-}
-
-// Nome e descrição curta da página de produto Nuvemshop.
-export function extrairDadosProduto(html: string): { nome: string; descricao: string } {
-  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const titulo = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
-  const desc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)["']/i);
-  return {
-    nome: textoLimpo(h1?.[1] ?? titulo?.[1] ?? ""),
-    descricao: desc ? textoLimpo(desc[1]) : "",
-  };
 }
 
 // Preço daqui a partir do preço do fornecedor + margem em %.

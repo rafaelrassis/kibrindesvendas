@@ -1,18 +1,18 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   calcularSync,
   chaveUrlFornecedor,
   espelharVariacoes,
-  extrairDadosProduto,
-  extrairUrlsProdutos,
-  precoComMargem,
-  extrairImagemPrincipal,
-  extrairVariantesNuvemshop,
+  extrairImagemPrincipalLoja,
+  extrairVariantesLoja,
   normalizarOpcao,
+  precoComMargem,
+  referenciaDoLink,
   ultimoHorarioAgendado,
-  urlImagemFornecedor,
+  urlFotoFornecedor,
+  urlProdutoLoja,
   validarUrlFornecedor,
+  type ProdutoLojaFornecedor,
   type VarianteFornecedor,
 } from "./fornecedor";
 
@@ -20,36 +20,105 @@ function variante(opcoes: string[], disponivel: boolean, estoque: number | null 
   return { opcoes, disponivel, estoque, preco: 11.9 };
 }
 
-describe("extrairVariantesNuvemshop", () => {
-  const principal = [
-    { option0: "Preto", option1: "P", option2: null, stock: 0, available: false, price_number: 11.9 },
-    { option0: "Branco", option1: "P", option2: null, stock: null, available: true, price_number: 11.9 },
-    { option0: "Azul", option1: "M", option2: null, stock: 12, available: true, price_number: 12.5 },
-  ];
-  const relacionado = [{ option0: "Outro", stock: 5, available: true, price_number: 1 }];
+function produtoFornecedor(dados: Partial<ProdutoLojaFornecedor>): ProdutoLojaFornecedor {
+  return {
+    id: "p1",
+    nome: "Short Tactel",
+    referencia: "ST878392",
+    descricao: "Leve e confortável",
+    preco: 11.9,
+    foto: null,
+    cores: [],
+    tamanhos: [],
+    fotos_cores: null,
+    estoque: null,
+    estoque_infinito: null,
+    precos_var: null,
+    ...dados,
+  };
+}
 
-  it("lê o LS.variants do produto principal, ignorando relacionados", () => {
-    const html = `
-      <div class="js-product-container js-item-product" data-variants="${JSON.stringify(relacionado).replace(/"/g, "&quot;")}"></div>
-      <script>LS.variants = ${JSON.stringify(principal)}; LS.x = "]";</script>`;
-    expect(extrairVariantesNuvemshop(html)).toEqual([
+describe("extrairVariantesLoja", () => {
+  it("cruza cor x tamanho, com estoque e disponibilidade de cada combinação", () => {
+    const p = produtoFornecedor({
+      cores: ["Preto", "Branco"],
+      tamanhos: ["P", "M"],
+      estoque: { Preto: { P: 0, M: 5 }, Branco: { P: 3, M: 0 } },
+    });
+    expect(extrairVariantesLoja(p)).toEqual([
       { opcoes: ["Preto", "P"], disponivel: false, estoque: 0, preco: 11.9, imagem: null },
-      { opcoes: ["Branco", "P"], disponivel: true, estoque: null, preco: 11.9, imagem: null },
-      { opcoes: ["Azul", "M"], disponivel: true, estoque: 12, preco: 12.5, imagem: null },
+      { opcoes: ["Preto", "M"], disponivel: true, estoque: 5, preco: 11.9, imagem: null },
+      { opcoes: ["Branco", "P"], disponivel: true, estoque: 3, preco: 11.9, imagem: null },
+      { opcoes: ["Branco", "M"], disponivel: false, estoque: 0, preco: 11.9, imagem: null },
     ]);
   });
 
-  it("sem LS.variants, cai no data-variants do container principal", () => {
-    const html = `
-      <div class="js-product-container js-item-product" data-variants="${JSON.stringify(relacionado).replace(/"/g, "&quot;")}"></div>
-      <div class="js-product-container js-has-new-shipping" data-variants="${JSON.stringify(principal).replace(/"/g, "&quot;")}"></div>`;
-    expect(extrairVariantesNuvemshop(html)).toHaveLength(3);
+  it("estoque_infinito vira estoque null e sempre disponível", () => {
+    const p = produtoFornecedor({
+      cores: ["Preto"],
+      tamanhos: ["P", "M"],
+      estoque: { Preto: { P: 0, M: 0 } },
+      estoque_infinito: { Preto: ["P"] },
+    });
+    expect(extrairVariantesLoja(p)).toEqual([
+      { opcoes: ["Preto", "P"], disponivel: true, estoque: null, preco: 11.9, imagem: null },
+      { opcoes: ["Preto", "M"], disponivel: false, estoque: 0, preco: 11.9, imagem: null },
+    ]);
   });
 
-  it("página sem variações dá erro legível", () => {
-    expect(() => extrairVariantesNuvemshop("<html>Página não encontrada</html>")).toThrow(
-      /Não achei as variações/
+  it("preco_var sobrescreve o preço base da combinação", () => {
+    const p = produtoFornecedor({
+      cores: ["Amarelo"],
+      tamanhos: ["P"],
+      estoque: { Amarelo: { P: 10 } },
+      precos_var: { Amarelo: { P: 9.9 } },
+    });
+    expect(extrairVariantesLoja(p)[0].preco).toBe(9.9);
+  });
+
+  it("usa a foto da cor quando o fornecedor informa", () => {
+    const p = produtoFornecedor({
+      cores: ["Preto"],
+      tamanhos: ["P"],
+      estoque: { Preto: { P: 1 } },
+      fotos_cores: { Preto: "2455666b/produtos/foto.png" },
+    });
+    expect(extrairVariantesLoja(p)[0].imagem).toBe(
+      "https://wvvbvkmddehdyoozbnkx.supabase.co/storage/v1/object/public/loja/2455666b/produtos/foto.png"
     );
+  });
+
+  it("sem cor ou sem tamanho: variação única sem controle", () => {
+    expect(extrairVariantesLoja(produtoFornecedor({}))).toEqual([
+      { opcoes: [], disponivel: true, estoque: null, preco: 11.9, imagem: null },
+    ]);
+  });
+});
+
+describe("urlFotoFornecedor", () => {
+  it("monta a URL do bucket público a partir do caminho", () => {
+    expect(urlFotoFornecedor("2455666b/produtos/foto.png")).toBe(
+      "https://wvvbvkmddehdyoozbnkx.supabase.co/storage/v1/object/public/loja/2455666b/produtos/foto.png"
+    );
+  });
+
+  it("recusa caminho que já é uma URL de outro lugar", () => {
+    expect(urlFotoFornecedor("https://evil.com/a.png")).toBeNull();
+    expect(urlFotoFornecedor("//evil.com/a.png")).toBeNull();
+    expect(urlFotoFornecedor(null)).toBeNull();
+    expect(urlFotoFornecedor("")).toBeNull();
+  });
+});
+
+describe("extrairImagemPrincipalLoja", () => {
+  it("monta a URL a partir do campo foto do produto", () => {
+    expect(extrairImagemPrincipalLoja(produtoFornecedor({ foto: "a/b.png" }))).toBe(
+      "https://wvvbvkmddehdyoozbnkx.supabase.co/storage/v1/object/public/loja/a/b.png"
+    );
+  });
+
+  it("sem foto, null", () => {
+    expect(extrairImagemPrincipalLoja(produtoFornecedor({ foto: null }))).toBeNull();
   });
 });
 
@@ -202,18 +271,6 @@ describe("validarUrlFornecedor", () => {
   });
 });
 
-describe("página real da Sete Malhas (fixture)", () => {
-  it("lê cor, tamanho e preço de todas as variantes", () => {
-    const html = readFileSync(new URL("./fixtures/setemalhas-produto.html", import.meta.url), "utf8");
-    const v = extrairVariantesNuvemshop(html);
-    expect(v.length).toBeGreaterThan(0);
-    for (const x of v) {
-      expect(x.opcoes.length).toBe(2);
-      expect(x.preco).toBeGreaterThan(0);
-    }
-  });
-});
-
 describe("espelharVariacoes", () => {
   const v = (cor: string, tam: string): VarianteFornecedor => ({
     opcoes: [cor, tam],
@@ -270,44 +327,23 @@ describe("espelharVariacoes", () => {
   });
 });
 
-describe("imagens do fornecedor", () => {
-  it("normaliza e só aceita o CDN da Nuvemshop", () => {
-    expect(urlImagemFornecedor("//acdn-us.mitiendanube.com/a.webp")).toBe("https://acdn-us.mitiendanube.com/a.webp");
-    expect(urlImagemFornecedor("https://evil.com/a.png")).toBeNull();
-    expect(urlImagemFornecedor("http://x.mitiendanube.com/a.png")).toBe("https://x.mitiendanube.com/a.png");
-    expect(urlImagemFornecedor("ftp://x.mitiendanube.com/a.png")).toBeNull();
-    expect(urlImagemFornecedor(null)).toBeNull();
-  });
-
-  it("lê a foto de cada variante e a og:image", () => {
-    const html = readFileSync(new URL("./fixtures/setemalhas-produto.html", import.meta.url), "utf8");
-    expect(extrairVariantesNuvemshop(html).every((v) => v.imagem?.startsWith("https://"))).toBe(true);
-    expect(
-      extrairImagemPrincipal('<meta property="og:image" content="//a.mitiendanube.com/p.jpg" />')
-    ).toBe("https://a.mitiendanube.com/p.jpg");
-  });
-});
-
 describe("importação do fornecedor", () => {
-  it("pega só links de produto do sitemap", () => {
-    const xml = `<urlset><url><loc>https://setemalhas.com/</loc></url>
-      <url><loc>https://setemalhas.com/produtos/</loc></url>
-      <url><loc>https://setemalhas.com/produtos/short-tactel/</loc></url>
-      <url><loc>https://setemalhas.com/produtos/short-tactel/</loc></url>
-      <url><loc>https://setemalhas.com/produtos/categoria/x/</loc></url>
-      <url><loc>http://setemalhas.com/produtos/inseguro/</loc></url></urlset>`;
-    expect(extrairUrlsProdutos(xml)).toEqual(["https://setemalhas.com/produtos/short-tactel/"]);
-  });
-
-  it("compara links ignorando barra final e www", () => {
-    expect(chaveUrlFornecedor("https://www.setemalhas.com/produtos/a/")).toBe(
-      chaveUrlFornecedor("https://setemalhas.com/produtos/a")
+  it("monta o link do produto pela referência", () => {
+    expect(urlProdutoLoja("https://www.setemalhas.com", "ST 878392")).toBe(
+      "https://www.setemalhas.com/?produto=ST%20878392"
     );
   });
 
-  it("lê nome e descrição", () => {
-    const html = '<meta property="og:description" content="Leve &amp; macio"><h1 class="x"> Short <b>Tactel</b> </h1>';
-    expect(extrairDadosProduto(html)).toEqual({ nome: "Short Tactel", descricao: "Leve & macio" });
+  it("lê a referência de volta do link", () => {
+    expect(referenciaDoLink("https://www.setemalhas.com/?produto=ST878392")).toBe("ST878392");
+    expect(referenciaDoLink("https://www.setemalhas.com/")).toBeNull();
+    expect(referenciaDoLink("não é url")).toBeNull();
+  });
+
+  it("compara links do mesmo produto ignorando www", () => {
+    expect(chaveUrlFornecedor("https://www.setemalhas.com/?produto=ST878392")).toBe(
+      chaveUrlFornecedor("https://setemalhas.com/?produto=st878392")
+    );
   });
 
   it("aplica a margem", () => {
