@@ -102,11 +102,26 @@ async function hostsConhecidos(excetoProdutoId: string): Promise<string[]> {
   return [...hosts];
 }
 
+// Um nome "corresponde" ao outro se forem iguais ou se um contém o outro
+// por inteiro (cobre sufixo que o cadastro daqui tem a mais, tipo "Básica"
+// ou "Algodão – Unissex", que o fornecedor não usa). Comparação feita nos
+// dois sentidos, sempre com correspondência única exigida por quem chama —
+// nunca decide sozinho entre, por exemplo, a versão adulto e a infantil do
+// mesmo produto (uma contém o nome da outra).
+function nomesCorrespondem(a: string, b: string): boolean {
+  const na = normalizarOpcao(a);
+  const nb = normalizarOpcao(b);
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 // Igual a buscarProdutoFornecedor, mas quando o link salvo não resolve (link
 // no formato antigo de antes da migração de fornecedor, ou corrompido),
 // tenta recasar o produto pelo nome dentro da loja — a do próprio link, se
 // existir, e as de outros produtos já linkados certo — e devolve o link
-// corrigido pra ser salvo.
+// corrigido pra ser salvo. Só aceita uma referência (direta ou por nome)
+// cujo nome no fornecedor bate com o nome daqui: um link com a referência
+// certa mas de outro produto (dado corrompido) não deve ser aceito só
+// porque "parece" válido.
 async function buscarProdutoFornecedorComCorrecao(
   produtoId: string,
   nome: string,
@@ -128,13 +143,14 @@ async function buscarProdutoFornecedorComCorrecao(
     try {
       const loja = await buscarLojaFornecedor(hostSalvo);
       const achado = loja.produtos.find((p) => p.referencia === referencia);
-      if (achado) return { produto: achado, variantes: extrairVariantesLoja(achado), urlCorrigida: null };
+      if (achado && nomesCorrespondem(achado.nome, nome)) {
+        return { produto: achado, variantes: extrairVariantesLoja(achado), urlCorrigida: null };
+      }
     } catch {
       // segue pro recasamento por nome abaixo
     }
   }
 
-  const alvo = normalizarOpcao(nome);
   const candidatos = [...new Set([hostSalvo, ...(await hostsConhecidos(produtoId))].filter((h): h is string => !!h))];
   for (const host of candidatos) {
     let loja: LojaFornecedor;
@@ -143,8 +159,9 @@ async function buscarProdutoFornecedorComCorrecao(
     } catch {
       continue;
     }
-    const achado = loja.produtos.find((p) => normalizarOpcao(p.nome) === alvo);
-    if (achado) {
+    const batem = loja.produtos.filter((p) => nomesCorrespondem(p.nome, nome));
+    if (batem.length === 1) {
+      const achado = batem[0];
       return {
         produto: achado,
         variantes: extrairVariantesLoja(achado),
