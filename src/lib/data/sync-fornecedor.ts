@@ -12,6 +12,7 @@ import {
   normalizarOpcao,
   referenciaDoLink,
   ultimoHorarioAgendado,
+  urlProdutoLoja,
   validarUrlFornecedor,
   type LojaFornecedor,
   type ProdutoLojaFornecedor,
@@ -77,6 +78,83 @@ export async function buscarProdutoFornecedor(
     throw new Error("Não achei esse produto no fornecedor — pode ter sido removido ou trocado de referência.");
   }
   return { produto, variantes: extrairVariantesLoja(produto) };
+}
+
+// Hosts de loja conhecidos a partir do link salvo em outros produtos (nem
+// que o formato deles também esteja desatualizado — qualquer host com link
+// cadastrado vale a tentativa). Usado como último recurso pra re-achar um
+// produto cujo link está desatualizado ou corrompido (fornecedor trocou de
+// plataforma antes deste link ser salvo no formato novo, ou o campo foi
+// sobrescrito por engano com outra URL).
+async function hostsConhecidos(excetoProdutoId: string): Promise<string[]> {
+  const outros = await prisma.produto.findMany({
+    where: { id: { not: excetoProdutoId }, fornecedorUrl: { not: null } },
+    select: { fornecedorUrl: true },
+  });
+  const hosts = new Set<string>();
+  for (const o of outros) {
+    try {
+      hosts.add(new URL(o.fornecedorUrl!).hostname);
+    } catch {
+      // ignora
+    }
+  }
+  return [...hosts];
+}
+
+// Igual a buscarProdutoFornecedor, mas quando o link salvo não resolve (link
+// no formato antigo de antes da migração de fornecedor, ou corrompido),
+// tenta recasar o produto pelo nome dentro da loja — a do próprio link, se
+// existir, e as de outros produtos já linkados certo — e devolve o link
+// corrigido pra ser salvo.
+async function buscarProdutoFornecedorComCorrecao(
+  produtoId: string,
+  nome: string,
+  urlSalva: string
+): Promise<{
+  produto: ProdutoLojaFornecedor;
+  variantes: ReturnType<typeof extrairVariantesLoja>;
+  urlCorrigida: string | null;
+}> {
+  let hostSalvo: string | null = null;
+  try {
+    hostSalvo = new URL(urlSalva).hostname;
+  } catch {
+    // ignora
+  }
+
+  const referencia = referenciaDoLink(urlSalva);
+  if (referencia && hostSalvo) {
+    try {
+      const loja = await buscarLojaFornecedor(hostSalvo);
+      const achado = loja.produtos.find((p) => p.referencia === referencia);
+      if (achado) return { produto: achado, variantes: extrairVariantesLoja(achado), urlCorrigida: null };
+    } catch {
+      // segue pro recasamento por nome abaixo
+    }
+  }
+
+  const alvo = normalizarOpcao(nome);
+  const candidatos = [...new Set([hostSalvo, ...(await hostsConhecidos(produtoId))].filter((h): h is string => !!h))];
+  for (const host of candidatos) {
+    let loja: LojaFornecedor;
+    try {
+      loja = await buscarLojaFornecedor(host);
+    } catch {
+      continue;
+    }
+    const achado = loja.produtos.find((p) => normalizarOpcao(p.nome) === alvo);
+    if (achado) {
+      return {
+        produto: achado,
+        variantes: extrairVariantesLoja(achado),
+        urlCorrigida: urlProdutoLoja(`https://${host}`, achado.referencia),
+      };
+    }
+  }
+  throw new Error(
+    "Link do fornecedor inválido, e não achei esse produto no fornecedor pelo nome — confira o link manualmente."
+  );
 }
 
 type Config = {
@@ -211,7 +289,11 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
   try {
     const url = produto.fornecedorUrl && validarUrlFornecedor(produto.fornecedorUrl);
     if (!url) throw new Error("Link do fornecedor inválido.");
-    const { produto: produtoFornecedor, variantes } = await buscarProdutoFornecedor(url);
+    const {
+      produto: produtoFornecedor,
+      variantes,
+      urlCorrigida,
+    } = await buscarProdutoFornecedorComCorrecao(produtoId, produto.nome, url);
     const espelho = produto.fornecedorEspelhar
       ? espelharVariacoes(produto.variacoes, variantes)
       : null;
@@ -291,6 +373,7 @@ async function sincronizarUm(produtoId: string, config: Config): Promise<Resulta
       await tx.produto.update({
         where: { id: produtoId },
         data: {
+          fornecedorUrl: urlCorrigida ?? undefined,
           imagens: fotos?.galeria,
           estoque: r.estoque,
           ativo,
