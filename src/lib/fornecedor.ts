@@ -142,6 +142,21 @@ function rotulo(combinacao: Record<string, string>) {
   return Object.values(combinacao).join(" / ");
 }
 
+// Duas variações com o mesmo tipo (dado legado — cadastro duplicado, ex:
+// duas linhas "Cor") confundem a grade: gerarCombinacoes usa o tipo como
+// chave do objeto da combinação, então a segunda variação sobrescreveria a
+// primeira e geraria combinações repetidas (e o unique constraint de
+// EstoqueVariacao quebraria ao salvar). Mantém só a mais completa de cada
+// tipo.
+function semTiposDuplicados(variacoes: ProdutoParaSync["variacoes"]): ProdutoParaSync["variacoes"] {
+  const porTipo = new Map<string, ProdutoParaSync["variacoes"][number]>();
+  for (const v of variacoes) {
+    const atual = porTipo.get(v.tipo);
+    if (!atual || v.valores.length > atual.valores.length) porTipo.set(v.tipo, v);
+  }
+  return [...porTipo.values()];
+}
+
 export type VariacaoLocal = { tipo: string; valores: string[] };
 
 export type EspelhoVariacoes = {
@@ -241,7 +256,7 @@ export function calcularSync(
     precoMinimo: precos.length > 0 ? Math.min(...precos) : null,
   };
 
-  const variacoes = produto.variacoes.filter((v) => v.valores.length > 0);
+  const variacoes = semTiposDuplicados(produto.variacoes.filter((v) => v.valores.length > 0));
   if (variacoes.length === 0) {
     const atual = produto.estoque;
     const novo = novoEstoque(variantes, atual, reposicao);

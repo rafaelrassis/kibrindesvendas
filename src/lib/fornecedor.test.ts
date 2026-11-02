@@ -232,6 +232,23 @@ describe("calcularSync", () => {
     const r = calcularSync({ variacoes: [], estoque: null, estoqueVariacoes: [] }, [variante([], true)], 30);
     expect(r.estoque).toBeUndefined();
   });
+
+  it("duas variações com o mesmo tipo (dado legado) não geram combinação duplicada", () => {
+    const r = calcularSync(
+      {
+        variacoes: [
+          { tipo: "Cor", valores: ["Preto"] },
+          { tipo: "Cor", valores: ["Preto", "Branco"] },
+        ],
+        estoque: null,
+        estoqueVariacoes: [],
+      },
+      variantes,
+      50
+    );
+    const chaves = (r.grade ?? []).map((g) => g.combinacao);
+    expect(new Set(chaves).size).toBe(chaves.length);
+  });
 });
 
 describe("ultimoHorarioAgendado", () => {
